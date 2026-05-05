@@ -397,6 +397,36 @@ async def stream_run_analysis(
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
+    # If incidents already exist for this run, stream them without re-analyzing.
+    # This prevents re-triggering the full analysis pipeline on every SSE reconnect.
+    existing_incidents = await storage.get_incidents_for_run(run_id)
+    if existing_incidents:
+        row_map = {str(r.id): r for r in rows}
+
+        async def _stream_existing():
+            for i, incident in enumerate(existing_incidents):
+                row = row_map.get(str(incident.recon_row_id))
+                payload = {
+                    "row_index": i,
+                    "row_id": str(incident.recon_row_id),
+                    "incident_id": str(incident.id),
+                    "cached": True,
+                    "severity": row.severity.value if row and row.severity else None,
+                    "root_cause_summary": incident.root_cause_summary,
+                    "confidence": incident.confidence,
+                    "requires_human_review": incident.requires_human_review,
+                    "jira_summary": incident.jira_summary,
+                    "llm_model": incident.llm_model,
+                }
+                yield f"event: incident\ndata: {json.dumps(payload)}\n\n"
+            yield f"event: done\ndata: {json.dumps({'total_rows': len(existing_incidents)})}\n\n"
+
+        return StreamingResponse(
+            _stream_existing(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
     config = get_config_by_key(llm_config) if llm_config else get_config()
     graph = build_graph(config, storage)
 

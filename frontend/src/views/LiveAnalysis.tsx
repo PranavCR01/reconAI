@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { TopBar, Breadcrumbs } from '@/components/layout/TopBar'
@@ -95,8 +95,19 @@ export default function LiveAnalysis() {
   const [startTime] = useState(() => Date.now())
   const [elapsed, setElapsed] = useState(0)
   const [isDone, setIsDone] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
   const [totalRows, setTotalRows] = useState(0)
   const heatCells = useRef<number[]>(Array.from({ length: 80 }, () => Math.random()))
+  const sseCleanupRef = useRef<(() => void) | null>(null)
+
+  const handleStop = useCallback(() => {
+    if (sseCleanupRef.current) {
+      sseCleanupRef.current()
+      sseCleanupRef.current = null
+    }
+    store.setSseConnected(false)
+    setIsPaused(true)
+  }, [store])
 
   useEffect(() => {
     const id = setInterval(() => setElapsed(Date.now() - startTime), 1000)
@@ -117,12 +128,17 @@ export default function LiveAnalysis() {
         store.setSseConnected(false)
         setIsDone(true)
         setTotalRows(e.total_rows)
+        sseCleanupRef.current = null
       },
       onError: () => {
         store.setSseConnected(false)
       },
     }, store.llmConfig)
-    return cleanup
+    sseCleanupRef.current = cleanup
+    return () => {
+      cleanup()
+      sseCleanupRef.current = null
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runId])
 
@@ -167,7 +183,7 @@ export default function LiveAnalysis() {
         }
         right={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {store.sseConnected && (
+            {store.sseConnected && !isPaused && (
               <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ok)' }}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--ok)', animation: 'blink-dot 1.2s ease-in-out infinite' }} />
                 LIVE
@@ -182,6 +198,22 @@ export default function LiveAnalysis() {
               </div>
               <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>ETA {etaStr}</span>
             </div>
+            {store.sseConnected && !isPaused && (
+              <button
+                onClick={handleStop}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '4px 10px', borderRadius: 5,
+                  border: '1px solid var(--line)',
+                  background: 'var(--bg-2)', color: 'var(--warn)',
+                  fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: 1, background: 'var(--warn)' }} />
+                Stop
+              </button>
+            )}
           </div>
         }
       />
@@ -230,6 +262,53 @@ export default function LiveAnalysis() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', minHeight: 'calc(100vh - 210px)' }}>
         {/* Feed */}
         <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10, borderRight: '1px solid var(--line)' }}>
+          <AnimatePresence>
+            {isPaused && !isDone && (
+              <motion.div
+                key="paused-banner"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25 }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  background: 'oklch(0.24 0.05 75 / 0.4)',
+                  border: '1px solid oklch(0.50 0.13 75)',
+                  flexShrink: 0,
+                }}
+              >
+                <span style={{ color: 'var(--warn)', fontSize: 14, lineHeight: 1 }}>⏸</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--warn)', fontWeight: 600 }}>
+                  Analysis paused
+                </span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>·</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-2)' }}>
+                  {resolvedCount} of {total || '…'} incidents streamed
+                </span>
+                <button
+                  onClick={() => navigate(`/runs/${runId}/summary`)}
+                  style={{
+                    marginLeft: 'auto',
+                    padding: '4px 12px',
+                    borderRadius: 5,
+                    border: '1px solid oklch(0.50 0.13 75)',
+                    background: 'oklch(0.28 0.06 75 / 0.5)',
+                    color: 'var(--warn)',
+                    fontFamily: 'var(--mono)',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  View Summary →
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <AnimatePresence>
             {isDone && (
               <motion.div
@@ -432,7 +511,7 @@ function IncidentCard({ incident: inc, runId }: { incident: RCAIncident; runId: 
           <div style={{ display: 'flex', gap: 6 }}>
             {inc.id && (
               <button
-                onClick={() => navigate(`/incidents/${inc.id}`)}
+                onClick={() => navigate(`/runs/${runId}/incidents/${inc.id}`)}
                 style={{ padding: '4px 10px', borderRadius: 5, border: '1px solid var(--line)', background: 'var(--bg-2)', color: 'var(--fg-1)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}
               >
                 Open Detail

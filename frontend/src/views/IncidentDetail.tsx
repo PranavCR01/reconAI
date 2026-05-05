@@ -111,7 +111,7 @@ function CollapsiblePanel({ title, children }: { title: string; children: React.
 }
 
 export default function IncidentDetail() {
-  const { incidentId } = useParams<{ incidentId: string }>()
+  const { runId, incidentId } = useParams<{ runId: string; incidentId: string }>()
   const [incident, setIncident] = useState<(RCAIncident & { evidence: Evidence[] }) | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -175,7 +175,7 @@ export default function IncidentDetail() {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-        <TopBar center={<Breadcrumbs crumbs={[{ label: 'Incidents' }, { label: '…' }]} />} />
+        <TopBar center={<Breadcrumbs crumbs={[{ label: 'Live Analysis', to: runId ? `/runs/${runId}` : '/' }, { label: '…' }]} />} />
         <div style={{ maxWidth: 1320, margin: '0 auto', padding: '18px 24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <SkeletonBlock h={40} />
@@ -190,7 +190,7 @@ export default function IncidentDetail() {
   if (error || !incident) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-        <TopBar center={<Breadcrumbs crumbs={[{ label: 'Incidents' }, { label: 'Error' }]} />} />
+        <TopBar center={<Breadcrumbs crumbs={[{ label: 'Live Analysis', to: runId ? `/runs/${runId}` : '/' }, { label: 'Error' }]} />} />
         <div style={{ maxWidth: 1320, margin: '0 auto', padding: '40px 24px', textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--p1)' }}>
           {error ?? 'Incident not found'}
         </div>
@@ -207,7 +207,7 @@ export default function IncidentDetail() {
       <TopBar
         center={
           <Breadcrumbs crumbs={[
-            { label: 'Incidents', to: '/' },
+            { label: 'Live Analysis', to: runId ? `/runs/${runId}` : '/' },
             { label: inc.id?.slice(0, 8) ?? '…' },
           ]} />
         }

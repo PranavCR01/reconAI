@@ -157,7 +157,7 @@ export default function App() {
             <Route path="/" element={<Upload />} />
             <Route path="/runs/:runId" element={<LiveAnalysis />} />
             <Route path="/runs/:runId/summary" element={<RunSummary />} />
-            <Route path="/incidents/:incidentId" element={<IncidentDetail />} />
+            <Route path="/runs/:runId/incidents/:incidentId" element={<IncidentDetail />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

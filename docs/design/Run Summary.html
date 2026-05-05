@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ReconAI — Run Summary</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: oklch(0.16 0.006 250);
+    --bg-1: oklch(0.19 0.006 250);
+    --bg-2: oklch(0.22 0.007 250);
+    --bg-3: oklch(0.26 0.008 250);
+    --line: oklch(0.30 0.008 250);
+    --line-soft: oklch(0.25 0.007 250);
+    --fg: oklch(0.96 0.005 250);
+    --fg-1: oklch(0.82 0.006 250);
+    --fg-2: oklch(0.66 0.008 250);
+    --fg-3: oklch(0.50 0.008 250);
+
+    --p1: oklch(0.65 0.20 25);
+    --p1-bg: oklch(0.30 0.09 25);
+    --p2: oklch(0.78 0.15 75);
+    --p2-bg: oklch(0.32 0.07 75);
+    --p3: oklch(0.60 0.012 250);
+    --p3-bg: oklch(0.28 0.008 250);
+
+    --ok: oklch(0.74 0.16 155);
+    --warn: oklch(0.78 0.15 75);
+    --info: oklch(0.74 0.12 220);
+    --violet: oklch(0.72 0.14 295);
+
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  /* Top bar (matches other views) */
+  .topbar {
+    height: 52px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--bg-1), var(--bg));
+    display: flex; align-items: center;
+    padding: 0 18px; gap: 18px;
+    position: sticky; top: 0; z-index: 20;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .brand-mark {
+    width: 22px; height: 22px;
+    border-radius: 5px;
+    background: linear-gradient(135deg, oklch(0.55 0.14 250), oklch(0.42 0.12 295));
+    box-shadow: inset 0 0 0 1px oklch(0.70 0.10 250 / 0.3);
+    position: relative;
+  }
+  .brand-mark::after {
+    content: ''; position: absolute; inset: 5px;
+    border-radius: 2px; border: 1.5px solid var(--fg);
+    border-right-color: transparent; border-bottom-color: transparent;
+    transform: rotate(45deg);
+  }
+  .crumbs {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--fg-2); font-size: 12.5px;
+    font-family: var(--mono);
+  }
+  .crumbs a { color: var(--fg-2); text-decoration: none; }
+  .crumbs .sep { color: var(--fg-3); }
+  .crumbs .current { color: var(--fg); font-weight: 500; }
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 26px; padding: 0 10px;
+    border-radius: 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--fg-1);
+    font: 500 12px var(--mono);
+  }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px oklch(0.74 0.16 155 / 0.18); }
+  .badge .label { color: var(--fg-3); font-weight: 400; }
+  .badge.user { font-family: var(--sans); }
+
+  .page { max-width: 1320px; margin: 0 auto; padding: 18px 24px 80px; }
+
+  /* Run header */
+  .run-head {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--ok);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 18px;
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  }
+  .run-head .id { font: 600 16px var(--mono); color: var(--fg); letter-spacing: -0.01em; }
+  .run-head .id small { color: var(--fg-3); font-weight: 400; font-size: 11.5px; margin-left: 8px; font-family: var(--mono); }
+  .env-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font: 500 11px var(--mono);
+    color: oklch(0.85 0.10 25);
+    padding: 3px 8px; border-radius: 4px;
+    background: var(--p1-bg); border: 1px solid oklch(0.45 0.15 25);
+  }
+  .env-pill .d { width: 6px; height: 6px; border-radius: 50%; background: var(--p1); box-shadow: 0 0 0 3px oklch(0.65 0.20 25 / 0.18); }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font: 500 11.5px var(--mono);
+    color: oklch(0.92 0.10 155);
+    padding: 3px 8px; border-radius: 4px;
+    background: oklch(0.30 0.07 155 / 0.5);
+    border: 1px solid oklch(0.40 0.10 155);
+  }
+  .status-pill .d { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px oklch(0.74 0.16 155 / 0.2); }
+  .run-meta {
+    display: flex; gap: 18px;
+    font: 500 11.5px var(--mono); color: var(--fg-3);
+    margin-left: auto; flex-wrap: wrap;
+  }
+  .run-meta b { color: var(--fg-1); font-weight: 500; }
+  .head-actions { display: flex; gap: 8px; }
+
+  .btn {
+    height: 32px; padding: 0 14px;
+    border-radius: 6px;
+    font: 500 12px var(--sans);
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--fg-1);
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn:hover { background: var(--bg-3); }
+  .btn.primary {
+    background: oklch(0.42 0.10 220);
+    border-color: oklch(0.55 0.13 220);
+    color: oklch(0.97 0.02 220);
+  }
+  .btn.primary:hover { background: oklch(0.47 0.11 220); }
+  .btn.icon-only { padding: 0; width: 32px; justify-content: center; }
+
+  /* Stat cards */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .stat { background: var(--bg-1); padding: 14px 18px; }
+  .stat .l {
+    font: 500 10.5px var(--mono); color: var(--fg-3);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .stat .v {
+    display: flex; align-items: baseline; gap: 8px; margin-top: 6px;
+  }
+  .stat .v .num {
+    font: 600 24px var(--mono);
+    color: var(--fg); letter-spacing: -0.02em; line-height: 1;
+  }
+  .stat .v .num.ok { color: var(--ok); }
+  .stat .v .num.warn { color: var(--warn); }
+  .stat .v .num.crit { color: var(--p1); }
+  .stat .v .delta { font: 500 11px var(--mono); color: var(--fg-3); }
+  .stat .v .delta.up { color: var(--p1); }
+  .stat .v .delta.down { color: var(--ok); }
+  .stat .bar {
+    height: 3px; border-radius: 2px; margin-top: 8px;
+    background: var(--bg-3); overflow: hidden; display: flex;
+  }
+  .stat .bar i { display: block; height: 100%; }
+
+  /* Layout grid */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+
+  .panel {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .panel-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .panel-title {
+    font: 600 11px var(--mono);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--fg-2);
+  }
+  .panel-meta { margin-left: auto; font: 500 11px var(--mono); color: var(--fg-3); }
+  .panel-body { padding: 16px; }
+
+  /* Root cause distribution */
+  .rc-row {
+    display: grid;
+    grid-template-columns: 170px 1fr 70px 50px;
+    gap: 12px;
+    align-items: center;
+    padding: 7px 0;
+  }
+  .rc-row + .rc-row { border-top: 1px dashed var(--line-soft); }
+  .rc-name {
+    font: 500 12px var(--mono); color: var(--fg-1);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .rc-name .swatch { width: 8px; height: 8px; border-radius: 2px; }
+  .rc-bar {
+    height: 16px; background: var(--bg-2); border-radius: 3px; overflow: hidden;
+    border: 1px solid var(--line-soft);
+    position: relative;
+  }
+  .rc-bar i {
+    display: block; height: 100%;
+    border-radius: 3px 0 0 3px;
+  }
+  .rc-pct { font: 600 12.5px var(--mono); color: var(--fg); text-align: right; }
+  .rc-n   { font: 500 11px var(--mono); color: var(--fg-3); text-align: right; }
+
+  /* Object breakdown table */
+  .tbl { width: 100%; border-collapse: collapse; }
+  .tbl thead th {
+    font: 600 10.5px var(--mono);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--fg-3); text-align: left;
+    padding: 6px 0 8px; border-bottom: 1px solid var(--line);
+  }
+  .tbl tbody td {
+    padding: 10px 0; border-bottom: 1px dashed var(--line-soft);
+    font-size: 12.5px;
+  }
+  .tbl tbody tr:last-child td { border-bottom: 0; }
+  .tbl .obj { font: 500 12.5px var(--mono); color: var(--fg); }
+  .tbl .num { font: 600 13px var(--mono); color: var(--fg); }
+  .tbl .num.dim { color: var(--fg-2); font-weight: 500; }
+  .tbl .pill-row { display: inline-flex; gap: 4px; }
+  .sev-mini {
+    font: 600 10px var(--mono);
+    padding: 1px 5px; border-radius: 3px; letter-spacing: 0.04em;
+  }
+  .sev-mini.p1 { background: var(--p1-bg); color: oklch(0.92 0.10 25); border: 1px solid oklch(0.45 0.15 25); }
+  .sev-mini.p2 { background: var(--p2-bg); color: oklch(0.93 0.10 75); border: 1px solid oklch(0.50 0.13 75); }
+  .sev-mini.p3 { background: var(--p3-bg); color: var(--fg-1); border: 1px solid var(--line); }
+  .sev-mini.muted { background: var(--bg-2); color: var(--fg-3); border: 1px solid var(--line-soft); }
+  .mini-bar {
+    width: 80px; height: 4px; background: var(--bg-3); border-radius: 2px; overflow: hidden;
+  }
+  .mini-bar i { display: block; height: 100%; background: var(--ok); }
+  .tright { text-align: right; }
+
+  /* Recall@k */
+  .recall-wrap {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 18px;
+    align-items: center;
+  }
+  .recall-num {
+    font: 600 56px var(--mono); color: var(--ok);
+    line-height: 1; letter-spacing: -0.03em;
+  }
+  .recall-num small { font-size: 18px; color: var(--fg-3); margin-left: 4px; font-weight: 500; }
+  .recall-sub { font: 500 11px var(--mono); color: var(--fg-3); margin-top: 6px; }
+  .recall-detail { display: flex; flex-direction: column; gap: 6px; }
+  .recall-row {
+    display: grid; grid-template-columns: 60px 1fr 50px; gap: 10px;
+    align-items: center; font: 500 12px var(--mono); color: var(--fg-2);
+  }
+  .recall-row b { color: var(--fg); }
+  .recall-row .b {
+    height: 6px; background: var(--bg-3); border-radius: 3px; overflow: hidden;
+  }
+  .recall-row .b i {
+    display: block; height: 100%;
+    background: linear-gradient(90deg, var(--ok), oklch(0.80 0.14 155));
+    border-radius: 3px;
+  }
+  .recall-foot {
+    margin-top: 16px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    padding-top: 14px; border-top: 1px dashed var(--line-soft);
+  }
+  .recall-foot .item {
+    font: 500 11px var(--mono); color: var(--fg-3);
+  }
+  .recall-foot .item b {
+    display: block; color: var(--fg); font-size: 16px;
+    font-weight: 600; letter-spacing: -0.01em; margin-top: 2px;
+  }
+
+  /* LLM comparison */
+  .vs-tbl {
+    width: 100%; border-collapse: collapse;
+  }
+  .vs-tbl thead th {
+    font: 600 10.5px var(--mono);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--fg-3); text-align: left;
+    padding: 8px 12px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .vs-tbl thead th.center { text-align: center; }
+  .vs-tbl thead th .sub { display: block; font-size: 9.5px; font-weight: 500; color: var(--fg-3); margin-top: 2px; text-transform: none; letter-spacing: 0; }
+  .vs-tbl tbody td {
+    padding: 10px 12px; border-bottom: 1px dashed var(--line-soft);
+    font-size: 12.5px; vertical-align: middle;
+  }
+  .vs-tbl tbody tr:last-child td { border-bottom: 0; }
+  .vs-tbl .model {
+    display: flex; align-items: center; gap: 10px;
+    font: 500 12.5px var(--mono); color: var(--fg);
+  }
+  .vs-tbl .model .av {
+    width: 24px; height: 24px; border-radius: 5px;
+    display: grid; place-items: center;
+    font: 600 10px var(--mono); color: var(--fg);
+    border: 1px solid var(--line);
+  }
+  .vs-tbl .model .av.claude { background: linear-gradient(135deg, oklch(0.4 0.10 50), oklch(0.5 0.12 35)); }
+  .vs-tbl .model .av.groq   { background: linear-gradient(135deg, oklch(0.4 0.10 280), oklch(0.5 0.12 295)); }
+  .vs-tbl .model .av.hybrid { background: linear-gradient(135deg, oklch(0.4 0.10 220), oklch(0.5 0.12 250)); }
+  .vs-tbl .model small { display: block; color: var(--fg-3); font-weight: 500; font-size: 10.5px; margin-top: 1px; }
+  .vs-tbl .metric { font: 600 13px var(--mono); color: var(--fg); }
+  .vs-tbl .metric .delta { display: inline-block; font-size: 10.5px; font-weight: 500; color: var(--fg-3); margin-left: 4px; }
+  .vs-tbl .metric .delta.up { color: var(--ok); }
+  .vs-tbl .metric .delta.down { color: var(--p1); }
+  .vs-tbl .winner-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    font: 500 10px var(--mono); padding: 2px 6px; border-radius: 3px;
+    background: oklch(0.30 0.07 155 / 0.5); color: var(--ok);
+    border: 1px solid oklch(0.40 0.10 155);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .vs-tbl .selected td { background: oklch(0.22 0.04 220 / 0.25); }
+  .vs-tbl .selected td:first-child { box-shadow: inset 2px 0 0 var(--info); }
+  .selected-tag {
+    font: 500 9.5px var(--mono); padding: 1px 5px; border-radius: 3px;
+    background: oklch(0.24 0.04 220 / 0.5); color: var(--info);
+    border: 1px solid oklch(0.40 0.06 220);
+    text-transform: uppercase; letter-spacing: 0.06em; margin-left: 6px;
+  }
+  .vs-tbl .bar-cell { min-width: 100px; }
+  .vs-tbl .bar {
+    height: 4px; background: var(--bg-3); border-radius: 2px; overflow: hidden; margin-top: 4px;
+  }
+  .vs-tbl .bar i { display: block; height: 100%; }
+
+  /* Footer notes */
+  .footnote {
+    margin-top: 14px;
+    font: 500 11px var(--mono);
+    color: var(--fg-3);
+    line-height: 1.6;
+  }
+  .footnote code {
+    background: var(--bg-2); padding: 1px 5px; border-radius: 3px; color: var(--fg-1);
+  }
+
+  /* Section heading */
+  .section-h {
+    display: flex; align-items: center; gap: 12px;
+    margin: 26px 0 12px;
+  }
+  .section-h h2 { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: -0.005em; }
+  .section-h .meta { font: 500 11px var(--mono); color: var(--fg-3); }
+
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark"></div>
+    <span style="font-size:14px"><b>reconAI</b></span>
+  </div>
+  <nav class="crumbs">
+    <a href="#">Runs</a>
+    <span class="sep">›</span>
+    <span class="current">run_20260503_0142Z · summary</span>
+  </nav>
+  <div class="topbar-right">
+    <span class="badge"><span class="dot"></span><span class="label">env</span> prod-east-1</span>
+    <span class="badge"><span class="label">model</span> claude-sonnet-4.5</span>
+    <span class="badge user"><span style="width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg, oklch(0.6 0.12 295), oklch(0.5 0.10 250));display:inline-grid;place-items:center;font-size:9.5px;font-weight:600;color:var(--fg)">JK</span> j.kowalski</span>
+  </div>
+</header>
+
+<main class="page">
+
+  <!-- Run header -->
+  <section class="run-head">
+    <div>
+      <div class="id">run_20260503_0142Z <small>· fsc-acct-sync · 4 integrations · 12,418 rows scanned</small></div>
+      <div style="display:flex; gap:10px; margin-top:8px; align-items:center;">
+        <span class="env-pill"><span class="d"></span>PROD · db2-fsc-prod-01</span>
+        <span class="status-pill"><span class="d"></span>completed</span>
+        <span style="font: 500 11.5px var(--mono); color: var(--fg-3)">started <b style="color:var(--fg-1); font-weight:500;">2026-05-03 01:42:08Z</b></span>
+        <span style="font: 500 11.5px var(--mono); color: var(--fg-3)">finished <b style="color:var(--fg-1); font-weight:500;">01:46:20Z</b></span>
+        <span style="font: 500 11.5px var(--mono); color: var(--fg-3)">duration <b style="color:var(--fg-1); font-weight:500;">4m 12s</b></span>
+      </div>
+    </div>
+    <div class="head-actions" style="margin-left:auto">
+      <button class="btn">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>
+        Download JSON
+      </button>
+      <button class="btn primary">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3l10 10M3 13l10-10"/></svg>
+        Export to Jira
+      </button>
+      <button class="btn icon-only" title="More">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="3" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="13" cy="8" r="1.3"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- Stat cards -->
+  <section class="stats">
+    <div class="stat">
+      <div class="l">Rows Scanned</div>
+      <div class="v"><span class="num">12,418</span><span class="delta">across 4 obj</span></div>
+      <div class="bar"><i style="background: var(--info); width: 100%"></i></div>
+    </div>
+    <div class="stat">
+      <div class="l">Resolved</div>
+      <div class="v"><span class="num ok">8</span><span class="delta">/ 10</span></div>
+      <div class="bar"><i style="background: var(--ok); width: 80%"></i><i style="background: var(--bg-3); width: 20%"></i></div>
+    </div>
+    <div class="stat">
+      <div class="l">Needs Review</div>
+      <div class="v"><span class="num warn">2</span><span class="delta">low conf.</span></div>
+      <div class="bar"><i style="background: var(--warn); width: 20%"></i><i style="background: var(--bg-3); width: 80%"></i></div>
+    </div>
+    <div class="stat">
+      <div class="l">P1 Critical</div>
+      <div class="v"><span class="num crit">2</span><span class="delta up">+1 vs. last</span></div>
+      <div class="bar"><i style="background: var(--p1); width: 20%"></i><i style="background: var(--bg-3); width: 80%"></i></div>
+    </div>
+    <div class="stat">
+      <div class="l">Avg Confidence</div>
+      <div class="v"><span class="num">88<span style="font-size:13px; color:var(--fg-3);">%</span></span><span class="delta down">+4pt</span></div>
+      <div class="bar"><i style="background: var(--ok); width: 88%"></i><i style="background: var(--bg-3); width: 12%"></i></div>
+    </div>
+    <div class="stat">
+      <div class="l">Avg Latency / Inc</div>
+      <div class="v"><span class="num">42<span style="font-size:13px; color:var(--fg-3);">s</span></span><span class="delta down">−18%</span></div>
+      <div class="bar"><i style="background: var(--violet); width: 42%"></i><i style="background: var(--bg-3); width: 58%"></i></div>
+    </div>
+  </section>
+
+  <!-- 2-col: Root cause + By object -->
+  <div class="grid">
+
+    <section class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Root Cause Distribution</span>
+        <span class="panel-meta">5 categories · n=10</span>
+      </div>
+      <div class="panel-body">
+
+        <div class="rc-row">
+          <div class="rc-name"><span class="swatch" style="background: var(--p1)"></span>FLS_STRIPPED</div>
+          <div class="rc-bar"><i style="width: 100%; background: linear-gradient(90deg, oklch(0.55 0.18 25), var(--p1))"></i></div>
+          <div class="rc-pct">38%</div>
+          <div class="rc-n">n=4</div>
+        </div>
+        <div class="rc-row">
+          <div class="rc-name"><span class="swatch" style="background: var(--warn)"></span>DATAWAVE_ERROR</div>
+          <div class="rc-bar"><i style="width: 50%; background: linear-gradient(90deg, oklch(0.65 0.13 75), var(--warn))"></i></div>
+          <div class="rc-pct">19%</div>
+          <div class="rc-n">n=2</div>
+        </div>
+        <div class="rc-row">
+          <div class="rc-name"><span class="swatch" style="background: var(--info)"></span>CDC_EXCLUDED</div>
+          <div class="rc-bar"><i style="width: 45%; background: linear-gradient(90deg, oklch(0.60 0.10 220), var(--info))"></i></div>
+          <div class="rc-pct">17%</div>
+          <div class="rc-n">n=2</div>
+        </div>
+        <div class="rc-row">
+          <div class="rc-name"><span class="swatch" style="background: var(--violet)"></span>DELIVERY_GAP</div>
+          <div class="rc-bar"><i style="width: 34%; background: linear-gradient(90deg, oklch(0.60 0.12 295), var(--violet))"></i></div>
+          <div class="rc-pct">13%</div>
+          <div class="rc-n">n=1</div>
+        </div>
+        <div class="rc-row">
+          <div class="rc-name"><span class="swatch" style="background: var(--fg-3)"></span>OTHER</div>
+          <div class="rc-bar"><i style="width: 34%; background: linear-gradient(90deg, oklch(0.45 0.008 250), var(--fg-3))"></i></div>
+          <div class="rc-pct">13%</div>
+          <div class="rc-n">n=1</div>
+        </div>
+
+        <div class="footnote">
+          <code>FLS_STRIPPED</code> dominates this run · same root pattern as <code>INC-2026-0319-014</code> (45d ago). Recommend: alert on FLS-audit changes for integration profiles.
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <span class="panel-title">By Object</span>
+        <span class="panel-meta">10 incidents</span>
+      </div>
+      <div class="panel-body">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Object</th>
+              <th class="tright">Incidents</th>
+              <th>Severity</th>
+              <th class="tright">Resolved</th>
+              <th class="tright">Avg Conf.</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="obj">Contact</td>
+              <td class="tright num">4</td>
+              <td><div class="pill-row"><span class="sev-mini p1">1</span><span class="sev-mini p2">2</span><span class="sev-mini p3">1</span></div></td>
+              <td class="tright"><span class="num dim">3/4</span><div class="mini-bar" style="margin-left:auto; margin-top:4px"><i style="width:75%"></i></div></td>
+              <td class="tright num">91%</td>
+            </tr>
+            <tr>
+              <td class="obj">FinancialAccount</td>
+              <td class="tright num">3</td>
+              <td><div class="pill-row"><span class="sev-mini p1">1</span><span class="sev-mini p2">1</span><span class="sev-mini p3">1</span></div></td>
+              <td class="tright"><span class="num dim">3/3</span><div class="mini-bar" style="margin-left:auto; margin-top:4px"><i style="width:100%"></i></div></td>
+              <td class="tright num">86%</td>
+            </tr>
+            <tr>
+              <td class="obj">KYC_Record</td>
+              <td class="tright num">2</td>
+              <td><div class="pill-row"><span class="sev-mini p2">2</span><span class="sev-mini muted">·</span><span class="sev-mini muted">·</span></div></td>
+              <td class="tright"><span class="num dim">1/2</span><div class="mini-bar" style="margin-left:auto; margin-top:4px"><i style="width:50%"></i></div></td>
+              <td class="tright num">72%</td>
+            </tr>
+            <tr>
+              <td class="obj">Address</td>
+              <td class="tright num">1</td>
+              <td><div class="pill-row"><span class="sev-mini p3">1</span><span class="sev-mini muted">·</span><span class="sev-mini muted">·</span></div></td>
+              <td class="tright"><span class="num dim">1/1</span><div class="mini-bar" style="margin-left:auto; margin-top:4px"><i style="width:100%"></i></div></td>
+              <td class="tright num">94%</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="footnote">
+          <code>KYC_Record</code> has the lowest avg confidence (<b style="color:var(--warn)">72%</b>) — both incidents involve enum bucketing logic that requires human review.
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Recall@k -->
+  <section class="panel">
+    <div class="panel-head">
+      <span class="panel-title">recall@k · AI accuracy on resolved incidents</span>
+      <span class="panel-meta">vs. operator-confirmed root cause · last 90 days · n=412</span>
+    </div>
+    <div class="panel-body">
+      <div class="recall-wrap">
+        <div>
+          <div class="recall-num">87<small>%</small></div>
+          <div class="recall-sub">recall@1 · top hypothesis correct</div>
+        </div>
+        <div class="recall-detail">
+          <div class="recall-row"><span>recall@1</span><span class="b"><i style="width: 87%"></i></span><b>87.0%</b></div>
+          <div class="recall-row"><span>recall@2</span><span class="b"><i style="width: 94%"></i></span><b>94.2%</b></div>
+          <div class="recall-row"><span>recall@3</span><span class="b"><i style="width: 97%"></i></span><b>97.4%</b></div>
+          <div class="recall-row"><span>recall@5</span><span class="b"><i style="width: 99%"></i></span><b>99.1%</b></div>
+        </div>
+      </div>
+      <div class="recall-foot">
+        <div class="item">true positives<b>358</b></div>
+        <div class="item">operator overrides<b>54</b></div>
+        <div class="item">avg hypotheses / incident<b>3.4</b></div>
+      </div>
+      <div class="footnote">
+        Operator overrides clustered on <code>KYC_Record</code> bucketing (<b>21</b>) and timezone-related <code>FinancialAccount</code> drift (<b>14</b>) — both queued as RAG-store reinforcement targets for next training pass.
+      </div>
+    </div>
+  </section>
+
+  <!-- LLM comparison -->
+  <div class="section-h">
+    <h2>LLM Comparison · this run</h2>
+    <span class="meta">ran on 10 incidents · seed=42 · same toolset · same prompts</span>
+  </div>
+
+  <section class="panel">
+    <div class="panel-body" style="padding: 0;">
+      <table class="vs-tbl">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th class="center">Accuracy <span class="sub">recall@1 vs operator</span></th>
+            <th class="center">P50 Latency <span class="sub">per incident</span></th>
+            <th class="center">P95 Latency</th>
+            <th class="center">Cost <span class="sub">per incident</span></th>
+            <th class="center">Tokens <span class="sub">in / out</span></th>
+            <th class="center">Verdict</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="selected">
+            <td>
+              <div class="model">
+                <div class="av claude">CL</div>
+                <div>claude-sonnet-4.5 <span class="selected-tag">selected</span><small>anthropic · t=0.0</small></div>
+              </div>
+            </td>
+            <td class="bar-cell"><div class="metric">9 / 10 <span class="delta up">+2</span></div><div class="bar"><i style="width: 90%; background: var(--ok)"></i></div></td>
+            <td><div class="metric">42<span style="color:var(--fg-3); font-weight: 500">s</span></div></td>
+            <td><div class="metric">71<span style="color:var(--fg-3); font-weight: 500">s</span></div></td>
+            <td><div class="metric">$0.18 <span class="delta down">+$0.11</span></div></td>
+            <td><div class="metric">12.4k / 2.1k</div></td>
+            <td><span class="winner-tag">✓ best accuracy</span></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="model">
+                <div class="av groq">GR</div>
+                <div>groq-llama-3.3-70b<small>groq · t=0.0</small></div>
+              </div>
+            </td>
+            <td class="bar-cell"><div class="metric">7 / 10 <span class="delta">−2</span></div><div class="bar"><i style="width: 70%; background: var(--warn)"></i></div></td>
+            <td><div class="metric">9<span style="color:var(--fg-3); font-weight: 500">s</span></div></td>
+            <td><div class="metric">14<span style="color:var(--fg-3); font-weight: 500">s</span></div></td>
+            <td><div class="metric">$0.07 <span class="delta down">−$0.11</span></div></td>
+            <td><div class="metric">11.8k / 1.6k</div></td>
+            <td><span class="winner-tag" style="background: oklch(0.32 0.07 75 / 0.5); color: oklch(0.93 0.10 75); border-color: oklch(0.50 0.13 75);">✓ fastest · cheapest</span></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="model">
+                <div class="av hybrid">HY</div>
+                <div>hybrid · groq → claude<small>groq triage · claude RCA</small></div>
+              </div>
+            </td>
+            <td class="bar-cell"><div class="metric">9 / 10 <span class="delta up">+2</span></div><div class="bar"><i style="width: 90%; background: var(--ok)"></i></div></td>
+            <td><div class="metric">22<span style="color:var(--fg-3); font-weight: 500">s</span></div></td>
+            <td><div class="metric">38<span style="color:var(--fg-3); font-weight: 500">s</span></div></td>
+            <td><div class="metric">$0.11 <span class="delta down">−$0.07</span></div></td>
+            <td><div class="metric">12.0k / 1.9k</div></td>
+            <td><span class="winner-tag" style="background: oklch(0.24 0.04 220 / 0.5); color: var(--info); border-color: oklch(0.40 0.06 220);">✓ best balance</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="footnote" style="padding: 0 4px;">
+    Recommendation: switch <code>fsc-contact-sync</code> nightly runs to <b style="color: var(--info)">hybrid</b> — same accuracy as Claude, 48% lower cost, 2× faster. Keep Claude for ad-hoc incident deep-dives.
+  </div>
+
+</main>
+
+</body>
+</html>

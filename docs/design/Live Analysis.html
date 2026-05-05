@@ -1,0 +1,1183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ReconAI — Live Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: oklch(0.16 0.006 250);
+    --bg-1: oklch(0.19 0.006 250);
+    --bg-2: oklch(0.22 0.007 250);
+    --bg-3: oklch(0.26 0.008 250);
+    --line: oklch(0.30 0.008 250);
+    --line-soft: oklch(0.25 0.007 250);
+    --fg: oklch(0.96 0.005 250);
+    --fg-1: oklch(0.82 0.006 250);
+    --fg-2: oklch(0.66 0.008 250);
+    --fg-3: oklch(0.50 0.008 250);
+
+    --p1: oklch(0.65 0.20 25);
+    --p1-bg: oklch(0.30 0.09 25);
+    --p2: oklch(0.78 0.15 75);
+    --p2-bg: oklch(0.32 0.07 75);
+    --p3: oklch(0.60 0.012 250);
+    --p3-bg: oklch(0.28 0.008 250);
+
+    --ok: oklch(0.74 0.16 155);
+    --ok-bg: oklch(0.30 0.07 155);
+    --warn: oklch(0.78 0.15 75);
+    --info: oklch(0.74 0.12 220);
+    --info-bg: oklch(0.28 0.06 220);
+    --violet: oklch(0.72 0.14 295);
+
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    height: 52px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--bg-1), var(--bg));
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    gap: 18px;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .brand-mark {
+    width: 22px; height: 22px;
+    display: grid; place-items: center;
+    border-radius: 5px;
+    background: linear-gradient(135deg, oklch(0.55 0.14 250), oklch(0.42 0.12 295));
+    box-shadow: inset 0 0 0 1px oklch(0.70 0.10 250 / 0.3), 0 1px 0 oklch(0.30 0.05 250);
+    position: relative;
+  }
+  .brand-mark::after {
+    content: '';
+    position: absolute;
+    inset: 5px;
+    border-radius: 2px;
+    border: 1.5px solid var(--fg);
+    border-right-color: transparent;
+    border-bottom-color: transparent;
+    transform: rotate(45deg);
+  }
+  .brand-name { font-size: 14px; }
+  .brand-name b { color: var(--fg); }
+  .brand-name span { color: var(--fg-2); font-weight: 500; }
+
+  .crumbs {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--fg-2);
+    font-size: 12.5px;
+  }
+  .crumbs .sep { color: var(--fg-3); }
+  .crumbs .current { color: var(--fg); font-weight: 500; }
+
+  .topbar-right {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--fg-1);
+    font-size: 12px;
+    font-family: var(--mono);
+    font-weight: 500;
+  }
+  .badge .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--info);
+    box-shadow: 0 0 0 3px oklch(0.74 0.12 220 / 0.18);
+  }
+  .badge .label { color: var(--fg-3); font-weight: 400; }
+  .badge.user { font-family: var(--sans); }
+
+  .progress-pill {
+    display: flex; align-items: center; gap: 10px;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 8px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    min-width: 280px;
+  }
+  .progress-pill .lbl {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--fg-2);
+  }
+  .progress-pill .lbl b { color: var(--fg); font-weight: 600; }
+  .progress-track {
+    flex: 1;
+    height: 4px;
+    background: var(--bg-3);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--info), oklch(0.78 0.13 250));
+    width: 70%;
+    border-radius: 2px;
+    box-shadow: 0 0 8px oklch(0.74 0.12 220 / 0.5);
+  }
+  .progress-eta { font-family: var(--mono); font-size: 11px; color: var(--fg-3); }
+
+  .icon-btn {
+    width: 30px; height: 30px;
+    display: grid; place-items: center;
+    border-radius: 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--fg-1);
+    cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--bg-3); }
+
+  /* ---------- Stats row ---------- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .stat {
+    background: var(--bg);
+    padding: 14px 18px;
+    display: flex; flex-direction: column;
+    gap: 4px;
+  }
+  .stat-label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-3);
+    font-weight: 500;
+  }
+  .stat-value {
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  .stat-num {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--fg);
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+  .stat-delta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-3);
+  }
+  .stat-delta.up { color: var(--p1); }
+  .stat-delta.down { color: var(--ok); }
+  .stat-bar {
+    height: 3px; border-radius: 2px;
+    margin-top: 6px;
+    background: var(--bg-3);
+    overflow: hidden;
+    display: flex;
+  }
+  .stat-bar > i { height: 100%; display: block; }
+
+  /* ---------- Toolbar ---------- */
+  .toolbar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg);
+  }
+  .seg {
+    display: inline-flex;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 2px;
+  }
+  .seg button {
+    background: transparent; border: 0;
+    color: var(--fg-2);
+    font: 500 12px var(--sans);
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .seg button.active {
+    background: var(--bg-3);
+    color: var(--fg);
+    box-shadow: 0 1px 0 oklch(0.35 0.008 250);
+  }
+  .filter-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 26px; padding: 0 10px;
+    border-radius: 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--fg-1);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .filter-chip svg { color: var(--fg-3); }
+  .toolbar-right { margin-left: auto; display: flex; gap: 8px; align-items: center; color: var(--fg-3); font-size: 11.5px; font-family: var(--mono); }
+
+  .live-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 0 4px oklch(0.74 0.16 155 / 0.18);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 4px oklch(0.74 0.16 155 / 0.18); }
+    50% { box-shadow: 0 0 0 7px oklch(0.74 0.16 155 / 0.05); }
+  }
+
+  /* ---------- Layout ---------- */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 0;
+  }
+  .feed {
+    padding: 14px 18px 60px;
+    display: flex; flex-direction: column;
+    gap: 12px;
+    border-right: 1px solid var(--line);
+  }
+
+  /* ---------- Card ---------- */
+  .card {
+    position: relative;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-left-width: 3px;
+    border-radius: 8px;
+    padding: 14px 16px 14px 16px;
+    overflow: hidden;
+  }
+  .card.p1 { border-left-color: var(--p1); }
+  .card.p2 { border-left-color: var(--p2); }
+  .card.p3 { border-left-color: var(--p3); }
+  .card.analyzing {
+    background: linear-gradient(180deg, var(--bg-1), oklch(0.20 0.012 75 / 0.4));
+  }
+  .card.queued { opacity: 0.72; }
+
+  .card-head {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .sev {
+    display: inline-flex; align-items: center;
+    height: 20px; padding: 0 7px;
+    border-radius: 4px;
+    font: 600 10.5px var(--mono);
+    letter-spacing: 0.04em;
+  }
+  .sev.p1 { background: var(--p1-bg); color: oklch(0.92 0.10 25); border: 1px solid oklch(0.45 0.15 25); }
+  .sev.p2 { background: var(--p2-bg); color: oklch(0.93 0.10 75); border: 1px solid oklch(0.50 0.13 75); }
+  .sev.p3 { background: var(--p3-bg); color: var(--fg-1); border: 1px solid var(--line); }
+
+  .integration {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px;
+    color: var(--fg-1);
+    font-weight: 500;
+  }
+  .integration svg { color: var(--fg-3); }
+  .rec-id {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--fg-2);
+    background: var(--bg-2);
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--line-soft);
+  }
+
+  .status {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11.5px;
+    font-family: var(--mono);
+    color: var(--fg-2);
+  }
+  .status .sd {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .status.resolved .sd { background: var(--ok); box-shadow: 0 0 0 3px oklch(0.74 0.16 155 / 0.2); }
+  .status.analyzing .sd { background: var(--warn); animation: blink 1.2s ease-in-out infinite; }
+  .status.queued .sd { background: var(--fg-3); }
+  @keyframes blink {
+    0%, 100% { opacity: 0.45; box-shadow: 0 0 0 0 oklch(0.78 0.15 75 / 0.4); }
+    50% { opacity: 1; box-shadow: 0 0 0 5px oklch(0.78 0.15 75 / 0); }
+  }
+  .status .ts { color: var(--fg-3); }
+
+  .mapping {
+    display: flex; align-items: center;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    gap: 10px;
+    overflow: hidden;
+  }
+  .mapping .src, .mapping .dst {
+    display: flex; align-items: center; gap: 8px;
+    min-width: 0;
+  }
+  .mapping .obj { color: var(--fg); font-weight: 500; }
+  .mapping .field { color: var(--info); }
+  .mapping .arrow {
+    color: var(--fg-3);
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .mapping .sys {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fg-3);
+    padding: 1px 5px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .mapping .sys.sf { color: oklch(0.74 0.10 220); border-color: oklch(0.40 0.06 220); }
+  .mapping .sys.db { color: oklch(0.78 0.10 75); border-color: oklch(0.40 0.06 75); }
+
+  .hyp-row {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .hyp-row .lbl {
+    font: 500 10.5px var(--mono);
+    color: var(--fg-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-right: 4px;
+  }
+  .hyp {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 11px;
+    font: 500 11px var(--mono);
+    background: var(--bg-2);
+    color: var(--fg-3);
+    border: 1px solid var(--line-soft);
+  }
+  .hyp .check {
+    width: 10px; height: 10px;
+    display: grid; place-items: center;
+  }
+  .hyp.done { color: var(--ok); border-color: oklch(0.40 0.10 155); background: oklch(0.24 0.04 155 / 0.4); }
+  .hyp.fail { color: var(--p1); border-color: oklch(0.45 0.12 25); background: oklch(0.26 0.06 25 / 0.4); }
+  .hyp.active {
+    color: var(--warn); border-color: oklch(0.50 0.10 75);
+    background: oklch(0.28 0.06 75 / 0.5);
+  }
+  .hyp.active .check { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hyp.pending { color: var(--fg-3); }
+
+  .root-cause {
+    display: grid;
+    grid-template-columns: 16px 1fr;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 6px;
+    margin-bottom: 10px;
+  }
+  .root-cause .icn { color: var(--ok); padding-top: 2px; }
+  .root-cause .body { font-size: 13px; color: var(--fg-1); line-height: 1.5; }
+  .root-cause .body b { color: var(--fg); font-weight: 600; }
+  .root-cause .body code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--bg-3);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--fg);
+  }
+  .root-cause .label {
+    font: 600 10px var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ok);
+    margin-bottom: 3px;
+  }
+
+  .analyzing-stream {
+    padding: 10px 12px;
+    background: var(--bg-2);
+    border: 1px dashed var(--line);
+    border-radius: 6px;
+    margin-bottom: 10px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--fg-2);
+    display: grid; gap: 4px;
+  }
+  .analyzing-stream .line { display: flex; gap: 8px; }
+  .analyzing-stream .ts { color: var(--fg-3); }
+  .analyzing-stream .tag { color: var(--info); }
+  .analyzing-stream .cur { color: var(--fg); }
+  .caret {
+    display: inline-block;
+    width: 7px; height: 12px;
+    background: var(--warn);
+    margin-left: 2px;
+    vertical-align: -2px;
+    animation: caret 1s steps(2) infinite;
+  }
+  @keyframes caret { 50% { opacity: 0; } }
+
+  .card-foot {
+    display: flex; align-items: center; gap: 12px;
+    flex-wrap: wrap;
+  }
+  .evidence {
+    display: flex; align-items: center; gap: 6px;
+    flex-wrap: wrap;
+  }
+  .ev-label {
+    font: 500 10.5px var(--mono);
+    color: var(--fg-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-right: 2px;
+  }
+  .ev {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 22px; padding: 0 8px;
+    border-radius: 4px;
+    font: 500 11px var(--mono);
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    color: var(--fg-1);
+    cursor: pointer;
+  }
+  .ev:hover { border-color: var(--line); background: var(--bg-3); }
+  .ev .scheme { color: var(--info); }
+
+  .conf {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 8px;
+    min-width: 220px;
+  }
+  .conf .lbl { font: 500 10.5px var(--mono); color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.06em; }
+  .conf .track {
+    flex: 1;
+    height: 4px;
+    background: var(--bg-3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .conf .fill {
+    height: 100%;
+    border-radius: 2px;
+  }
+  .conf .fill.high { background: linear-gradient(90deg, var(--ok), oklch(0.80 0.14 155)); }
+  .conf .fill.med  { background: linear-gradient(90deg, var(--warn), oklch(0.82 0.13 75)); }
+  .conf .fill.low  { background: linear-gradient(90deg, var(--p1), oklch(0.72 0.18 25)); }
+  .conf .pct { font: 500 11.5px var(--mono); color: var(--fg-1); width: 38px; text-align: right; }
+
+  .actions { display: flex; gap: 6px; }
+  .btn {
+    height: 26px; padding: 0 10px;
+    border-radius: 5px;
+    font: 500 11.5px var(--sans);
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--fg-1);
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { background: var(--bg-3); }
+  .btn.primary {
+    background: oklch(0.40 0.10 220);
+    border-color: oklch(0.50 0.12 220);
+    color: oklch(0.97 0.02 220);
+  }
+  .btn.primary:hover { background: oklch(0.45 0.11 220); }
+
+  /* ---------- Right rail ---------- */
+  .rail {
+    background: var(--bg);
+    padding: 16px 16px 60px;
+    display: flex; flex-direction: column;
+    gap: 14px;
+  }
+  .panel {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .panel-head {
+    display: flex; align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-1);
+  }
+  .panel-title {
+    font: 600 11px var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-2);
+  }
+  .panel-meta {
+    margin-left: auto;
+    font: 500 11px var(--mono);
+    color: var(--fg-3);
+  }
+  .panel-body { padding: 12px; }
+
+  .agent-step {
+    display: grid;
+    grid-template-columns: 18px 1fr auto;
+    gap: 10px;
+    padding: 6px 0;
+    align-items: center;
+  }
+  .agent-step .num {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--bg-3);
+    color: var(--fg-2);
+    font: 600 10px var(--mono);
+    display: grid; place-items: center;
+  }
+  .agent-step.done .num { background: oklch(0.30 0.07 155); color: var(--ok); }
+  .agent-step.active .num { background: oklch(0.32 0.07 75); color: var(--warn); }
+  .agent-step .label { font-size: 12.5px; color: var(--fg-1); }
+  .agent-step .label .sub { display: block; font: 500 10.5px var(--mono); color: var(--fg-3); margin-top: 1px; }
+  .agent-step .t { font: 500 10.5px var(--mono); color: var(--fg-3); }
+
+  .qstats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .qstat {
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 6px;
+    padding: 10px;
+  }
+  .qstat .l { font: 500 10px var(--mono); color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.06em; }
+  .qstat .v { font: 600 16px var(--mono); color: var(--fg); margin-top: 4px; }
+  .qstat .d { font: 500 10.5px var(--mono); color: var(--fg-3); margin-top: 2px; }
+
+  .heat-grid {
+    display: grid;
+    grid-template-columns: repeat(20, 1fr);
+    gap: 2px;
+  }
+  .heat-grid i {
+    aspect-ratio: 1;
+    background: var(--bg-2);
+    border-radius: 2px;
+  }
+
+  .src-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 0;
+    font-size: 12.5px;
+  }
+  .src-row .ic {
+    width: 22px; height: 22px;
+    display: grid; place-items: center;
+    border-radius: 4px;
+    background: var(--bg-2); border: 1px solid var(--line-soft);
+    color: var(--fg-2);
+    font: 600 10px var(--mono);
+  }
+  .src-row .nm { color: var(--fg-1); }
+  .src-row .nm small { display:block; font: 500 10.5px var(--mono); color: var(--fg-3); }
+  .src-row .v { margin-left: auto; font: 500 11.5px var(--mono); color: var(--fg-2); }
+  .src-row .ok { color: var(--ok); }
+
+  /* ---------- Misc icons ---------- */
+  .ic-chev { color: var(--fg-3); }
+
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark"></div>
+    <div class="brand-name"><b>reconAI</b> <span style="color:var(--fg-3); margin: 0 4px">/</span> <span>Reconciliation</span></div>
+  </div>
+
+  <nav class="crumbs">
+    <span>Runs</span>
+    <span class="sep">›</span>
+    <span>FSC ↔ DB2 nightly</span>
+    <span class="sep">›</span>
+    <span class="current">run_20260503_0142Z</span>
+  </nav>
+
+  <div class="topbar-right">
+    <span class="badge"><span class="dot"></span><span class="label">model</span> claude-sonnet-4.5 · t=0.0</span>
+    <span class="badge"><span class="label">env</span> prod-east-1</span>
+
+    <div class="progress-pill">
+      <span class="lbl"><b>7</b>/10 analyzed</span>
+      <div class="progress-track"><div class="progress-fill" style="width:70%"></div></div>
+      <span class="progress-eta">eta 1m 12s</span>
+    </div>
+
+    <button class="icon-btn" title="Pause">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="4" y="3" width="3" height="10" rx="1"/><rect x="9" y="3" width="3" height="10" rx="1"/></svg>
+    </button>
+    <button class="icon-btn" title="Settings">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M3 13l1.4-1.4M11.6 4.4L13 3"/></svg>
+    </button>
+    <span class="badge user"><span style="width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg, oklch(0.6 0.12 295), oklch(0.5 0.10 250));display:inline-grid;place-items:center;font-size:9.5px;font-weight:600;color:var(--fg)">JK</span> j.kowalski</span>
+  </div>
+</header>
+
+<!-- Stats row -->
+<section class="stats">
+  <div class="stat">
+    <span class="stat-label">Discrepancies</span>
+    <div class="stat-value"><span class="stat-num">10</span><span class="stat-delta up">+3 vs. last run</span></div>
+    <div class="stat-bar">
+      <i style="background:var(--p1); width:20%"></i>
+      <i style="background:var(--p2); width:40%"></i>
+      <i style="background:var(--p3); width:40%"></i>
+    </div>
+  </div>
+  <div class="stat">
+    <span class="stat-label">P1 Critical</span>
+    <div class="stat-value"><span class="stat-num" style="color:var(--p1)">2</span><span class="stat-delta up">+1</span></div>
+    <div class="stat-bar"><i style="background:var(--p1); width:20%"></i><i style="background:var(--bg-3); width:80%"></i></div>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Resolved</span>
+    <div class="stat-value"><span class="stat-num" style="color:var(--ok)">5</span><span class="stat-delta">/ 10</span></div>
+    <div class="stat-bar"><i style="background:var(--ok); width:50%"></i><i style="background:var(--bg-3); width:50%"></i></div>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Needs Review</span>
+    <div class="stat-value"><span class="stat-num" style="color:var(--warn)">2</span><span class="stat-delta">low conf.</span></div>
+    <div class="stat-bar"><i style="background:var(--warn); width:20%"></i><i style="background:var(--bg-3); width:80%"></i></div>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Auto-fix Eligible</span>
+    <div class="stat-value"><span class="stat-num">3</span><span class="stat-delta">queued</span></div>
+    <div class="stat-bar"><i style="background:var(--info); width:30%"></i><i style="background:var(--bg-3); width:70%"></i></div>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Mean Time / Incident</span>
+    <div class="stat-value"><span class="stat-num">42<span style="font-size:13px; color:var(--fg-3)">s</span></span><span class="stat-delta down">−18%</span></div>
+    <div class="stat-bar"><i style="background:var(--violet); width:42%"></i><i style="background:var(--bg-3); width:58%"></i></div>
+  </div>
+</section>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <div class="seg">
+    <button class="active">Live Analysis</button>
+    <button>Queue</button>
+    <button>Resolved</button>
+    <button>Diff Explorer</button>
+  </div>
+  <span class="filter-chip">
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M4 8h8M6 12h4"/></svg>
+    Severity: All
+    <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor" class="ic-chev"><path d="M3 4.5L6 7.5 9 4.5"/></svg>
+  </span>
+  <span class="filter-chip">Integration: FSC ↔ DB2 <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor" class="ic-chev"><path d="M3 4.5L6 7.5 9 4.5"/></svg></span>
+  <span class="filter-chip">Status: Active <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor" class="ic-chev"><path d="M3 4.5L6 7.5 9 4.5"/></svg></span>
+  <span class="filter-chip">Sort: Severity ↓ <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor" class="ic-chev"><path d="M3 4.5L6 7.5 9 4.5"/></svg></span>
+
+  <div class="toolbar-right">
+    <span class="live-dot"></span>
+    <span>LIVE · streaming from agent-pool-3 · 2026-05-03 01:42:18 UTC</span>
+  </div>
+</div>
+
+<!-- Main grid -->
+<div class="main">
+  <!-- Feed -->
+  <div class="feed" id="feed"></div>
+
+  <!-- Right rail -->
+  <aside class="rail">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Agent Pipeline</span>
+        <span class="panel-meta">incident #07 of 10</span>
+      </div>
+      <div class="panel-body">
+        <div class="agent-step done">
+          <span class="num">✓</span>
+          <span class="label">Schema diff
+            <span class="sub">12 mismatched fields detected</span>
+          </span>
+          <span class="t">+0.4s</span>
+        </div>
+        <div class="agent-step done">
+          <span class="num">✓</span>
+          <span class="label">Field-Level Security pull
+            <span class="sub">sf-fls://Account · 117 profiles</span>
+          </span>
+          <span class="t">+1.2s</span>
+        </div>
+        <div class="agent-step done">
+          <span class="num">✓</span>
+          <span class="label">DB2 sample query
+            <span class="sub">FSC.ACCOUNT_PARTY n=2,000</span>
+          </span>
+          <span class="t">+2.8s</span>
+        </div>
+        <div class="agent-step active">
+          <span class="num">4</span>
+          <span class="label">Hypothesis ranking
+            <span class="sub">scoring H1, H2, H3a, H3b</span>
+          </span>
+          <span class="t">~3.1s</span>
+        </div>
+        <div class="agent-step">
+          <span class="num">5</span>
+          <span class="label">Generate remediation
+            <span class="sub">SOQL + DDL patch</span>
+          </span>
+          <span class="t">queued</span>
+        </div>
+        <div class="agent-step">
+          <span class="num">6</span>
+          <span class="label">Confidence scoring</span>
+          <span class="t">queued</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Run Stats</span>
+        <span class="panel-meta">last 60s</span>
+      </div>
+      <div class="panel-body">
+        <div class="qstats">
+          <div class="qstat"><div class="l">Tokens / incident</div><div class="v">14.2k</div><div class="d">in 11.8k · out 2.4k</div></div>
+          <div class="qstat"><div class="l">Tool calls</div><div class="v">63</div><div class="d">avg 9 / incident</div></div>
+          <div class="qstat"><div class="l">Cache hit</div><div class="v">71%</div><div class="d">FLS &amp; schema</div></div>
+          <div class="qstat"><div class="l">Spend</div><div class="v">$1.84</div><div class="d">budget $5.00</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Source Connections</span>
+        <span class="panel-meta">5/5 healthy</span>
+      </div>
+      <div class="panel-body">
+        <div class="src-row"><span class="ic">SF</span><span class="nm">Salesforce FSC<small>org-00D5g000004fEdTEAU</small></span><span class="v ok">●  18ms</span></div>
+        <div class="src-row"><span class="ic">DB</span><span class="nm">DB2 LUW · FSC<small>db2-fsc-prod-01</small></span><span class="v ok">●  31ms</span></div>
+        <div class="src-row"><span class="ic">SP</span><span class="nm">Splunk<small>idx=sf_apex_logs</small></span><span class="v ok">●  84ms</span></div>
+        <div class="src-row"><span class="ic">MQ</span><span class="nm">MuleSoft CloudHub<small>fsc-acct-sync v3.4.1</small></span><span class="v ok">●  22ms</span></div>
+        <div class="src-row"><span class="ic">VC</span><span class="nm">GitHub · fsc-mappings<small>main @ a3f9c2b</small></span><span class="v ok">●  cached</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Discrepancy Heatmap</span>
+        <span class="panel-meta">last 24h · per object</span>
+      </div>
+      <div class="panel-body">
+        <div class="heat-grid" id="heat"></div>
+        <div style="display:flex; justify-content:space-between; margin-top:8px; font:500 10.5px var(--mono); color:var(--fg-3)">
+          <span>Account</span><span>Contact</span><span>Asset</span><span>FinAcct</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+/* -------- Data -------- */
+const incidents = [
+  {
+    id: 'INC-2026-0507-001',
+    sev: 'p1',
+    status: 'resolved',
+    integration: 'fsc-acct-sync',
+    recId: '0015g00000xH7QkAAK',
+    src: { obj: 'Account', field: 'AnnualRevenue__c' },
+    dst: { tbl: 'FSC.ACCOUNT_PARTY', col: 'ANNL_RVN_AMT' },
+    hyps: [['H1','done'],['H2','fail'],['H3a','done'],['H3b','done']],
+    rootCause: {
+      label: 'Root cause · confirmed',
+      html: 'Field-level security strips <code>AnnualRevenue__c</code> for the integration user’s profile (<code>Integration_User_FSC</code>). MuleSoft flow logs <b>null</b> for this field on 217/217 records since <code>2026-04-29 03:11Z</code>, matching the FLS change in <code>fls-audit/2026-04-29.csv</code>.'
+    },
+    evidence: [
+      ['sf-fls://', 'Account/Integration_User_FSC'],
+      ['splunk://', 'sourcetype=mule_flow_logs · 217 hits'],
+      ['db2://', 'FSC.ACCOUNT_PARTY where ANNL_RVN_AMT IS NULL'],
+      ['gh://', 'fsc-mappings/account.yaml#L42']
+    ],
+    conf: 96, confLevel: 'high',
+    ts: 'resolved 01:39:22Z · 38s'
+  },
+  {
+    id: 'INC-2026-0507-002',
+    sev: 'p1',
+    status: 'analyzing',
+    integration: 'fsc-acct-sync',
+    recId: '0015g00000xH3MaAAK',
+    src: { obj: 'FinancialAccount', field: 'Balance__c' },
+    dst: { tbl: 'FSC.FIN_ACCT_BAL', col: 'CURR_BAL_AMT' },
+    hyps: [['H1','done'],['H2','done'],['H3a','active'],['H3b','pending']],
+    stream: [
+      ['01:42:14', 'tool', 'db2.query', 'SELECT CURR_BAL_AMT, AS_OF_TS FROM FSC.FIN_ACCT_BAL WHERE PARTY_ID=…'],
+      ['01:42:15', 'tool', 'sf.soql',  'SELECT Balance__c, LastModifiedDate FROM FinancialAccount WHERE Id=…'],
+      ['01:42:17', 'agent','reasoning','timestamp drift detected: SF lags DB2 by 47 minutes — checking apex trigger queue']
+    ],
+    evidence: [
+      ['sf-fls://', 'FinancialAccount/Balance__c'],
+      ['splunk://', 'sourcetype=apex_log · trigger=BalanceSync'],
+      ['db2://', 'FSC.FIN_ACCT_BAL @AS_OF_TS=01:42:00Z']
+    ],
+    conf: 0, confLevel: 'med',
+    ts: 'analyzing · 8.2s elapsed'
+  },
+  {
+    id: 'INC-2026-0507-003',
+    sev: 'p2',
+    status: 'resolved',
+    integration: 'fsc-contact-sync',
+    recId: '0035g00000zZ1LpAAK',
+    src: { obj: 'Contact', field: 'TaxIdentificationNumber__pc' },
+    dst: { tbl: 'FSC.PARTY_TAX_ID', col: 'TAX_ID_HASH' },
+    hyps: [['H1','done'],['H2','done'],['H3a','done'],['H3b','done']],
+    rootCause: {
+      label: 'Root cause · confirmed',
+      html: 'Encryption transform mismatch. SF stores SHA-256 of TIN; DB2 column expects bcrypt cost=12 per <code>fsc-mappings/contact.yaml#L88</code>. <b>3,401 records</b> in last delta cannot be matched. Mapping config drifted on <code>2026-04-22</code> (PR #1488).'
+    },
+    evidence: [
+      ['gh://', 'fsc-mappings/contact.yaml @PR-1488'],
+      ['sf-fls://', 'Contact/TaxIdentificationNumber__pc'],
+      ['db2://', 'FSC.PARTY_TAX_ID · n=3,401 nomatch']
+    ],
+    conf: 91, confLevel: 'high',
+    ts: 'resolved 01:40:07Z · 51s'
+  },
+  {
+    id: 'INC-2026-0507-004',
+    sev: 'p2',
+    status: 'resolved',
+    integration: 'fsc-acct-sync',
+    recId: '0015g00000xJ2BcAAK',
+    src: { obj: 'Account', field: 'BillingCountryCode' },
+    dst: { tbl: 'FSC.ACCOUNT_PARTY', col: 'BILL_CTRY_ISO3' },
+    hyps: [['H1','fail'],['H2','done'],['H3a','done'],['H3b','pending']],
+    rootCause: {
+      label: 'Root cause · confirmed',
+      html: 'ISO-3166 alpha-2 → alpha-3 conversion missing in MuleSoft DataWeave script <code>account-out.dwl:117</code>. Affects <b>14 country codes</b> (incl. <code>UK→GBR</code>, <code>US→USA</code>) on 1,184 records.'
+    },
+    evidence: [
+      ['mulesoft://', 'flows/account-out.dwl:117'],
+      ['db2://', 'FSC.ACCOUNT_PARTY where LENGTH(BILL_CTRY_ISO3)=2']
+    ],
+    conf: 88, confLevel: 'high',
+    ts: 'resolved 01:40:51Z · 33s'
+  },
+  {
+    id: 'INC-2026-0507-005',
+    sev: 'p2',
+    status: 'resolved',
+    integration: 'fsc-asset-sync',
+    recId: 'a045g00000mP7QkAAK',
+    src: { obj: 'Asset', field: 'PurchaseDate' },
+    dst: { tbl: 'FSC.ASSET_REGISTRY', col: 'PURCH_DT_UTC' },
+    hyps: [['H1','done'],['H2','done'],['H3a','done'],['H3b','done']],
+    rootCause: {
+      label: 'Root cause · confirmed',
+      html: 'Timezone offset applied twice. SF user locale (<code>America/New_York</code>) is converted to UTC by Apex, then re-offset by integration adapter. Net effect: dates 4–5 hours earlier in DB2 across <b>7,812 rows</b>.'
+    },
+    evidence: [
+      ['splunk://', 'apex_log · AssetTriggerHandler'],
+      ['mulesoft://', 'asset-out.dwl:54'],
+      ['db2://', 'FSC.ASSET_REGISTRY sample n=500']
+    ],
+    conf: 84, confLevel: 'high',
+    ts: 'resolved 01:41:30Z · 44s'
+  },
+  {
+    id: 'INC-2026-0507-006',
+    sev: 'p2',
+    status: 'resolved',
+    integration: 'fsc-acct-sync',
+    recId: '0015g00000xK1JpAAK',
+    src: { obj: 'Account', field: 'NumberOfEmployees' },
+    dst: { tbl: 'FSC.ACCOUNT_PARTY', col: 'EMP_HDCNT_RANGE' },
+    hyps: [['H1','done'],['H2','fail'],['H3a','done'],['H3b','pending']],
+    rootCause: {
+      label: 'Root cause · partial — needs review',
+      html: 'Integer field maps to enumerated bucket (<code>1-10</code>, <code>11-50</code>, …). Bucketing logic exists but was migrated to <code>employee-bucket-v2</code> and the v1 lookup table is stale. <b>312 records</b> resolved to <code>UNKNOWN</code>.'
+    },
+    evidence: [
+      ['gh://', 'fsc-mappings/account.yaml#L201'],
+      ['db2://', 'FSC.ACCOUNT_PARTY where EMP_HDCNT_RANGE=\'UNKNOWN\'']
+    ],
+    conf: 67, confLevel: 'med',
+    ts: 'needs review 01:42:04Z'
+  },
+  {
+    id: 'INC-2026-0507-007',
+    sev: 'p3',
+    status: 'analyzing',
+    integration: 'fsc-contact-sync',
+    recId: '0035g00000zZ4QkAAK',
+    src: { obj: 'Contact', field: 'PreferredLanguage__c' },
+    dst: { tbl: 'FSC.PARTY_PREF', col: 'LANG_CD_BCP47' },
+    hyps: [['H1','done'],['H2','active'],['H3a','pending'],['H3b','pending']],
+    stream: [
+      ['01:42:11', 'tool', 'sf.describe', 'Contact.PreferredLanguage__c picklist values (n=42)'],
+      ['01:42:13', 'agent','reasoning', 'comparing picklist set to BCP-47 codes; suspect informal codes (\'ZH\' vs \'zh-Hans\')']
+    ],
+    evidence: [
+      ['sf-fls://', 'Contact/PreferredLanguage__c'],
+      ['db2://', 'FSC.PARTY_PREF distinct LANG_CD_BCP47']
+    ],
+    conf: 0, confLevel: 'med',
+    ts: 'analyzing · 4.6s elapsed'
+  },
+  {
+    id: 'INC-2026-0507-008',
+    sev: 'p3',
+    status: 'queued',
+    integration: 'fsc-asset-sync',
+    recId: 'a045g00000mP9LpAAK',
+    src: { obj: 'Asset', field: 'WarrantyEndDate__c' },
+    dst: { tbl: 'FSC.ASSET_REGISTRY', col: 'WRNTY_END_DT' },
+    hyps: [['H1','pending'],['H2','pending'],['H3a','pending'],['H3b','pending']],
+    evidence: [
+      ['sf-fls://', 'Asset/WarrantyEndDate__c'],
+      ['db2://', 'FSC.ASSET_REGISTRY']
+    ],
+    conf: 0, confLevel: 'med',
+    ts: 'queued · position 1 of 3'
+  },
+  {
+    id: 'INC-2026-0507-009',
+    sev: 'p3',
+    status: 'queued',
+    integration: 'fsc-acct-sync',
+    recId: '0015g00000xL5JpAAK',
+    src: { obj: 'Account', field: 'Industry' },
+    dst: { tbl: 'FSC.ACCOUNT_PARTY', col: 'NAICS_CD' },
+    hyps: [['H1','pending'],['H2','pending'],['H3a','pending'],['H3b','pending']],
+    evidence: [
+      ['gh://', 'fsc-mappings/account.yaml#L317'],
+      ['db2://', 'FSC.ACCOUNT_PARTY']
+    ],
+    conf: 0, confLevel: 'med',
+    ts: 'queued · position 2 of 3'
+  },
+  {
+    id: 'INC-2026-0507-010',
+    sev: 'p3',
+    status: 'queued',
+    integration: 'fsc-contact-sync',
+    recId: '0035g00000zZ7QkAAK',
+    src: { obj: 'Contact', field: 'DoNotCall' },
+    dst: { tbl: 'FSC.PARTY_CONSENT', col: 'CALL_OPT_OUT_FLG' },
+    hyps: [['H1','pending'],['H2','pending'],['H3a','pending'],['H3b','pending']],
+    evidence: [
+      ['sf-fls://', 'Contact/DoNotCall'],
+      ['db2://', 'FSC.PARTY_CONSENT']
+    ],
+    conf: 0, confLevel: 'med',
+    ts: 'queued · position 3 of 3'
+  }
+];
+
+/* -------- Render -------- */
+const evIcon = (scheme) => {
+  if (scheme.startsWith('sf')) return 'SF';
+  if (scheme.startsWith('db')) return 'DB';
+  if (scheme.startsWith('splunk')) return 'SP';
+  if (scheme.startsWith('mule')) return 'MQ';
+  if (scheme.startsWith('gh')) return 'VC';
+  return '··';
+};
+
+const hypHTML = (hyps) => {
+  return `<div class="hyp-row"><span class="lbl">Hypotheses</span>` +
+    hyps.map(([name, state]) => {
+      let mark = '';
+      if (state === 'done') mark = '<span class="check">✓</span>';
+      else if (state === 'fail') mark = '<span class="check">✕</span>';
+      else if (state === 'active') mark = '<span class="check">◐</span>';
+      else mark = '<span class="check">·</span>';
+      return `<span class="hyp ${state}">${mark}${name}</span>`;
+    }).join('') +
+    `</div>`;
+};
+
+const evidenceHTML = (ev) => `
+  <div class="evidence">
+    <span class="ev-label">Evidence</span>
+    ${ev.map(([s, d]) => `<span class="ev"><span class="scheme">${s}</span>${d}</span>`).join('')}
+  </div>
+`;
+
+const confHTML = (c) => {
+  if (c.status === 'queued') return `<div class="conf"><span class="lbl">Confidence</span><div class="track"></div><span class="pct" style="color:var(--fg-3)">—</span></div>`;
+  if (c.status === 'analyzing') return `<div class="conf"><span class="lbl">Confidence</span><div class="track"><div class="fill med" style="width:0%"></div></div><span class="pct" style="color:var(--fg-3)">…</span></div>`;
+  return `<div class="conf"><span class="lbl">Confidence</span><div class="track"><div class="fill ${c.confLevel}" style="width:${c.conf}%"></div></div><span class="pct">${c.conf}%</span></div>`;
+};
+
+const actionsHTML = (c) => {
+  if (c.status === 'resolved') {
+    if (c.conf >= 80) return `<div class="actions"><button class="btn primary">Apply fix</button><button class="btn">View patch</button></div>`;
+    return `<div class="actions"><button class="btn primary">Review</button><button class="btn">Escalate</button></div>`;
+  }
+  if (c.status === 'analyzing') return `<div class="actions"><button class="btn">Inspect</button></div>`;
+  return `<div class="actions"><button class="btn">Skip</button></div>`;
+};
+
+const streamHTML = (s) => `
+  <div class="analyzing-stream">
+    ${s.map(([t, kind, tag, msg], i) => `
+      <div class="line">
+        <span class="ts">${t}</span>
+        <span class="tag">${kind}.${tag}</span>
+        <span class="${i===s.length-1 ? 'cur' : ''}">${msg}${i===s.length-1 ? '<span class="caret"></span>' : ''}</span>
+      </div>
+    `).join('')}
+  </div>
+`;
+
+const cardHTML = (c) => `
+  <article class="card ${c.sev} ${c.status}">
+    <div class="card-head">
+      <span class="sev ${c.sev}">${c.sev.toUpperCase()}</span>
+      <span class="integration">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l3-3v2h4V5l3 3-3 3v-2H6v2L3 8z"/></svg>
+        ${c.integration}
+      </span>
+      <span class="rec-id">${c.recId}</span>
+      <span class="status ${c.status}">
+        <span class="sd"></span>
+        ${c.status}
+        <span class="ts">· ${c.ts}</span>
+      </span>
+    </div>
+
+    <div class="mapping">
+      <span class="src">
+        <span class="sys sf">SF</span>
+        <span class="obj">${c.src.obj}</span><span style="color:var(--fg-3)">.</span><span class="field">${c.src.field}</span>
+      </span>
+      <span class="arrow">→</span>
+      <span class="dst">
+        <span class="sys db">DB2</span>
+        <span class="obj">${c.dst.tbl}</span><span style="color:var(--fg-3)">.</span><span class="field">${c.dst.col}</span>
+      </span>
+      <span style="margin-left:auto; color:var(--fg-3); font-size:11px">${c.id}</span>
+    </div>
+
+    ${hypHTML(c.hyps)}
+
+    ${c.rootCause ? `
+      <div class="root-cause">
+        <span class="icn">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8l3 3 7-7"/></svg>
+        </span>
+        <div>
+          <div class="label">${c.rootCause.label}</div>
+          <div class="body">${c.rootCause.html}</div>
+        </div>
+      </div>` : ''
+    }
+
+    ${c.stream ? streamHTML(c.stream) : ''}
+
+    ${c.status === 'queued' ? `
+      <div style="padding:10px 12px; background:var(--bg-2); border:1px dashed var(--line); border-radius:6px; margin-bottom:10px; font-size:12px; color:var(--fg-3); font-family:var(--mono)">
+        awaiting agent slot · est. start in ${c.id.endsWith('008') ? '14s' : c.id.endsWith('009') ? '47s' : '1m 12s'}
+      </div>` : ''
+    }
+
+    <div class="card-foot">
+      ${evidenceHTML(c.evidence)}
+      ${confHTML(c)}
+      ${actionsHTML(c)}
+    </div>
+  </article>
+`;
+
+document.getElementById('feed').innerHTML = incidents.map(cardHTML).join('');
+
+/* heatmap */
+const heat = document.getElementById('heat');
+const palette = ['var(--bg-2)','oklch(0.30 0.04 250)','oklch(0.42 0.10 75)','oklch(0.55 0.15 25)','oklch(0.65 0.20 25)'];
+let h = '';
+for (let i=0;i<80;i++){
+  const r = Math.random();
+  let v = 0;
+  if (r > 0.92) v=4; else if (r > 0.82) v=3; else if (r>0.65) v=2; else if (r>0.4) v=1;
+  h += `<i style="background:${palette[v]}"></i>`;
+}
+heat.innerHTML = h;
+
+/* progress fill animation tick */
+let tick = 70;
+setInterval(() => {
+  tick = Math.min(99, tick + 0.05);
+  document.querySelector('.progress-fill').style.width = tick + '%';
+}, 200);
+
+</script>
+</body>
+</html>

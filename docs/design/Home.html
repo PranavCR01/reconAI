@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ReconAI — New Run</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: oklch(0.16 0.006 250);
+    --bg-1: oklch(0.19 0.006 250);
+    --bg-2: oklch(0.22 0.007 250);
+    --bg-3: oklch(0.26 0.008 250);
+    --line: oklch(0.30 0.008 250);
+    --line-soft: oklch(0.25 0.007 250);
+    --fg: oklch(0.96 0.005 250);
+    --fg-1: oklch(0.82 0.006 250);
+    --fg-2: oklch(0.66 0.008 250);
+    --fg-3: oklch(0.50 0.008 250);
+
+    --p1: oklch(0.65 0.20 25);
+    --p1-bg: oklch(0.30 0.09 25);
+    --p2: oklch(0.78 0.15 75);
+    --p2-bg: oklch(0.32 0.07 75);
+    --p3: oklch(0.60 0.012 250);
+    --p3-bg: oklch(0.28 0.008 250);
+
+    --ok: oklch(0.74 0.16 155);
+    --ok-bg: oklch(0.30 0.07 155);
+    --warn: oklch(0.78 0.15 75);
+    --info: oklch(0.74 0.12 220);
+    --info-bg: oklch(0.28 0.06 220);
+    --violet: oklch(0.72 0.14 295);
+
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 20% -10%, oklch(0.25 0.04 250 / 0.4), transparent 50%),
+      radial-gradient(circle at 90% 110%, oklch(0.24 0.05 295 / 0.3), transparent 50%);
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    height: 52px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--bg-1), var(--bg));
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    gap: 18px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .brand-mark {
+    width: 22px; height: 22px;
+    display: grid; place-items: center;
+    border-radius: 5px;
+    background: linear-gradient(135deg, oklch(0.55 0.14 250), oklch(0.42 0.12 295));
+    box-shadow: inset 0 0 0 1px oklch(0.70 0.10 250 / 0.3), 0 1px 0 oklch(0.30 0.05 250);
+    position: relative;
+  }
+  .brand-mark::after {
+    content: '';
+    position: absolute;
+    inset: 5px;
+    border-radius: 2px;
+    border: 1.5px solid var(--fg);
+    border-right-color: transparent;
+    border-bottom-color: transparent;
+    transform: rotate(45deg);
+  }
+  .brand-name { font-size: 14px; }
+  .brand-name b { color: var(--fg); }
+  .brand-name span { color: var(--fg-2); font-weight: 500; }
+
+  .nav {
+    display: flex; gap: 2px;
+    margin-left: 18px;
+  }
+  .nav a {
+    padding: 6px 12px;
+    border-radius: 6px;
+    color: var(--fg-2);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .nav a:hover { color: var(--fg); background: var(--bg-2); }
+  .nav a.active { color: var(--fg); background: var(--bg-2); }
+
+  .topbar-right {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--fg-1);
+    font-size: 12px;
+    font-family: var(--mono);
+    font-weight: 500;
+  }
+  .badge .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 0 3px oklch(0.74 0.16 155 / 0.18);
+  }
+  .badge .label { color: var(--fg-3); font-weight: 400; }
+  .badge.user { font-family: var(--sans); }
+  .icon-btn {
+    width: 30px; height: 30px;
+    display: grid; place-items: center;
+    border-radius: 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--fg-1);
+    cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--bg-3); }
+
+  /* ---------- Page shell ---------- */
+  .page {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 36px 24px 80px;
+  }
+
+  .page-head {
+    display: flex; align-items: flex-end; gap: 16px;
+    margin-bottom: 24px;
+  }
+  .page-head h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .page-head .sub {
+    color: var(--fg-3);
+    font-size: 12.5px;
+    font-family: var(--mono);
+  }
+  .page-head .meta {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--fg-3);
+  }
+
+  /* ---------- Drop zone ---------- */
+  .drop {
+    position: relative;
+    background: var(--bg-1);
+    border: 1.5px dashed var(--line);
+    border-radius: 12px;
+    padding: 44px 32px 36px;
+    text-align: center;
+    transition: border-color .15s, background .15s;
+    overflow: hidden;
+  }
+  .drop::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      linear-gradient(var(--bg-1), var(--bg-1)) padding-box,
+      repeating-linear-gradient(45deg, transparent 0 12px, oklch(0.22 0.008 250 / 0.4) 12px 13px) border-box;
+    z-index: -1;
+  }
+  .drop.drag {
+    border-color: var(--info);
+    background: oklch(0.22 0.04 220 / 0.4);
+  }
+  .drop-icon {
+    width: 56px; height: 56px;
+    border-radius: 12px;
+    margin: 0 auto 16px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    display: grid; place-items: center;
+    color: var(--info);
+    box-shadow: inset 0 0 0 4px oklch(0.20 0.006 250);
+  }
+  .drop-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .drop-sub {
+    color: var(--fg-2);
+    font-size: 13px;
+    margin-bottom: 18px;
+  }
+  .drop-sub b { color: var(--fg-1); }
+  .drop-actions {
+    display: flex; gap: 10px; justify-content: center;
+    margin-bottom: 18px;
+  }
+  .file-spec {
+    display: inline-flex; align-items: center; gap: 14px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    color: var(--fg-3);
+    font: 500 11.5px var(--mono);
+  }
+  .file-spec .sep { color: oklch(0.34 0.008 250); }
+  .file-spec b { color: var(--fg-1); font-weight: 500; }
+
+  .or {
+    text-align: center;
+    margin: 18px 0 14px;
+    color: var(--fg-3);
+    font: 500 10.5px var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .or::before, .or::after {
+    content: ''; flex: 1; height: 1px; background: var(--line);
+  }
+
+  .sample-row {
+    display: flex; gap: 10px; justify-content: center;
+  }
+
+  /* Buttons */
+  .btn {
+    height: 34px; padding: 0 14px;
+    border-radius: 6px;
+    font: 500 12.5px var(--sans);
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--fg-1);
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn:hover { background: var(--bg-3); }
+  .btn.primary {
+    background: oklch(0.42 0.10 220);
+    border-color: oklch(0.55 0.13 220);
+    color: oklch(0.97 0.02 220);
+    box-shadow: inset 0 1px 0 oklch(0.65 0.13 220 / 0.3);
+  }
+  .btn.primary:hover { background: oklch(0.47 0.11 220); }
+  .btn.lg { height: 40px; padding: 0 18px; font-size: 13.5px; font-weight: 600; }
+  .btn.ghost { background: transparent; }
+
+  /* ---------- Config block ---------- */
+  .config {
+    margin-top: 22px;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .config-head {
+    display: flex; align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-1);
+  }
+  .config-title {
+    font: 600 11px var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-2);
+  }
+  .config-meta {
+    margin-left: auto;
+    font: 500 11px var(--mono);
+    color: var(--fg-3);
+  }
+  .config-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--line);
+  }
+  .field {
+    background: var(--bg-1);
+    padding: 16px 18px;
+    display: flex; flex-direction: column;
+    gap: 10px;
+  }
+  .field-label {
+    font: 500 11px var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fg-3);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .field-label .help {
+    color: var(--fg-3);
+    font-family: var(--sans);
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 400;
+  }
+
+  /* Segmented */
+  .seg {
+    display: inline-flex;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 3px;
+    width: 100%;
+  }
+  .seg button {
+    flex: 1;
+    background: transparent; border: 0;
+    color: var(--fg-2);
+    font: 500 12.5px var(--sans);
+    padding: 7px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .seg button.active {
+    background: var(--bg-3);
+    color: var(--fg);
+    box-shadow: 0 1px 0 oklch(0.35 0.008 250), inset 0 0 0 1px oklch(0.34 0.008 250);
+  }
+  .seg button .pdot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--fg-3);
+  }
+  .seg button.active .pdot.prod { background: var(--p1); box-shadow: 0 0 0 3px oklch(0.65 0.20 25 / 0.18); }
+  .seg button.active .pdot.uat  { background: var(--info); box-shadow: 0 0 0 3px oklch(0.74 0.12 220 / 0.18); }
+  .seg button .ml { font: 500 10.5px var(--mono); color: var(--fg-3); }
+  .seg button.active .ml { color: var(--fg-2); }
+
+  .field-foot {
+    font: 500 11px var(--mono);
+    color: var(--fg-3);
+    display: flex; gap: 12px;
+  }
+  .field-foot b { color: var(--fg-1); font-weight: 500; }
+
+  /* Action footer */
+  .action-bar {
+    margin-top: 22px;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 18px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .action-summary {
+    display: flex; gap: 18px;
+    font: 500 11.5px var(--mono);
+    color: var(--fg-3);
+    flex-wrap: wrap;
+  }
+  .action-summary b { color: var(--fg-1); font-weight: 500; }
+  .action-summary .ok { color: var(--ok); }
+  .action-bar .right { margin-left: auto; display: flex; gap: 10px; }
+
+  /* ---------- Recent runs ---------- */
+  .section-head {
+    display: flex; align-items: center; gap: 12px;
+    margin: 36px 0 12px;
+  }
+  .section-head h2 {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    margin: 0;
+  }
+  .section-head .meta {
+    font: 500 11px var(--mono);
+    color: var(--fg-3);
+  }
+  .section-head .right {
+    margin-left: auto;
+    display: flex; gap: 8px;
+  }
+
+  .table {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .tr {
+    display: grid;
+    grid-template-columns: 2.4fr 1.2fr 0.8fr 1fr 0.8fr 1fr 0.6fr;
+    align-items: center;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line-soft);
+    gap: 14px;
+  }
+  .tr:last-child { border-bottom: 0; }
+  .tr.head {
+    background: var(--bg);
+    font: 600 10.5px var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-3);
+    padding-top: 10px; padding-bottom: 10px;
+  }
+  .tr.body:hover { background: var(--bg-2); cursor: pointer; }
+  .run-id {
+    font: 500 12.5px var(--mono);
+    color: var(--fg);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .run-id .arrow { color: var(--fg-3); }
+  .run-id small { color: var(--fg-3); font-weight: 400; }
+  .col-mono { font: 500 12px var(--mono); color: var(--fg-1); }
+  .col-mono.dim { color: var(--fg-2); }
+  .num-big {
+    font: 600 14px var(--mono);
+    color: var(--fg);
+    letter-spacing: -0.01em;
+  }
+  .env {
+    display: inline-flex; align-items: center; gap: 6px;
+    font: 500 11px var(--mono);
+  }
+  .env .d { width: 6px; height: 6px; border-radius: 50%; }
+  .env.prod .d { background: var(--p1); box-shadow: 0 0 0 3px oklch(0.65 0.20 25 / 0.18); }
+  .env.prod { color: oklch(0.85 0.10 25); }
+  .env.uat .d { background: var(--info); box-shadow: 0 0 0 3px oklch(0.74 0.12 220 / 0.18); }
+  .env.uat { color: oklch(0.85 0.08 220); }
+
+  .p1-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 22px; padding: 0 8px;
+    border-radius: 4px;
+    font: 600 11px var(--mono);
+    background: var(--p1-bg);
+    color: oklch(0.92 0.10 25);
+    border: 1px solid oklch(0.45 0.15 25);
+  }
+  .p1-pill.zero {
+    background: var(--bg-2); color: var(--fg-2);
+    border-color: var(--line);
+  }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 22px; padding: 0 8px;
+    border-radius: 4px;
+    font: 500 11px var(--mono);
+    border: 1px solid var(--line);
+    background: var(--bg-2);
+    color: var(--fg-1);
+  }
+  .status-pill .d { width: 7px; height: 7px; border-radius: 50%; }
+  .status-pill.ok    { background: oklch(0.30 0.07 155 / 0.5); color: oklch(0.92 0.10 155); border-color: oklch(0.40 0.10 155); }
+  .status-pill.ok .d { background: var(--ok); box-shadow: 0 0 0 3px oklch(0.74 0.16 155 / 0.18); }
+  .status-pill.review { background: oklch(0.32 0.06 75 / 0.5); color: oklch(0.93 0.10 75); border-color: oklch(0.50 0.13 75); }
+  .status-pill.review .d { background: var(--warn); }
+  .status-pill.fail { background: oklch(0.30 0.09 25 / 0.5); color: oklch(0.92 0.10 25); border-color: oklch(0.45 0.15 25); }
+  .status-pill.fail .d { background: var(--p1); }
+
+  .row-actions {
+    display: flex; justify-content: flex-end;
+  }
+  .row-actions a {
+    color: var(--fg-3);
+    text-decoration: none;
+    font: 500 11.5px var(--mono);
+  }
+  .row-actions a:hover { color: var(--fg); }
+
+  /* mini sparkline */
+  .spark {
+    height: 18px; display: flex; gap: 1.5px; align-items: flex-end;
+  }
+  .spark i {
+    flex: 1; background: var(--bg-3); border-radius: 1px;
+  }
+
+  /* hidden file input */
+  .file-input { display: none; }
+
+  /* link buttons */
+  .link {
+    color: var(--info);
+    text-decoration: none;
+    font: 500 12px var(--mono);
+  }
+  .link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark"></div>
+    <div class="brand-name"><b>reconAI</b> <span style="color:var(--fg-3); margin: 0 4px">/</span> <span>Reconciliation</span></div>
+  </div>
+  <nav class="nav">
+    <a href="#" class="active">Runs</a>
+    <a href="#">Settings</a>
+    <a href="#">Docs</a>
+  </nav>
+  <div class="topbar-right">
+    <span class="badge"><span class="dot"></span><span class="label">org</span> td-bank-na</span>
+    <button class="icon-btn" title="Notifications">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6a4 4 0 118 0v3l1 2H3l1-2V6z"/><path d="M6.5 13a1.5 1.5 0 003 0"/></svg>
+    </button>
+    <span class="badge user"><span style="width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg, oklch(0.6 0.12 295), oklch(0.5 0.10 250));display:inline-grid;place-items:center;font-size:9.5px;font-weight:600;color:var(--fg)">JK</span> j.kowalski</span>
+  </div>
+</header>
+
+<main class="page">
+
+  <div class="page-head">
+    <div>
+      <h1>New reconciliation run</h1>
+      <div class="sub">Compare a Salesforce FSC export against the DB2 system of record.</div>
+    </div>
+    <div class="meta">
+      ready · agent-pool-3 · 12 workers idle
+    </div>
+  </div>
+
+  <!-- Drop zone -->
+  <div class="drop" id="drop">
+    <div class="drop-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M12 16V4M12 4l-4 4M12 4l4 4"/>
+        <path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/>
+      </svg>
+    </div>
+    <div class="drop-title">Drop your FSC export here</div>
+    <div class="drop-sub">CSV exported from Salesforce FSC · or <b>click to browse</b></div>
+    <div class="drop-actions">
+      <label class="btn">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h10v9H3zM3 7h10"/></svg>
+        Browse files
+        <input class="file-input" type="file" accept=".csv" />
+      </label>
+      <button class="btn ghost">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+        Connect via SFDX
+      </button>
+    </div>
+
+    <div class="file-spec">
+      <span><b>.csv</b> only</span><span class="sep">·</span>
+      <span>max <b>500 MB</b></span><span class="sep">·</span>
+      <span>UTF-8 · RFC 4180</span><span class="sep">·</span>
+      <span>required cols: <b>Id, Object, Field, Value, LastModifiedDate</b></span>
+    </div>
+
+    <div class="or">or</div>
+
+    <div class="sample-row">
+      <button class="btn">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M2 6h12M5 3v10"/></svg>
+        Use sample FSC data
+        <span style="font-family:var(--mono); font-size:10.5px; color:var(--fg-3); margin-left:4px">10k rows · 4 objects</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Config -->
+  <section class="config">
+    <div class="config-head">
+      <span class="config-title">Run Configuration</span>
+      <span class="config-meta">presets · default-fsc-recon-v3</span>
+    </div>
+    <div class="config-body">
+      <div class="field">
+        <span class="field-label">Environment <span class="help">— which DB2 instance to compare against</span></span>
+        <div class="seg" data-seg="env">
+          <button class="active" data-val="prod">
+            <span class="pdot prod"></span>
+            PROD
+            <span class="ml">db2-fsc-prod-01</span>
+          </button>
+          <button data-val="uat">
+            <span class="pdot uat"></span>
+            UAT
+            <span class="ml">db2-fsc-uat-02</span>
+          </button>
+        </div>
+        <div class="field-foot">
+          <span>region <b>us-east-1</b></span>
+          <span>conn <b style="color:var(--ok)">●</b> 31ms</span>
+          <span>last sync <b>2026-05-03 01:02Z</b></span>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label">LLM Model <span class="help">— agent backbone for hypothesis &amp; root-cause</span></span>
+        <div class="seg" data-seg="model">
+          <button class="active" data-val="claude">
+            Claude
+            <span class="ml">sonnet-4.5</span>
+          </button>
+          <button data-val="groq">
+            Groq
+            <span class="ml">llama-3.3-70b</span>
+          </button>
+          <button data-val="hybrid">
+            Hybrid
+            <span class="ml">groq → claude</span>
+          </button>
+        </div>
+        <div class="field-foot">
+          <span>est. cost <b>~$0.18 / incident</b></span>
+          <span>est. p50 latency <b>42s</b></span>
+          <span>budget cap <b>$5.00</b></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Action bar -->
+  <div class="action-bar">
+    <div class="action-summary">
+      <span><span class="ok">●</span> ready · <b>0</b> files queued</span>
+      <span style="color: oklch(0.34 0.008 250)">|</span>
+      <span>env <b>PROD</b></span>
+      <span>model <b>claude-sonnet-4.5</b></span>
+      <span>integrations <b>4</b></span>
+      <span>thresholds <b>default</b></span>
+    </div>
+    <div class="right">
+      <button class="btn lg">Save preset</button>
+      <button class="btn primary lg">
+        Start Analysis
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 3l7 5-7 5V3z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Recent runs -->
+  <div class="section-head">
+    <h2>Recent runs</h2>
+    <span class="meta">last 3 · <a href="#" class="link">view all →</a></span>
+    <div class="right">
+      <button class="btn"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 8a6 6 0 11-1.76-4.24L14 5"/><path d="M14 2v3h-3"/></svg> Refresh</button>
+    </div>
+  </div>
+
+  <div class="table">
+    <div class="tr head">
+      <div>Run ID</div>
+      <div>Started</div>
+      <div>Env</div>
+      <div>Discrepancies</div>
+      <div>P1</div>
+      <div>Status</div>
+      <div></div>
+    </div>
+
+    <!-- Row 1 -->
+    <div class="tr body">
+      <div class="run-id">
+        <span class="arrow">›</span>
+        run_20260503_0142Z
+        <small>fsc-acct-sync · 4 integrations</small>
+      </div>
+      <div class="col-mono">
+        2026-05-03 01:42Z
+        <div style="color:var(--fg-3); font-size:10.5px; margin-top:2px">7m ago · 4m 12s</div>
+      </div>
+      <div><span class="env prod"><span class="d"></span>PROD</span></div>
+      <div>
+        <span class="num-big">10</span>
+        <div class="spark" style="width:90px; margin-top:4px">
+          <i style="height:30%"></i><i style="height:20%; background:var(--p3)"></i><i style="height:60%; background:var(--p2)"></i><i style="height:40%; background:var(--p2)"></i><i style="height:90%; background:var(--p1)"></i><i style="height:50%; background:var(--p2)"></i><i style="height:30%; background:var(--p3)"></i><i style="height:25%; background:var(--p3)"></i>
+        </div>
+      </div>
+      <div><span class="p1-pill">● 2</span></div>
+      <div><span class="status-pill review"><span class="d"></span>analyzing</span></div>
+      <div class="row-actions"><a href="#">open →</a></div>
+    </div>
+
+    <!-- Row 2 -->
+    <div class="tr body">
+      <div class="run-id">
+        <span class="arrow">›</span>
+        run_20260502_2200Z
+        <small>nightly · 6 integrations</small>
+      </div>
+      <div class="col-mono">
+        2026-05-02 22:00Z
+        <div style="color:var(--fg-3); font-size:10.5px; margin-top:2px">yesterday · 8m 47s</div>
+      </div>
+      <div><span class="env prod"><span class="d"></span>PROD</span></div>
+      <div>
+        <span class="num-big">7</span>
+        <div class="spark" style="width:90px; margin-top:4px">
+          <i style="height:20%; background:var(--p3)"></i><i style="height:40%; background:var(--p2)"></i><i style="height:30%; background:var(--p3)"></i><i style="height:50%; background:var(--p2)"></i><i style="height:25%; background:var(--p3)"></i><i style="height:60%; background:var(--p2)"></i><i style="height:35%; background:var(--p3)"></i><i style="height:20%; background:var(--p3)"></i>
+        </div>
+      </div>
+      <div><span class="p1-pill zero">● 0</span></div>
+      <div><span class="status-pill ok"><span class="d"></span>resolved</span></div>
+      <div class="row-actions"><a href="#">open →</a></div>
+    </div>
+
+    <!-- Row 3 -->
+    <div class="tr body">
+      <div class="run-id">
+        <span class="arrow">›</span>
+        run_20260501_1815Z
+        <small>fsc-contact-sync · 2 integrations</small>
+      </div>
+      <div class="col-mono">
+        2026-05-01 18:15Z
+        <div style="color:var(--fg-3); font-size:10.5px; margin-top:2px">2 days ago · 12m 03s</div>
+      </div>
+      <div><span class="env uat"><span class="d"></span>UAT</span></div>
+      <div>
+        <span class="num-big">23</span>
+        <div class="spark" style="width:90px; margin-top:4px">
+          <i style="height:80%; background:var(--p1)"></i><i style="height:65%; background:var(--p2)"></i><i style="height:90%; background:var(--p1)"></i><i style="height:55%; background:var(--p2)"></i><i style="height:70%; background:var(--p1)"></i><i style="height:40%; background:var(--p2)"></i><i style="height:60%; background:var(--p2)"></i><i style="height:35%; background:var(--p3)"></i>
+        </div>
+      </div>
+      <div><span class="p1-pill">● 5</span></div>
+      <div><span class="status-pill fail"><span class="d"></span>needs review</span></div>
+      <div class="row-actions"><a href="#">open →</a></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  // Segmented controls
+  document.querySelectorAll('.seg').forEach(seg => {
+    seg.addEventListener('click', e => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      seg.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // update action bar summary
+      const env = document.querySelector('[data-seg="env"] .active')?.dataset.val || 'prod';
+      const model = document.querySelector('[data-seg="model"] .active')?.dataset.val || 'claude';
+      const modelLabel = { claude: 'claude-sonnet-4.5', groq: 'groq-llama-3.3-70b', hybrid: 'hybrid (groq→claude)' }[model];
+      const sum = document.querySelector('.action-summary');
+      sum.children[2].innerHTML = 'env <b>' + env.toUpperCase() + '</b>';
+      sum.children[3].innerHTML = 'model <b>' + modelLabel + '</b>';
+    });
+  });
+
+  // Drag-and-drop visuals
+  const drop = document.getElementById('drop');
+  ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('drag'); }));
+</script>
+</body>
+</html>

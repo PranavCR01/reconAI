@@ -1,0 +1,1059 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "total_incidents": 50,
+    "objects_covered": ["Contact", "Account", "Task", "Event", "AccountAccountRelation", "AccountContactRelation", "ContactContactRelation", "FinancialAccount__c", "KYC_Record__c", "Address__c"],
+    "discrepancy_type_distribution": {
+      "NULL_DOWNSTREAM": 18,
+      "VALUE_MISMATCH": 18,
+      "STALE_VALUE": 5,
+      "MISSING_RECORD": 3,
+      "DUPLICATE_DOWNSTREAM": 3,
+      "DUPLICATE_DOWNSTREAM_NOTES": "remaining 3 from sample CSV"
+    },
+    "evaluation_metrics": {
+      "root_cause_accuracy": "exact match between final_hypothesis root cause category and ground_truth.root_cause",
+      "confidence_calibration": "ECE (Expected Calibration Error) — bucket predictions by confidence, compare bucket accuracy to bucket confidence",
+      "hypothesis_efficiency": "len(hypotheses_tested) <= ground_truth.min_hypotheses_needed",
+      "early_termination_correct": "system terminated before H5/RAG when deterministic root cause was confirmable",
+      "bert_score": "semantic similarity between generated root_cause_summary and ground_truth.reference_explanation",
+      "false_positive_rate": "incidents where confidence > 0.8 AND root cause was wrong",
+      "human_review_precision": "incidents correctly flagged requires_human_review=True for genuinely ambiguous cases"
+    }
+  },
+  "incidents": [
+    {
+      "id": "BM-001",
+      "sf_record_id": "0031Q00001AbCdEfAA",
+      "sf_object": "Contact",
+      "sf_field": "MailingCity",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "FLS_STRIPPED",
+        "root_cause_category": "H3a",
+        "confidence_range": [0.88, 0.97],
+        "min_hypotheses_needed": 3,
+        "reasoning": "MailingCity is a standard Contact field. DB2 has no value at all (never populated). FLS check on integration user will confirm read access is missing. Splunk should show no missed events — field was never transmitted because FLS strips it at API layer.",
+        "reference_explanation": "Integration user lacks FLS read access to Contact.MailingCity. The field is stripped from the CDC payload before transmission, resulting in a permanently null value in DB2.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a"],
+        "early_termination_at": "H3a",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Classic FLS pattern on standard address field. High confidence expected."
+      }
+    },
+    {
+      "id": "BM-002",
+      "sf_record_id": "0031Q00001GhIjKlAA",
+      "sf_object": "Contact",
+      "sf_field": "Phone",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "FLS_STRIPPED",
+        "root_cause_category": "H3a",
+        "confidence_range": [0.88, 0.97],
+        "min_hypotheses_needed": 3,
+        "reasoning": "Phone is a standard Contact field. DB2 has no historical values. FLS check should confirm integration user lacks read access. Splunk will show CDC events firing but field absent from payload.",
+        "reference_explanation": "Integration user 'user@client.com' lacks FLS read access to Contact.Phone. Field is omitted from CDC change event payload, resulting in null propagation to DB2 PHONE_NBR.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a"],
+        "early_termination_at": "H3a",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Identical pattern to BM-001. Consistency test."
+      }
+    },
+    {
+      "id": "BM-003",
+      "sf_record_id": "0031Q00001MnOpQrAA",
+      "sf_object": "Contact",
+      "sf_field": "TaxId__c",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "FLS_STRIPPED",
+        "root_cause_category": "H3a",
+        "confidence_range": [0.88, 0.97],
+        "min_hypotheses_needed": 3,
+        "reasoning": "TaxId__c is a sensitive custom field. FLS restrictions on sensitive PII fields are extremely common in FSC integrations. Deployment correlation (deployed 19 hours before discrepancy) is a strong signal — FLS may have been tightened in recent deployment.",
+        "reference_explanation": "Integration user lacks FLS read access to Contact.TaxId__c. Recent deployment (2026-04-19) likely introduced stricter permission set configuration that removed read access for the integration profile.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a"],
+        "early_termination_at": "H3a",
+        "should_require_human_review": false,
+        "deployment_correlated": true,
+        "notes": "P1 because TaxId is compliance-critical. Deployment correlation should be mentioned in root cause summary."
+      }
+    },
+    {
+      "id": "BM-004",
+      "sf_record_id": "0031Q00001StUvWxAA",
+      "sf_object": "Contact",
+      "sf_field": "MailingState",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.70, 0.88],
+        "min_hypotheses_needed": 4,
+        "reasoning": "SF has IL, DB2 has NY. Both have values — not an FLS or CDC issue. This is a DataWeave mapping error where state codes are being mapped to wrong values, or a competing update from a bidirectional sync causing a clobber.",
+        "reference_explanation": "DataWeave transformation in SF_DB2_CONTACT_SYNC maps MailingState incorrectly — possible state code lookup table mismatch or bidirectional sync collision where DB2 value overwrote SF value.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "VALUE_MISMATCH on address fields often indicates DataWeave mapping or bidirectional sync collision."
+      }
+    },
+    {
+      "id": "BM-005",
+      "sf_record_id": "0031Q00001YzAbCdAA",
+      "sf_object": "Contact",
+      "sf_field": "Email",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "FLS_STRIPPED",
+        "root_cause_category": "H3a",
+        "confidence_range": [0.88, 0.97],
+        "min_hypotheses_needed": 3,
+        "reasoning": "Email is a sensitive PII field. Integration users frequently lack read access to Email for privacy compliance. DB2 has no value — never populated.",
+        "reference_explanation": "Integration user lacks FLS read access to Contact.Email. PII field commonly restricted for integration profiles per data privacy policy.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a"],
+        "early_termination_at": "H3a",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Email is a commonly FLS-restricted field. High confidence expected."
+      }
+    },
+    {
+      "id": "BM-006",
+      "sf_record_id": "0031Q00001EfGhIjAA",
+      "sf_object": "Contact",
+      "sf_field": "Birthdate",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.65, 0.85],
+        "min_hypotheses_needed": 4,
+        "reasoning": "SF has 1985-03-22, DB2 has 1985-03-23. One day off — classic timezone conversion error in DataWeave. Date fields without explicit timezone handling get shifted by UTC offset.",
+        "reference_explanation": "DataWeave transform applies incorrect timezone conversion to Birthdate field. Salesforce stores dates in UTC; DB2 stores in local time. Off-by-one day indicates UTC-to-local conversion applied during transform.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "Off-by-one date is a strong DataWeave timezone signal. Specific and testable."
+      }
+    },
+    {
+      "id": "BM-007",
+      "sf_record_id": "0031Q00001KlMnOpAA",
+      "sf_object": "Contact",
+      "sf_field": "LastName",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "root_cause_category": "H3b",
+        "confidence_range": [0.80, 0.92],
+        "min_hypotheses_needed": 3,
+        "reasoning": "LastName should never be FLS-restricted — it is a required field visible to all profiles. DB2 still has SMITH (old value), SF is now null. CDC exclusion more likely — LastName may not be in the ChangeEvent tracked fields list.",
+        "reference_explanation": "Contact.LastName is excluded from the ContactChangeEvent CDC channel field list. Updates to LastName are not transmitted to DB2, leaving stale value in place.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b"],
+        "early_termination_at": "H3b",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "FLS check should pass (LastName is always accessible). CDC exclusion is the correct next hypothesis."
+      }
+    },
+    {
+      "id": "BM-008",
+      "sf_record_id": "0011Q00001QrStUvAA",
+      "sf_object": "Account",
+      "sf_field": "BillingCity",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "FLS_STRIPPED",
+        "root_cause_category": "H3a",
+        "confidence_range": [0.88, 0.97],
+        "min_hypotheses_needed": 3,
+        "reasoning": "BillingCity null in DB2, SF has value. Standard address field on Account. FLS restriction on integration user is the most likely cause.",
+        "reference_explanation": "Integration user lacks FLS read access to Account.BillingCity. Field stripped from CDC payload.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a"],
+        "early_termination_at": "H3a",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Same FLS pattern as Contact.MailingCity — tests cross-object consistency."
+      }
+    },
+    {
+      "id": "BM-009",
+      "sf_record_id": "0011Q00001WxYzAbAA",
+      "sf_object": "Account",
+      "sf_field": "Industry",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.70, 0.85],
+        "min_hypotheses_needed": 4,
+        "reasoning": "SF has 'Financial Services' (picklist label), DB2 has 'FINSVCS' (code). Classic picklist label vs code mapping error in DataWeave. SF returns picklist labels by default; DB2 expects codes.",
+        "reference_explanation": "DataWeave transform passes SF picklist label ('Financial Services') to DB2 without converting to expected code ('FINSVCS'). Picklist label-to-code mapping table missing in transform.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "Picklist label vs code is the most common VALUE_MISMATCH pattern in FSC integrations."
+      }
+    },
+    {
+      "id": "BM-010",
+      "sf_record_id": "0011Q00001CdEfGhAA",
+      "sf_object": "Account",
+      "sf_field": "AnnualRevenue",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.60, 0.80],
+        "min_hypotheses_needed": 4,
+        "reasoning": "SF has 5000000, DB2 has 4500000. $500K difference — could be currency conversion, rounding, or a competing update. Not a metadata issue.",
+        "reference_explanation": "Numeric value mismatch on AnnualRevenue. Likely cause: DataWeave rounding or currency conversion applied incorrectly, or bidirectional sync overwrite from DB2 batch job with stale value.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "Numeric mismatch is ambiguous — requires human to verify source of truth."
+      }
+    },
+    {
+      "id": "BM-011",
+      "sf_record_id": "0011Q00001IjKlMnAA",
+      "sf_object": "Account",
+      "sf_field": "NumberOfEmployees",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "root_cause_category": "H3b",
+        "confidence_range": [0.78, 0.90],
+        "min_hypotheses_needed": 3,
+        "reasoning": "NumberOfEmployees is visible to all profiles — unlikely to be FLS-restricted. CDC field exclusion more likely for a non-critical numeric field.",
+        "reference_explanation": "Account.NumberOfEmployees excluded from AccountChangeEvent CDC channel. Field updates not transmitted to DB2.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b"],
+        "early_termination_at": "H3b",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "FLS should pass for this field. Tests whether system correctly moves to CDC check."
+      }
+    },
+    {
+      "id": "BM-012",
+      "sf_record_id": "0011Q00001OpQrStAA",
+      "sf_object": "Account",
+      "sf_field": "BillingPostalCode",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.65, 0.82],
+        "min_hypotheses_needed": 4,
+        "reasoning": "10001 vs 10002 — one digit off. Could be DataWeave truncation, ZIP+4 handling, or bidirectional sync collision.",
+        "reference_explanation": "DataWeave transform may be truncating ZIP+4 codes or applying incorrect postal code normalization. One-digit difference suggests systematic transform issue rather than data entry error.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "Similar to Birthdate off-by-one pattern. Tests numeric near-miss detection."
+      }
+    },
+    {
+      "id": "BM-013",
+      "sf_record_id": "0011Q00001UvWxYzAA",
+      "sf_object": "Account",
+      "sf_field": "Type",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "FLS_STRIPPED",
+        "root_cause_category": "H3a",
+        "confidence_range": [0.82, 0.92],
+        "min_hypotheses_needed": 3,
+        "reasoning": "Account.Type is a standard picklist field. Null in DB2 with no historical value. FLS restriction is the most common cause for standard picklist fields being null downstream.",
+        "reference_explanation": "Integration user lacks FLS read access to Account.Type. Field omitted from CDC payload.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a"],
+        "early_termination_at": "H3a",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Standard picklist field FLS test."
+      }
+    },
+    {
+      "id": "BM-014",
+      "sf_record_id": "0011Q00001AbCdEfAA",
+      "sf_object": "Account",
+      "sf_field": "Rating",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.65, 0.82],
+        "min_hypotheses_needed": 4,
+        "reasoning": "Hot vs Warm — picklist values. DataWeave mapping table may be outdated or incorrect for Rating picklist.",
+        "reference_explanation": "DataWeave rating mapping table maps 'Hot' to 'Warm' incorrectly, or Account was updated in SF after DB2 record was written and bidirectional sync applied stale DB2 value back.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "Simple picklist VALUE_MISMATCH."
+      }
+    },
+    {
+      "id": "BM-015",
+      "sf_record_id": "00T1Q00001GhIjKlAA",
+      "sf_object": "Task",
+      "sf_field": "Status",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.65, 0.82],
+        "min_hypotheses_needed": 4,
+        "reasoning": "Completed vs In Progress. Task status is a picklist. DataWeave mapping likely incorrect or DB2 received an earlier state that was not updated when status changed to Completed.",
+        "reference_explanation": "Task.Status picklist mapping in SF_DB2_ACTIVITY_SYNC DataWeave transform is incorrect or outdated. DB2 received intermediate status value that was not updated on completion.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "Activity sync VALUE_MISMATCH test."
+      }
+    },
+    {
+      "id": "BM-016",
+      "sf_record_id": "00T1Q00001MnOpQrAA",
+      "sf_object": "Task",
+      "sf_field": "Priority",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "root_cause_category": "H3b",
+        "confidence_range": [0.78, 0.90],
+        "min_hypotheses_needed": 3,
+        "reasoning": "Priority is a standard Task field visible to all. FLS restriction unlikely. CDC exclusion more likely — Priority may not be in the TaskChangeEvent tracked fields.",
+        "reference_explanation": "Task.Priority excluded from TaskChangeEvent CDC channel field list. Updates not propagated to DB2.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b"],
+        "early_termination_at": "H3b",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Activity object CDC exclusion test."
+      }
+    },
+    {
+      "id": "BM-017",
+      "sf_record_id": "00T1Q00001StUvWxAA",
+      "sf_object": "Task",
+      "sf_field": "Description",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "root_cause_category": "H3b",
+        "confidence_range": [0.85, 0.95],
+        "min_hypotheses_needed": 3,
+        "reasoning": "Description is a long text area field. Long text fields are explicitly excluded from CDC change events in Salesforce — this is a platform limitation, not a configuration error.",
+        "reference_explanation": "Task.Description is a LongTextArea field type. Salesforce CDC explicitly excludes LongTextArea fields from change event payloads. This is a platform limitation requiring a supplementary Bulk API sync for long text fields.",
+        "expected_hypothesis_path": ["H1", "H2", "H3b"],
+        "early_termination_at": "H3b",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Long text CDC exclusion is a platform-level rule. High confidence expected. Tests whether system knows this Salesforce platform fact."
+      }
+    },
+    {
+      "id": "BM-018",
+      "sf_record_id": "00U1Q00001YzAbCdAA",
+      "sf_object": "Event",
+      "sf_field": "StartDateTime",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.72, 0.88],
+        "min_hypotheses_needed": 4,
+        "reasoning": "4-hour difference — classic UTC to EST timezone conversion error. Salesforce stores datetime in UTC; DB2 stores in America/New_York. DataWeave not applying timezone offset.",
+        "reference_explanation": "DataWeave transform does not apply UTC-to-EST timezone conversion for Event.StartDateTime. SF stores 09:00 UTC; DB2 receives 09:00 but should show 13:00 EST (or vice versa depending on direction).",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "4-hour offset is a strong UTC/EST signal. Tests datetime timezone detection."
+      }
+    },
+    {
+      "id": "BM-019",
+      "sf_record_id": "00U1Q00001EfGhIjAA",
+      "sf_object": "Event",
+      "sf_field": "Location",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.55, 0.75],
+        "min_hypotheses_needed": 4,
+        "reasoning": "New York Office vs Chicago Office — office location text. Could be a DataWeave default value being applied, or a bidirectional sync where DB2 has older value. Lower confidence because location is free text.",
+        "reference_explanation": "Event.Location value mismatch suggests either DataWeave applying incorrect default location value or bidirectional sync collision where DB2 value was not updated after SF change.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "Free text VALUE_MISMATCH. Lower confidence appropriate — ambiguous root cause."
+      }
+    },
+    {
+      "id": "BM-020",
+      "sf_record_id": "00U1Q00001KlMnOpAA",
+      "sf_object": "Event",
+      "sf_field": "Subject",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "FLS_STRIPPED",
+        "root_cause_category": "H3a",
+        "confidence_range": [0.82, 0.93],
+        "min_hypotheses_needed": 3,
+        "reasoning": "Subject null in DB2 with no historical value. Standard Event field. FLS restriction on integration user most likely cause.",
+        "reference_explanation": "Integration user lacks FLS read access to Event.Subject. Field stripped from CDC payload.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a"],
+        "early_termination_at": "H3a",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Standard FLS pattern on Event object."
+      }
+    },
+    {
+      "id": "BM-021",
+      "sf_record_id": "0071Q00001QrStUvAA",
+      "sf_object": "AccountAccountRelation",
+      "sf_field": "Roles",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "FLS_STRIPPED",
+        "root_cause_category": "H3a",
+        "confidence_range": [0.82, 0.93],
+        "min_hypotheses_needed": 3,
+        "reasoning": "Relationship role null in DB2. AccountAccountRelation is a junction object — integration users frequently have restricted access to relationship objects in FSC.",
+        "reference_explanation": "Integration user lacks FLS read access to AccountAccountRelation.Roles. Relationship role stripped from CDC payload in SF_DB2_RELATIONSHIP_SYNC.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a"],
+        "early_termination_at": "H3a",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Tests FSC relationship object handling."
+      }
+    },
+    {
+      "id": "BM-022",
+      "sf_record_id": "0071Q00001WxYzAbAA",
+      "sf_object": "AccountAccountRelation",
+      "sf_field": "IsActive",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.65, 0.82],
+        "min_hypotheses_needed": 4,
+        "reasoning": "Boolean true vs false. Relationship deactivated in SF but DB2 still shows active. Could be DataWeave boolean mapping error (true/false vs 1/0) or update not propagated.",
+        "reference_explanation": "AccountAccountRelation.IsActive set to false in SF but DB2 shows active. DataWeave boolean serialization mismatch or CDC event not fired when relationship was deactivated.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "Boolean VALUE_MISMATCH on relationship object."
+      }
+    },
+    {
+      "id": "BM-023",
+      "sf_record_id": "0071Q00001CdEfGhAA",
+      "sf_object": "AccountAccountRelation",
+      "sf_field": "StartDate",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.65, 0.82],
+        "min_hypotheses_needed": 4,
+        "reasoning": "Off by one day — same pattern as Contact.Birthdate (BM-006). Timezone conversion error in date handling.",
+        "reference_explanation": "DataWeave UTC-to-local timezone conversion applied incorrectly to StartDate field, shifting date by one day.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "Consistency test — same pattern as BM-006 on different object."
+      }
+    },
+    {
+      "id": "BM-024",
+      "sf_record_id": "0071Q00001IjKlMnAA",
+      "sf_object": "AccountAccountRelation",
+      "sf_field": "EndDate",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.55, 0.75],
+        "min_hypotheses_needed": 4,
+        "reasoning": "SF has null EndDate (active relationship), DB2 has 2025-12-31 (expired). Bidirectional sync overwrite — DB2 had an EndDate that was written back to SF incorrectly, or DB2 was populated from a different source.",
+        "reference_explanation": "DB2 contains EndDate value not present in Salesforce. Likely bidirectional sync collision where DB2 batch job wrote an EndDate that differs from current SF state.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "Bidirectional sync collision pattern. Ambiguous — lower confidence appropriate."
+      }
+    },
+    {
+      "id": "BM-025",
+      "sf_record_id": "0071Q00001OpQrStAA",
+      "sf_object": "AccountAccountRelation",
+      "sf_field": "Roles",
+      "discrepancy_type": "MISSING_RECORD",
+      "ground_truth": {
+        "root_cause": "DELIVERY_GAP",
+        "root_cause_category": "H2",
+        "confidence_range": [0.75, 0.88],
+        "min_hypotheses_needed": 2,
+        "reasoning": "Record exists in SF but not in DB2 at all. Relationship records are junction objects — CREATE events may not trigger CDC if the object is not enabled for change events. Splunk will show no publish log for this record.",
+        "reference_explanation": "AccountAccountRelation record not found in DB2. CDC may not be enabled for this junction object, or the CREATE event was dropped. Splunk shows no publish log for this record ID.",
+        "expected_hypothesis_path": ["H1", "H2"],
+        "early_termination_at": "H2",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Junction object MISSING_RECORD. Tests whether system checks Splunk for publish log."
+      }
+    },
+    {
+      "id": "BM-026",
+      "sf_record_id": "00K1Q00001UvWxYzAA",
+      "sf_object": "AccountContactRelation",
+      "sf_field": "Roles",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "FLS_STRIPPED",
+        "root_cause_category": "H3a",
+        "confidence_range": [0.82, 0.93],
+        "min_hypotheses_needed": 3,
+        "reasoning": "AccountContactRelation.Roles null in DB2. Same pattern as AccountAccountRelation.Roles (BM-021). Junction object FLS restriction.",
+        "reference_explanation": "Integration user lacks FLS read access to AccountContactRelation.Roles. Field stripped from CDC payload.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a"],
+        "early_termination_at": "H3a",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Cross-object consistency test with BM-021."
+      }
+    },
+    {
+      "id": "BM-027",
+      "sf_record_id": "00K1Q00001AbCdEfAA",
+      "sf_object": "AccountContactRelation",
+      "sf_field": "IsActive",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.65, 0.82],
+        "min_hypotheses_needed": 4,
+        "reasoning": "Boolean mismatch — same pattern as AccountAccountRelation.IsActive (BM-022). Tests cross-object pattern consistency.",
+        "reference_explanation": "AccountContactRelation.IsActive boolean serialization mismatch in DataWeave transform.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "Cross-object consistency test with BM-022."
+      }
+    },
+    {
+      "id": "BM-028",
+      "sf_record_id": "00K1Q00001GhIjKlAA",
+      "sf_object": "AccountContactRelation",
+      "sf_field": "StartDate",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "root_cause_category": "H3b",
+        "confidence_range": [0.75, 0.88],
+        "min_hypotheses_needed": 3,
+        "reasoning": "Date field null in DB2. FLS unlikely for StartDate. CDC field exclusion more probable.",
+        "reference_explanation": "AccountContactRelation.StartDate excluded from AccountContactRelationChangeEvent CDC channel field list.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b"],
+        "early_termination_at": "H3b",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Date field CDC exclusion."
+      }
+    },
+    {
+      "id": "BM-029",
+      "sf_record_id": "0PO1Q00001MnOpQrAA",
+      "sf_object": "ContactContactRelation",
+      "sf_field": "Roles",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "FLS_STRIPPED",
+        "root_cause_category": "H3a",
+        "confidence_range": [0.82, 0.93],
+        "min_hypotheses_needed": 3,
+        "reasoning": "ContactContactRelation.Roles null in DB2. Consistent with junction object FLS pattern seen across AccountAccountRelation and AccountContactRelation.",
+        "reference_explanation": "Integration user lacks FLS read access to ContactContactRelation.Roles.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a"],
+        "early_termination_at": "H3a",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Third junction object — cross-object FLS consistency."
+      }
+    },
+    {
+      "id": "BM-030",
+      "sf_record_id": "0PO1Q00001StUvWxAA",
+      "sf_object": "ContactContactRelation",
+      "sf_field": "IsActive",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.65, 0.82],
+        "min_hypotheses_needed": 4,
+        "reasoning": "Boolean mismatch — consistent cross-object pattern. DataWeave boolean serialization issue.",
+        "reference_explanation": "ContactContactRelation.IsActive boolean mismatch in DataWeave transform — same pattern across all junction objects.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "Third boolean mismatch — tests cross-object consistency of VALUE_MISMATCH detection."
+      }
+    },
+    {
+      "id": "BM-031",
+      "sf_record_id": "a0B1Q00001YzAbCdAA",
+      "sf_object": "FinancialAccount__c",
+      "sf_field": "AnnualIncome__c",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "FLS_STRIPPED",
+        "root_cause_category": "H3a",
+        "confidence_range": [0.88, 0.97],
+        "min_hypotheses_needed": 3,
+        "reasoning": "AnnualIncome__c is a sensitive financial field. FLS restrictions on custom financial fields are extremely common in FSC. 45% simulator probability of FLS block for FinancialAccount__c fields.",
+        "reference_explanation": "Integration user lacks FLS read access to FinancialAccount__c.AnnualIncome__c. Sensitive financial field restricted per data governance policy.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a"],
+        "early_termination_at": "H3a",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Core FSC financial field FLS test."
+      }
+    },
+    {
+      "id": "BM-032",
+      "sf_record_id": "a0B1Q00001EfGhIjAA",
+      "sf_object": "FinancialAccount__c",
+      "sf_field": "AccountStatus__c",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.70, 0.88],
+        "min_hypotheses_needed": 4,
+        "reasoning": "Active vs Inactive — custom picklist mismatch. Deployment correlation (deployed 15 hours before) is a strong signal. DataWeave mapping table may have been modified in the deployment.",
+        "reference_explanation": "DataWeave mapping for FinancialAccount__c.AccountStatus__c picklist was modified in recent deployment (2026-04-16), introducing a mapping error between SF picklist values and DB2 codes.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": false,
+        "deployment_correlated": true,
+        "notes": "P1 with deployment correlation. Tests whether deployment signal is incorporated into reasoning."
+      }
+    },
+    {
+      "id": "BM-033",
+      "sf_record_id": "a0B1Q00001KlMnOpAA",
+      "sf_object": "FinancialAccount__c",
+      "sf_field": "BalanceAmt__c",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.60, 0.78],
+        "min_hypotheses_needed": 4,
+        "reasoning": "75000 vs 74500 — $500 discrepancy on balance. Could be currency rounding, interest calculation timing, or bidirectional sync writing back a stale value. P1 because balance accuracy is critical in FSI.",
+        "reference_explanation": "FinancialAccount balance discrepancy — $500 difference likely caused by DataWeave rounding or concurrent update during batch sync window.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "P1 financial balance discrepancy. Human review mandatory for financial values."
+      }
+    },
+    {
+      "id": "BM-034",
+      "sf_record_id": "a0B1Q00001QrStUvAA",
+      "sf_object": "FinancialAccount__c",
+      "sf_field": "InterestRate__c",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "root_cause_category": "H3b",
+        "confidence_range": [0.75, 0.88],
+        "min_hypotheses_needed": 3,
+        "reasoning": "InterestRate__c null in DB2 with no history. Custom field — likely excluded from CDC channel during initial setup to reduce payload size.",
+        "reference_explanation": "FinancialAccount__c.InterestRate__c excluded from FinancialAccountChangeEvent CDC channel field list.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b"],
+        "early_termination_at": "H3b",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Custom FSC field CDC exclusion."
+      }
+    },
+    {
+      "id": "BM-035",
+      "sf_record_id": "a0B1Q00001WxYzAbAA",
+      "sf_object": "FinancialAccount__c",
+      "sf_field": "AccountType__c",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.70, 0.85],
+        "min_hypotheses_needed": 4,
+        "reasoning": "Savings vs Checking — account type picklist mismatch. Classic picklist label vs code or incorrect mapping table.",
+        "reference_explanation": "DataWeave AccountType__c mapping maps 'Savings' picklist label to 'Checking' code incorrectly.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "FSC account type picklist mismatch."
+      }
+    },
+    {
+      "id": "BM-036",
+      "sf_record_id": "a0B1Q00001CdEfGhAA",
+      "sf_object": "FinancialAccount__c",
+      "sf_field": "PrimaryOwner__c",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "FLS_STRIPPED",
+        "root_cause_category": "H3a",
+        "confidence_range": [0.85, 0.95],
+        "min_hypotheses_needed": 3,
+        "reasoning": "PrimaryOwner__c is a lookup field referencing Contact. Lookup fields to sensitive objects are frequently FLS-restricted for integration users.",
+        "reference_explanation": "Integration user lacks FLS read access to FinancialAccount__c.PrimaryOwner__c. Lookup field to Contact restricted per data governance policy.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a"],
+        "early_termination_at": "H3a",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Lookup field FLS restriction — common FSC pattern."
+      }
+    },
+    {
+      "id": "BM-037",
+      "sf_record_id": "a0B1Q00001IjKlMnAA",
+      "sf_object": "FinancialAccount__c",
+      "sf_field": "AnnualIncome__c",
+      "discrepancy_type": "STALE_VALUE",
+      "ground_truth": {
+        "root_cause": "DELIVERY_GAP",
+        "root_cause_category": "H2",
+        "confidence_range": [0.72, 0.85],
+        "min_hypotheses_needed": 2,
+        "reasoning": "Values match but DB2 is 15 days behind SF last modified. Consumer lag in the SF_DB2_FIN_ACCT_SYNC pipeline. Splunk should show events being published but delayed in delivery.",
+        "reference_explanation": "FinancialAccount__c.AnnualIncome__c value is correct but stale — DB2 is 15 days behind due to consumer lag in SF_DB2_FIN_ACCT_SYNC Kafka consumer group.",
+        "expected_hypothesis_path": ["H1", "H2"],
+        "early_termination_at": "H2",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "STALE_VALUE with matching values but timestamp lag. Tests stale detection logic."
+      }
+    },
+    {
+      "id": "BM-038",
+      "sf_record_id": "a0C1Q00001OpQrStAA",
+      "sf_object": "KYC_Record__c",
+      "sf_field": "VerificationStatus__c",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.70, 0.85],
+        "min_hypotheses_needed": 4,
+        "reasoning": "Verified vs Pending. KYC status mismatch is P1 for compliance. DataWeave mapping likely incorrect for KYC status codes.",
+        "reference_explanation": "KYC_INTEGRATION_PIPELINE DataWeave maps 'Verified' to 'Pending' code incorrectly. Compliance-critical discrepancy requiring immediate remediation.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "P1 compliance field. Tests whether system escalates severity appropriately."
+      }
+    },
+    {
+      "id": "BM-039",
+      "sf_record_id": "a0C1Q00001UvWxYzAA",
+      "sf_object": "KYC_Record__c",
+      "sf_field": "ExpiryDate__c",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "FLS_STRIPPED",
+        "root_cause_category": "H3a",
+        "confidence_range": [0.88, 0.97],
+        "min_hypotheses_needed": 3,
+        "reasoning": "ExpiryDate__c null in DB2. Compliance date fields are highly sensitive and commonly FLS-restricted for integration users.",
+        "reference_explanation": "Integration user lacks FLS read access to KYC_Record__c.ExpiryDate__c. Compliance date field restricted per KYC data handling policy.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a"],
+        "early_termination_at": "H3a",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Compliance field FLS restriction. P1."
+      }
+    },
+    {
+      "id": "BM-040",
+      "sf_record_id": "a0C1Q00001AbCdEfAA",
+      "sf_object": "KYC_Record__c",
+      "sf_field": "DocumentType__c",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.68, 0.84],
+        "min_hypotheses_needed": 4,
+        "reasoning": "Passport vs Drivers License — document type picklist mismatch. DataWeave mapping incorrect for document type codes.",
+        "reference_explanation": "KYC_INTEGRATION_PIPELINE DataWeave document type mapping is incorrect — 'Passport' code maps to 'Drivers License' in the transform lookup table.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "P1 compliance document type mismatch."
+      }
+    },
+    {
+      "id": "BM-041",
+      "sf_record_id": "a0C1Q00001GhIjKlAA",
+      "sf_object": "KYC_Record__c",
+      "sf_field": "VerificationStatus__c",
+      "discrepancy_type": "MISSING_RECORD",
+      "ground_truth": {
+        "root_cause": "DELIVERY_GAP",
+        "root_cause_category": "H2",
+        "confidence_range": [0.75, 0.88],
+        "min_hypotheses_needed": 2,
+        "reasoning": "KYC record exists in SF but not in DB2. CREATE event likely dropped. Splunk will show no publish log for this record.",
+        "reference_explanation": "KYC_Record__c record not found in DB2. CDC CREATE event was not published or was dropped before delivery to KYC_INTEGRATION_PIPELINE consumer.",
+        "expected_hypothesis_path": ["H1", "H2"],
+        "early_termination_at": "H2",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "P1 missing KYC record — compliance critical."
+      }
+    },
+    {
+      "id": "BM-042",
+      "sf_record_id": "a0D1Q00001MnOpQrAA",
+      "sf_object": "Address__c",
+      "sf_field": "PostalCode",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.65, 0.82],
+        "min_hypotheses_needed": 4,
+        "reasoning": "10001 vs 10002 — one digit off. Same postal code near-miss pattern as BM-012. DataWeave truncation or ZIP+4 handling.",
+        "reference_explanation": "DataWeave postal code normalization error — same pattern as Account.BillingPostalCode (BM-012). Cross-object consistency.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "Cross-object consistency test with BM-012."
+      }
+    },
+    {
+      "id": "BM-043",
+      "sf_record_id": "a0D1Q00001StUvWxAA",
+      "sf_object": "Address__c",
+      "sf_field": "StateCode",
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "FLS_STRIPPED",
+        "root_cause_category": "H3a",
+        "confidence_range": [0.82, 0.93],
+        "min_hypotheses_needed": 3,
+        "reasoning": "StateCode null in DB2. Standard address field FLS restriction.",
+        "reference_explanation": "Integration user lacks FLS read access to Address__c.StateCode.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a"],
+        "early_termination_at": "H3a",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Address field FLS — consistent with Contact.MailingState pattern."
+      }
+    },
+    {
+      "id": "BM-044",
+      "sf_record_id": "a0D1Q00001YzAbCdAA",
+      "sf_object": "Address__c",
+      "sf_field": "City",
+      "discrepancy_type": "STALE_VALUE",
+      "ground_truth": {
+        "root_cause": "DELIVERY_GAP",
+        "root_cause_category": "H2",
+        "confidence_range": [0.70, 0.84],
+        "min_hypotheses_needed": 2,
+        "reasoning": "Values match but DB2 is 14 days behind SF. Consumer lag in SF_DB2_ADDRESS_SYNC.",
+        "reference_explanation": "Address__c.City value is correct but stale — 14-day lag in SF_DB2_ADDRESS_SYNC consumer group.",
+        "expected_hypothesis_path": ["H1", "H2"],
+        "early_termination_at": "H2",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "STALE_VALUE consumer lag pattern."
+      }
+    },
+    {
+      "id": "BM-045",
+      "sf_record_id": "a0D1Q00001EfGhIjAA",
+      "sf_object": "Address__c",
+      "sf_field": "Country",
+      "discrepancy_type": "VALUE_MISMATCH",
+      "ground_truth": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "root_cause_category": "H4",
+        "confidence_range": [0.68, 0.84],
+        "min_hypotheses_needed": 4,
+        "reasoning": "United States vs USA — country name vs country code mismatch. DataWeave not applying ISO 3166-1 country code conversion.",
+        "reference_explanation": "DataWeave transform passes SF country name ('United States') to DB2 without converting to expected ISO code ('USA'). Country name-to-code mapping missing.",
+        "expected_hypothesis_path": ["H1", "H2", "H3a", "H3b", "H4"],
+        "early_termination_at": "H4",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "Country name vs ISO code — common international data mapping error."
+      }
+    },
+    {
+      "id": "BM-046",
+      "sf_record_id": "a0B1Q00001OpQrStAA",
+      "sf_object": "FinancialAccount__c",
+      "sf_field": "BalanceAmt__c",
+      "discrepancy_type": "STALE_VALUE",
+      "ground_truth": {
+        "root_cause": "DELIVERY_GAP",
+        "root_cause_category": "H2",
+        "confidence_range": [0.72, 0.85],
+        "min_hypotheses_needed": 2,
+        "reasoning": "Values match but DB2 is 2 days behind SF. Financial balance staleness is a P2 concern.",
+        "reference_explanation": "FinancialAccount__c.BalanceAmt__c value matches but DB2 is 2 days stale. Consumer lag in SF_DB2_FIN_ACCT_SYNC.",
+        "expected_hypothesis_path": ["H1", "H2"],
+        "early_termination_at": "H2",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "Financial STALE_VALUE — 2-day lag is significant for balance data."
+      }
+    },
+    {
+      "id": "BM-047",
+      "sf_record_id": "0031Q00001UvWxYzAA",
+      "sf_object": "Contact",
+      "sf_field": "MailingCity",
+      "discrepancy_type": "STALE_VALUE",
+      "ground_truth": {
+        "root_cause": "DELIVERY_GAP",
+        "root_cause_category": "H2",
+        "confidence_range": [0.65, 0.80],
+        "min_hypotheses_needed": 2,
+        "reasoning": "Values match but DB2 is 2 days behind. Low-priority staleness on address field.",
+        "reference_explanation": "Contact.MailingCity value correct but stale in DB2 — 2-day consumer lag in SF_DB2_CONTACT_SYNC.",
+        "expected_hypothesis_path": ["H1", "H2"],
+        "early_termination_at": "H2",
+        "should_require_human_review": false,
+        "deployment_correlated": false,
+        "notes": "P3 STALE_VALUE on address — low priority."
+      }
+    },
+    {
+      "id": "BM-048",
+      "sf_record_id": "00K1Q00001MnOpQrAA",
+      "sf_object": "AccountContactRelation",
+      "sf_field": "Roles",
+      "discrepancy_type": "DUPLICATE_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "DUPLICATE_DOWNSTREAM",
+        "root_cause_category": "HDD",
+        "confidence_range": [0.70, 0.85],
+        "min_hypotheses_needed": 2,
+        "reasoning": "Same role value in DB2 twice. Junction object relationship records are especially prone to duplicate inserts when the integration uses INSERT instead of UPSERT.",
+        "reference_explanation": "SF_DB2_RELATIONSHIP_SYNC uses non-idempotent INSERT for AccountContactRelation. MuleSoft retry on transient failure created duplicate row for the same relationship.",
+        "expected_hypothesis_path": ["HDD1", "HDD2"],
+        "early_termination_at": "HDD2",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "Junction object DUPLICATE_DOWNSTREAM — idempotency issue."
+      }
+    },
+    {
+      "id": "BM-049",
+      "sf_record_id": "a0C1Q00001StUvWxAA",
+      "sf_object": "KYC_Record__c",
+      "sf_field": "VerificationStatus__c",
+      "discrepancy_type": "DUPLICATE_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "DUPLICATE_DOWNSTREAM",
+        "root_cause_category": "HDD",
+        "confidence_range": [0.72, 0.86],
+        "min_hypotheses_needed": 2,
+        "reasoning": "KYC record duplicated in DB2. High-severity because duplicate KYC records create compliance risk.",
+        "reference_explanation": "KYC_INTEGRATION_PIPELINE non-idempotent INSERT created duplicate KYC_Record__c rows. Compliance-critical — requires deduplication and upsert fix.",
+        "expected_hypothesis_path": ["HDD1", "HDD2"],
+        "early_termination_at": "HDD2",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "P2 compliance duplicate. Higher severity than BM-048."
+      }
+    },
+    {
+      "id": "BM-050",
+      "sf_record_id": "a0B1Q00001UvWxYzAA",
+      "sf_object": "FinancialAccount__c",
+      "sf_field": "AccountStatus__c",
+      "discrepancy_type": "DUPLICATE_DOWNSTREAM",
+      "ground_truth": {
+        "root_cause": "DUPLICATE_DOWNSTREAM",
+        "root_cause_category": "HDD",
+        "confidence_range": [0.72, 0.86],
+        "min_hypotheses_needed": 2,
+        "reasoning": "Closed account status duplicated in DB2. Financial account duplicates have regulatory implications.",
+        "reference_explanation": "SF_DB2_FIN_ACCT_SYNC non-idempotent INSERT created duplicate FinancialAccount__c status rows. Same root cause as BM-048 and BM-049 — systemic upsert issue across integration pipelines.",
+        "expected_hypothesis_path": ["HDD1", "HDD2"],
+        "early_termination_at": "HDD2",
+        "should_require_human_review": true,
+        "deployment_correlated": false,
+        "notes": "P2 financial account duplicate. Third in DUPLICATE_DOWNSTREAM series — tests consistency."
+      }
+    }
+  ],
+  "evaluation_guide": {
+    "root_cause_accuracy": {
+      "description": "Compare AI final_hypothesis root cause against ground_truth.root_cause",
+      "scoring": "1 if exact category match, 0 if wrong category",
+      "expected_baseline": "NULL_DOWNSTREAM incidents should be >90% accurate (deterministic FLS/CDC checks). VALUE_MISMATCH and ambiguous types will be lower."
+    },
+    "confidence_calibration": {
+      "description": "For each confidence bucket (0.5-0.6, 0.6-0.7, 0.7-0.8, 0.8-0.9, 0.9-1.0), check if actual accuracy matches stated confidence",
+      "formula": "ECE = sum(|bucket_confidence - bucket_accuracy| * bucket_size / total)",
+      "good_ece": "< 0.10",
+      "expected": "System should be well-calibrated on NULL_DOWNSTREAM (high confidence, high accuracy) and appropriately uncertain on VALUE_MISMATCH"
+    },
+    "hypothesis_efficiency": {
+      "description": "Did system take the minimum path to the answer?",
+      "formula": "efficiency = incidents where len(hypotheses_tested) <= ground_truth.min_hypotheses_needed / total",
+      "notes": "Early termination on FLS/CDC confirmation is the key signal"
+    },
+    "bert_score": {
+      "description": "Semantic similarity between AI root_cause_summary and ground_truth.reference_explanation",
+      "library": "bert_score Python package",
+      "model": "microsoft/deberta-xlarge-mnli recommended",
+      "good_f1": "> 0.85",
+      "notes": "Run: from bert_score import score; P, R, F1 = score(candidates, references, lang='en')"
+    },
+    "cross_object_consistency": {
+      "description": "For incidents with identical patterns on different objects (BM-001/BM-008, BM-022/BM-027/BM-030), AI should produce identical root cause categories",
+      "test": "Group by (discrepancy_type, root_cause, field_pattern) and check variance in confidence scores across objects"
+    },
+    "deployment_correlation_detection": {
+      "description": "For BM-003 and BM-032, AI should mention deployment correlation in root_cause_summary",
+      "test": "Check if 'deployment' or 'deploy' appears in root_cause_summary for deployment_correlated=true incidents"
+    }
+  }
+}

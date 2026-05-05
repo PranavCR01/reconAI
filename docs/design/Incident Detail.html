@@ -1,0 +1,1198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ReconAI — INC-2026-0507-002</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: oklch(0.16 0.006 250);
+    --bg-1: oklch(0.19 0.006 250);
+    --bg-2: oklch(0.22 0.007 250);
+    --bg-3: oklch(0.26 0.008 250);
+    --line: oklch(0.30 0.008 250);
+    --line-soft: oklch(0.25 0.007 250);
+    --fg: oklch(0.96 0.005 250);
+    --fg-1: oklch(0.82 0.006 250);
+    --fg-2: oklch(0.66 0.008 250);
+    --fg-3: oklch(0.50 0.008 250);
+
+    --p1: oklch(0.65 0.20 25);
+    --p1-bg: oklch(0.30 0.09 25);
+    --p2: oklch(0.78 0.15 75);
+    --p2-bg: oklch(0.32 0.07 75);
+    --p3: oklch(0.60 0.012 250);
+    --p3-bg: oklch(0.28 0.008 250);
+
+    --ok: oklch(0.74 0.16 155);
+    --ok-bg: oklch(0.30 0.07 155);
+    --warn: oklch(0.78 0.15 75);
+    --info: oklch(0.74 0.12 220);
+    --info-bg: oklch(0.28 0.06 220);
+    --violet: oklch(0.72 0.14 295);
+
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    height: 52px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--bg-1), var(--bg));
+    display: flex; align-items: center;
+    padding: 0 18px; gap: 18px;
+    position: sticky; top: 0; z-index: 20;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .brand-mark {
+    width: 22px; height: 22px;
+    border-radius: 5px;
+    background: linear-gradient(135deg, oklch(0.55 0.14 250), oklch(0.42 0.12 295));
+    box-shadow: inset 0 0 0 1px oklch(0.70 0.10 250 / 0.3);
+    position: relative;
+  }
+  .brand-mark::after {
+    content: ''; position: absolute; inset: 5px;
+    border-radius: 2px;
+    border: 1.5px solid var(--fg);
+    border-right-color: transparent; border-bottom-color: transparent;
+    transform: rotate(45deg);
+  }
+  .brand-name { font-size: 14px; }
+  .crumbs {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--fg-2); font-size: 12.5px;
+    font-family: var(--mono);
+  }
+  .crumbs a { color: var(--fg-2); text-decoration: none; }
+  .crumbs a:hover { color: var(--fg); }
+  .crumbs .sep { color: var(--fg-3); }
+  .crumbs .current { color: var(--fg); font-weight: 500; }
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 26px; padding: 0 10px;
+    border-radius: 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--fg-1);
+    font: 500 12px var(--mono);
+  }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--info); box-shadow: 0 0 0 3px oklch(0.74 0.12 220 / 0.18); }
+  .badge .label { color: var(--fg-3); font-weight: 400; }
+  .badge.user { font-family: var(--sans); }
+  .icon-btn {
+    width: 30px; height: 30px;
+    display: grid; place-items: center;
+    border-radius: 6px; background: var(--bg-2);
+    border: 1px solid var(--line); color: var(--fg-1); cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--bg-3); }
+
+  /* ---------- Page ---------- */
+  .page {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 18px 24px 80px;
+  }
+
+  /* Incident header */
+  .inc-head {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--p2);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 18px;
+  }
+  .inc-head-top {
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .sev {
+    display: inline-flex; align-items: center;
+    height: 22px; padding: 0 8px;
+    border-radius: 4px;
+    font: 600 11px var(--mono); letter-spacing: 0.04em;
+  }
+  .sev.p1 { background: var(--p1-bg); color: oklch(0.92 0.10 25); border: 1px solid oklch(0.45 0.15 25); }
+  .sev.p2 { background: var(--p2-bg); color: oklch(0.93 0.10 75); border: 1px solid oklch(0.50 0.13 75); }
+  .sev.p3 { background: var(--p3-bg); color: var(--fg-1); border: 1px solid var(--line); }
+  .inc-id {
+    font: 600 14px var(--mono);
+    color: var(--fg);
+  }
+  .inc-id .small { color: var(--fg-3); font-weight: 400; font-size: 11.5px; margin-left: 6px; }
+  .integration {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; color: var(--fg-1); font-weight: 500;
+  }
+  .integration svg { color: var(--fg-3); }
+  .rec-id {
+    font: 500 11.5px var(--mono);
+    color: var(--fg-2);
+    background: var(--bg-2);
+    padding: 2px 7px; border-radius: 3px;
+    border: 1px solid var(--line-soft);
+  }
+  .status {
+    display: inline-flex; align-items: center; gap: 6px;
+    font: 500 11.5px var(--mono); color: var(--fg-2);
+  }
+  .status .sd { width: 8px; height: 8px; border-radius: 50%; }
+  .status.resolved .sd { background: var(--ok); box-shadow: 0 0 0 3px oklch(0.74 0.16 155 / 0.2); }
+  .status.analyzing .sd { background: var(--warn); animation: blink 1.2s ease-in-out infinite; }
+  @keyframes blink { 0%,100% { opacity: 0.5 } 50% { opacity: 1 } }
+  .head-actions { margin-left: auto; display: flex; gap: 8px; }
+
+  .mapping {
+    display: flex; align-items: center;
+    font: 500 14px var(--mono);
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 6px;
+    padding: 12px 14px;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .mapping .grp { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .mapping .obj { color: var(--fg); font-weight: 600; }
+  .mapping .field { color: var(--info); }
+  .mapping .arrow { color: var(--fg-3); font-size: 14px; }
+  .mapping .sys {
+    font: 600 9.5px var(--mono);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--fg-3);
+    padding: 2px 6px; border: 1px solid var(--line); border-radius: 3px;
+  }
+  .mapping .sys.sf { color: oklch(0.74 0.10 220); border-color: oklch(0.40 0.06 220); }
+  .mapping .sys.db { color: oklch(0.78 0.10 75); border-color: oklch(0.40 0.06 75); }
+  .mapping .meta {
+    margin-left: auto;
+    font: 500 11px var(--mono);
+    color: var(--fg-3);
+    display: flex; gap: 12px;
+  }
+  .mapping .meta b { color: var(--fg-1); font-weight: 500; }
+
+  /* ---------- Layout ---------- */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 18px;
+  }
+
+  /* Panels */
+  .panel {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .panel-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .panel-title {
+    font: 600 11px var(--mono);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--fg-2);
+  }
+  .panel-meta { margin-left: auto; font: 500 11px var(--mono); color: var(--fg-3); }
+  .panel-body { padding: 14px 16px; }
+  .panel.collapsible .panel-head { cursor: pointer; user-select: none; }
+  .panel.collapsible .chev { color: var(--fg-3); transition: transform .15s; }
+  .panel.collapsible.collapsed .chev { transform: rotate(-90deg); }
+  .panel.collapsible.collapsed .panel-body { display: none; }
+
+  /* ---------- Hypothesis timeline ---------- */
+  .timeline {
+    position: relative;
+    padding-left: 18px;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute; left: 7px; top: 6px; bottom: 6px;
+    width: 1px; background: var(--line);
+  }
+  .tl-step {
+    position: relative;
+    padding: 10px 0 14px 14px;
+  }
+  .tl-step::before {
+    content: '';
+    position: absolute;
+    left: -12px; top: 16px;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: var(--bg-2);
+    border: 2px solid var(--line);
+  }
+  .tl-step.pass::before  { background: var(--ok); border-color: oklch(0.40 0.10 155); box-shadow: 0 0 0 3px oklch(0.74 0.16 155 / 0.18); }
+  .tl-step.fail::before  { background: var(--p1); border-color: oklch(0.45 0.15 25); }
+  .tl-step.confirm::before { background: var(--info); border-color: oklch(0.40 0.06 220); box-shadow: 0 0 0 3px oklch(0.74 0.12 220 / 0.18); }
+  .tl-row {
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap;
+  }
+  .hyp-tag {
+    font: 600 11px var(--mono);
+    padding: 2px 8px;
+    border-radius: 11px;
+    background: var(--bg-2); border: 1px solid var(--line-soft);
+    color: var(--fg-1);
+  }
+  .hyp-tag.pass { color: var(--ok); border-color: oklch(0.40 0.10 155); background: oklch(0.24 0.04 155 / 0.4); }
+  .hyp-tag.confirm { color: var(--info); border-color: oklch(0.40 0.06 220); background: oklch(0.24 0.04 220 / 0.4); }
+  .hyp-name { font-size: 13px; font-weight: 500; color: var(--fg); }
+  .hyp-verdict { font: 500 11.5px var(--mono); color: var(--fg-2); }
+  .hyp-verdict.pass { color: var(--ok); }
+  .hyp-verdict.confirm { color: var(--info); }
+  .hyp-time { margin-left: auto; font: 500 11px var(--mono); color: var(--fg-3); }
+  .hyp-detail {
+    margin-top: 6px;
+    color: var(--fg-2);
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  .hyp-detail code {
+    font-family: var(--mono); font-size: 11.5px;
+    background: var(--bg-2); border: 1px solid var(--line-soft);
+    padding: 1px 5px; border-radius: 3px; color: var(--fg-1);
+  }
+  .hyp-tools {
+    display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;
+  }
+  .tool-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    font: 500 10.5px var(--mono);
+    color: var(--fg-3);
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    padding: 2px 7px; border-radius: 3px;
+  }
+  .tool-chip b { color: var(--fg-1); font-weight: 500; }
+
+  /* ---------- Evidence cards ---------- */
+  .ev-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .ev-card {
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex; flex-direction: column; gap: 8px;
+    min-width: 0;
+  }
+  .ev-card .head {
+    display: flex; align-items: center; gap: 6px;
+    font: 500 11px var(--mono);
+    color: var(--fg-3);
+  }
+  .ev-card .head .src-tag {
+    font: 600 10px var(--mono);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 2px 6px; border-radius: 3px;
+    background: var(--bg-3); color: var(--info);
+    border: 1px solid var(--line);
+  }
+  .ev-card .head .ts { margin-left: auto; color: var(--fg-3); }
+  .ev-card .uri {
+    font: 500 12px var(--mono);
+    color: var(--fg);
+    word-break: break-all;
+    line-height: 1.4;
+  }
+  .ev-card .uri .scheme { color: var(--info); }
+  .ev-card .verdict {
+    display: flex; align-items: center; gap: 6px;
+    font: 500 11.5px var(--mono);
+    padding-top: 8px;
+    border-top: 1px dashed var(--line);
+  }
+  .ev-card .verdict.pass { color: var(--ok); }
+  .ev-card .verdict.confirm { color: var(--info); }
+  .ev-card .verdict.miss { color: var(--fg-2); }
+  .ev-card .verdict .d { width: 8px; height: 8px; border-radius: 50%; }
+  .ev-card .verdict.pass .d { background: var(--ok); }
+  .ev-card .verdict.confirm .d { background: var(--info); }
+  .ev-card .verdict.miss .d { background: var(--fg-3); }
+  .ev-card .snippet {
+    background: var(--bg);
+    border: 1px solid var(--line-soft);
+    border-radius: 4px;
+    padding: 8px 10px;
+    font: 500 11px var(--mono);
+    color: var(--fg-2);
+    white-space: pre-wrap;
+    line-height: 1.45;
+  }
+  .ev-card .snippet .k { color: var(--info); }
+  .ev-card .snippet .v { color: var(--fg-1); }
+  .ev-card .snippet .c { color: var(--fg-3); }
+  .ev-card .snippet .err { color: var(--p1); }
+  .ev-card .snippet .ok { color: var(--ok); }
+
+  /* Similar incidents */
+  .sim-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .sim-card {
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+  }
+  .sim-card:hover { background: var(--bg-3); border-color: var(--line); }
+  .sim-card-head {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+  }
+  .sim-card-head .id { font: 500 12px var(--mono); color: var(--fg); }
+  .sim-card-head .ago { font: 500 11px var(--mono); color: var(--fg-3); margin-left: auto; }
+  .sim-card .summary { font-size: 12.5px; color: var(--fg-1); margin-bottom: 8px; line-height: 1.5; }
+  .sim-card .summary code { font-family: var(--mono); font-size: 11.5px; background: var(--bg-3); padding: 1px 4px; border-radius: 3px; color: var(--fg); }
+  .sim-card .footer { display: flex; align-items: center; gap: 10px; }
+  .sim-card .sim-bar {
+    flex: 1; height: 4px; background: var(--bg-3); border-radius: 2px; overflow: hidden;
+  }
+  .sim-card .sim-bar > i {
+    display: block; height: 100%;
+    background: linear-gradient(90deg, var(--violet), oklch(0.78 0.13 295));
+  }
+  .sim-card .sim-pct { font: 500 11px var(--mono); color: var(--fg-1); }
+  .sim-card .resolved-tag {
+    font: 500 10.5px var(--mono); color: var(--ok);
+    background: oklch(0.24 0.04 155 / 0.4);
+    border: 1px solid oklch(0.40 0.10 155);
+    padding: 1px 6px; border-radius: 3px;
+  }
+
+  /* Suggested fix / postmortem */
+  .fix-block {
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .fix-block + .fix-block { margin-top: 10px; }
+  .fix-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--bg-2);
+  }
+  .fix-head .label {
+    font: 500 11px var(--mono); color: var(--fg-2);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .fix-head .badge-sm {
+    font: 500 10.5px var(--mono);
+    padding: 1px 6px; border-radius: 3px;
+    background: var(--bg-3); color: var(--fg-2);
+    border: 1px solid var(--line);
+  }
+  .fix-body { padding: 12px; }
+  .code-block {
+    background: var(--bg);
+    border: 1px solid var(--line-soft);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font: 500 11.5px var(--mono);
+    color: var(--fg-1);
+    white-space: pre;
+    overflow-x: auto;
+    line-height: 1.5;
+  }
+  .code-block .k { color: oklch(0.78 0.13 295); }
+  .code-block .s { color: oklch(0.78 0.13 75); }
+  .code-block .c { color: var(--fg-3); }
+  .code-block .add { color: var(--ok); }
+  .code-block .del { color: var(--p1); }
+
+  .pm-grid {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 8px 14px;
+    font-size: 12.5px;
+  }
+  .pm-grid dt {
+    color: var(--fg-3);
+    font: 500 10.5px var(--mono);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    padding-top: 2px;
+  }
+  .pm-grid dd { margin: 0; color: var(--fg-1); line-height: 1.55; }
+  .pm-grid dd code { font-family: var(--mono); font-size: 11.5px; background: var(--bg-3); padding: 1px 5px; border-radius: 3px; color: var(--fg); }
+
+  /* Jira summary */
+  .jira-card {
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .jira-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .jira-head .key {
+    font: 600 11px var(--mono); color: oklch(0.74 0.12 220);
+    background: oklch(0.24 0.04 220 / 0.4);
+    border: 1px solid oklch(0.40 0.06 220);
+    padding: 1px 6px; border-radius: 3px;
+  }
+  .jira-head .summary { font-size: 12.5px; color: var(--fg); font-weight: 500; }
+  .jira-head .copy {
+    margin-left: auto;
+    height: 26px; padding: 0 10px;
+    border-radius: 5px;
+    font: 500 11.5px var(--sans);
+    background: var(--bg-3);
+    border: 1px solid var(--line);
+    color: var(--fg-1);
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .jira-head .copy:hover { background: oklch(0.30 0.008 250); }
+  .jira-body {
+    padding: 12px 14px;
+    font: 500 12px var(--mono);
+    color: var(--fg-1);
+    background: var(--bg);
+    line-height: 1.6;
+  }
+  .jira-body .lbl { color: var(--info); }
+  .jira-body .dim { color: var(--fg-3); }
+
+  /* ---------- Resolution form ---------- */
+  .form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .form .full { grid-column: span 2; }
+  .form-field { display: flex; flex-direction: column; gap: 6px; }
+  .form-label {
+    font: 500 11px var(--mono);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--fg-3);
+  }
+  .input, .select, .textarea {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--fg);
+    border-radius: 6px;
+    padding: 9px 11px;
+    font: 500 12.5px var(--sans);
+    width: 100%;
+  }
+  .input:focus, .select:focus, .textarea:focus {
+    outline: none; border-color: var(--info);
+    box-shadow: 0 0 0 3px oklch(0.74 0.12 220 / 0.15);
+  }
+  .textarea { font-family: var(--mono); font-size: 12px; min-height: 80px; resize: vertical; line-height: 1.5; }
+  .select { appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%2370707a' stroke-width='1.5'><path d='M3 5l3 3 3-3'/></svg>"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+
+  .toggle-row {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+  .toggle-row .desc { font-size: 12.5px; color: var(--fg-1); }
+  .toggle-row .desc small { display: block; color: var(--fg-3); font: 500 10.5px var(--mono); margin-top: 2px; }
+  .toggle {
+    margin-left: auto;
+    width: 36px; height: 20px;
+    border-radius: 12px;
+    background: var(--bg-3);
+    border: 1px solid var(--line);
+    position: relative; cursor: pointer;
+    flex-shrink: 0;
+  }
+  .toggle::after {
+    content: ''; position: absolute;
+    width: 14px; height: 14px;
+    background: var(--fg-1);
+    border-radius: 50%;
+    top: 2px; left: 2px;
+    transition: left .15s, background .15s;
+  }
+  .toggle.on { background: oklch(0.40 0.10 155); border-color: oklch(0.50 0.12 155); }
+  .toggle.on::after { left: 18px; background: oklch(0.95 0.05 155); }
+
+  .checkbox-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px;
+    color: var(--fg-1);
+  }
+  .checkbox-row input { accent-color: var(--info); width: 14px; height: 14px; }
+
+  .form-foot {
+    grid-column: span 2;
+    display: flex; align-items: center; gap: 12px;
+    padding-top: 6px;
+    border-top: 1px solid var(--line-soft);
+    margin-top: 4px;
+  }
+  .form-foot .meta {
+    font: 500 11px var(--mono); color: var(--fg-3);
+  }
+  .form-foot .right { margin-left: auto; display: flex; gap: 8px; }
+
+  .btn {
+    height: 34px; padding: 0 14px;
+    border-radius: 6px;
+    font: 500 12.5px var(--sans);
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--fg-1);
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn:hover { background: var(--bg-3); }
+  .btn.primary {
+    background: oklch(0.42 0.10 220);
+    border-color: oklch(0.55 0.13 220);
+    color: oklch(0.97 0.02 220);
+  }
+  .btn.primary:hover { background: oklch(0.47 0.11 220); }
+  .btn.sm { height: 26px; padding: 0 10px; font-size: 11.5px; }
+
+  /* Right rail */
+  .rail-mini {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .mini-stat {
+    background: var(--bg-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 6px;
+    padding: 10px;
+  }
+  .mini-stat .l {
+    font: 500 10px var(--mono); color: var(--fg-3);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .mini-stat .v {
+    font: 600 16px var(--mono); color: var(--fg);
+    margin-top: 4px; letter-spacing: -0.01em;
+  }
+  .mini-stat .v.high { color: var(--ok); }
+  .mini-stat .d { font: 500 10.5px var(--mono); color: var(--fg-3); margin-top: 2px; }
+
+  .actor-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--line-soft);
+    font-size: 12.5px;
+  }
+  .actor-row:last-child { border: 0; }
+  .actor-av {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: linear-gradient(135deg, oklch(0.5 0.10 250), oklch(0.4 0.08 295));
+    display: grid; place-items: center;
+    font: 600 9.5px var(--mono); color: var(--fg);
+  }
+  .actor-av.bot { background: linear-gradient(135deg, oklch(0.5 0.12 220), oklch(0.4 0.10 250)); }
+  .actor-row .nm { color: var(--fg-1); font-weight: 500; }
+  .actor-row .nm small { display: block; color: var(--fg-3); font: 500 10.5px var(--mono); }
+  .actor-row .t { margin-left: auto; font: 500 10.5px var(--mono); color: var(--fg-3); }
+
+  .conf-big {
+    display: flex; align-items: baseline; gap: 8px;
+    margin-bottom: 8px;
+  }
+  .conf-big .num {
+    font: 600 28px var(--mono); color: var(--fg);
+    letter-spacing: -0.02em; line-height: 1;
+  }
+  .conf-big .pct { font: 500 11px var(--mono); color: var(--fg-3); }
+  .conf-bar {
+    height: 5px; background: var(--bg-3); border-radius: 3px; overflow: hidden;
+  }
+  .conf-bar > i {
+    display: block; height: 100%;
+    background: linear-gradient(90deg, var(--ok), oklch(0.80 0.14 155));
+    border-radius: 3px;
+  }
+  .conf-foot {
+    display: flex; justify-content: space-between;
+    margin-top: 6px;
+    font: 500 10.5px var(--mono); color: var(--fg-3);
+  }
+
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark"></div>
+    <div class="brand-name"><b>reconAI</b></div>
+  </div>
+  <nav class="crumbs">
+    <a href="#">Runs</a>
+    <span class="sep">›</span>
+    <a href="#">run_20260503_0142Z</a>
+    <span class="sep">›</span>
+    <span class="current">INC-2026-0507-002</span>
+  </nav>
+  <div class="topbar-right">
+    <span class="badge"><span class="dot"></span><span class="label">model</span> claude-sonnet-4.5</span>
+    <button class="icon-btn" title="Previous">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 3L5 8l5 5"/></svg>
+    </button>
+    <button class="icon-btn" title="Next">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3l5 5-5 5"/></svg>
+    </button>
+    <span class="badge user"><span style="width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg, oklch(0.6 0.12 295), oklch(0.5 0.10 250));display:inline-grid;place-items:center;font-size:9.5px;font-weight:600;color:var(--fg)">JK</span> j.kowalski</span>
+  </div>
+</header>
+
+<main class="page">
+
+  <!-- Incident header -->
+  <section class="inc-head">
+    <div class="inc-head-top">
+      <span class="sev p2">P2</span>
+      <span class="inc-id">INC-2026-0507-002 <span class="small">· opened 01:38:41Z · 4m 02s ago</span></span>
+      <span class="integration">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l3-3v2h4V5l3 3-3 3v-2H6v2L3 8z"/></svg>
+        fsc-contact-sync
+      </span>
+      <span class="rec-id">0035g00000zZ4MaAAK</span>
+      <span class="status resolved"><span class="sd"></span>resolved · root cause confirmed</span>
+      <div class="head-actions">
+        <button class="btn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>
+          Export
+        </button>
+        <button class="btn primary">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8l3 3 7-7"/></svg>
+          Apply suggested fix
+        </button>
+      </div>
+    </div>
+    <div class="mapping">
+      <span class="grp">
+        <span class="sys sf">SF</span>
+        <span class="obj">Contact</span><span style="color:var(--fg-3)">.</span><span class="field">Phone</span>
+      </span>
+      <span class="arrow">→</span>
+      <span class="grp">
+        <span class="sys db">DB2</span>
+        <span class="obj">FSC.PARTY_CONTACT</span><span style="color:var(--fg-3)">.</span><span class="field">PHONE_NBR</span>
+      </span>
+      <span class="meta">
+        <span>delta <b>2,847 rows</b></span>
+        <span>since <b>2026-04-29 03:11Z</b></span>
+        <span>integration <b>v3.4.1</b></span>
+      </span>
+    </div>
+  </section>
+
+  <div class="grid">
+    <!-- Left column -->
+    <div>
+
+      <!-- Hypothesis timeline -->
+      <section class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Hypothesis Execution</span>
+          <span class="panel-meta">3 hypotheses · 7.4s · 9 tool calls</span>
+        </div>
+        <div class="panel-body">
+          <div class="timeline">
+
+            <div class="tl-step pass">
+              <div class="tl-row">
+                <span class="hyp-tag pass">H1</span>
+                <span class="hyp-name">Source value present in Salesforce</span>
+                <span class="hyp-verdict pass">→ pass</span>
+                <span class="hyp-time">+0.6s · 01:38:42Z</span>
+              </div>
+              <div class="hyp-detail">
+                Confirmed Salesforce holds a non-null value: <code>Phone = "+1-416-555-0142"</code> on <code>Contact 0035g00000zZ4MaAAK</code>, last modified <code>2026-04-28 22:14Z</code> by <code><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="8df8fee8ffcdeee1e4e8e3f9a3eee2e0">[email&#160;protected]</a></code>. Source-side write succeeded; the discrepancy is downstream.
+              </div>
+              <div class="hyp-tools">
+                <span class="tool-chip">sf.soql · <b>1 call</b></span>
+                <span class="tool-chip">sf.history · <b>1 call</b></span>
+              </div>
+            </div>
+
+            <div class="tl-step pass">
+              <div class="tl-row">
+                <span class="hyp-tag pass">H2</span>
+                <span class="hyp-name">Splunk · CDC pipeline missed the event</span>
+                <span class="hyp-verdict pass">→ pass · no missed events</span>
+                <span class="hyp-time">+2.1s · 01:38:44Z</span>
+              </div>
+              <div class="hyp-detail">
+                Searched Splunk index <code>sf_apex_logs</code> for the modification window. CDC pipeline <code><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="dcbaafbff1bfb3b2a8bdbfa8f1afa5b2bf9caaeff2e8f2ed">[email&#160;protected]</a></code> emitted the change event; <code>ChangeEvent.payload.Phone</code> arrived at MuleSoft and was acknowledged. <b>0 events dropped, 0 retries, 0 DLQ entries.</b> Pipeline behavior is correct.
+              </div>
+              <div class="hyp-tools">
+                <span class="tool-chip">splunk.search · <b>2 calls</b></span>
+                <span class="tool-chip">mulesoft.dlq · <b>1 call</b></span>
+              </div>
+            </div>
+
+            <div class="tl-step confirm">
+              <div class="tl-row">
+                <span class="hyp-tag confirm">H3a</span>
+                <span class="hyp-name">FLS · field-level security stripped value at egress</span>
+                <span class="hyp-verdict confirm">→ confirmed</span>
+                <span class="hyp-time">+4.7s · 01:38:46Z</span>
+              </div>
+              <div class="hyp-detail">
+                Pulled FLS for the integration user’s profile. <code>Contact.Phone</code> is <b>not readable</b> by profile <code>Integration_User_FSC</code> (changed <code>2026-04-29 03:11Z</code> via setup audit log). MuleSoft therefore receives the field as <code>null</code> and writes <code>null</code> into <code>FSC.PARTY_CONTACT.PHONE_NBR</code>. <b>Root cause confirmed.</b>
+              </div>
+              <div class="hyp-tools">
+                <span class="tool-chip">sf.fls · <b>1 call</b></span>
+                <span class="tool-chip">sf.audit · <b>1 call</b></span>
+                <span class="tool-chip">db2.sample · <b>2 calls</b></span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- Evidence -->
+      <section class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Evidence</span>
+          <span class="panel-meta">3 sources · cached 14m</span>
+        </div>
+        <div class="panel-body">
+          <div class="ev-grid">
+
+            <!-- FLS -->
+            <div class="ev-card">
+              <div class="head">
+                <span class="src-tag">SF FLS</span>
+                <span>Field-Level Security</span>
+                <span class="ts">01:38:46Z</span>
+              </div>
+              <div class="uri"><span class="scheme">sf-fls://</span>Contact.Phone/<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2f5a5c4a5d6f4c43464a415b014c4042">[email&#160;protected]</a></div>
+              <div class="snippet"><span class="c"># profile: Integration_User_FSC</span>
+field: <span class="v">Contact.Phone</span>
+readable: <span class="err">false</span>
+editable: <span class="err">false</span>
+changed_at: <span class="v">2026-04-29T03:11:08Z</span>
+changed_by: <span class="v"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a5c4c1c8cccbe5c6c9ccc0cbd18bc6cac8">[email&#160;protected]</a></span></div>
+              <div class="verdict confirm"><span class="d"></span>FLS blocked at egress</div>
+            </div>
+
+            <!-- Splunk -->
+            <div class="ev-card">
+              <div class="head">
+                <span class="src-tag">SPLUNK</span>
+                <span>CDC Pipeline</span>
+                <span class="ts">01:38:44Z</span>
+              </div>
+              <div class="uri"><span class="scheme">splunk://</span>cdc-pipeline/Contact.Phone/0035g00000zZ4MaAAK</div>
+              <div class="snippet"><span class="c"># window: 2026-04-29 → 2026-05-03</span>
+events_emitted: <span class="ok">2,847</span>
+events_dlq:     <span class="v">0</span>
+retries:        <span class="v">0</span>
+ack_rate:       <span class="ok">100.0%</span></div>
+              <div class="verdict pass"><span class="d"></span>No missed events — pipeline OK</div>
+            </div>
+
+            <!-- DB2 -->
+            <div class="ev-card">
+              <div class="head">
+                <span class="src-tag">DB2</span>
+                <span>Historical scan</span>
+                <span class="ts">01:38:48Z</span>
+              </div>
+              <div class="uri"><span class="scheme">db2://</span>FSC.PARTY_CONTACT/PHONE_NBR/window-30d</div>
+              <div class="snippet"><span class="c"># scan: PHONE_NBR last 30d</span>
+total_rows:     <span class="v">2,847</span>
+non_null:       <span class="err">0</span>
+distinct_vals:  <span class="err">0</span>
+last_non_null:  <span class="v">2026-04-29 03:09Z</span></div>
+              <div class="verdict miss"><span class="d"></span>No historical values written</div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- Similar past incidents -->
+      <section class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Similar Past Incidents <span style="text-transform:none; letter-spacing:0; font-weight:400; color:var(--fg-3); margin-left: 8px;">via RAG · vector store recon-incidents-v4</span></span>
+          <span class="panel-meta">2 of 47 candidates</span>
+        </div>
+        <div class="panel-body">
+          <div class="sim-grid">
+
+            <div class="sim-card">
+              <div class="sim-card-head">
+                <span class="id">INC-2026-0319-014</span>
+                <span class="resolved-tag">resolved</span>
+                <span class="ago">45 days ago</span>
+              </div>
+              <div class="summary">
+                FLS change on <code>Account.AnnualRevenue__c</code> for the same <code>Integration_User_FSC</code> profile blocked field at egress. Resolved by reverting profile change.
+              </div>
+              <div class="footer">
+                <div class="sim-bar"><i style="width: 92%"></i></div>
+                <span class="sim-pct">0.92</span>
+              </div>
+            </div>
+
+            <div class="sim-card">
+              <div class="sim-card-head">
+                <span class="id">INC-2025-1108-077</span>
+                <span class="resolved-tag">resolved</span>
+                <span class="ago">177 days ago</span>
+              </div>
+              <div class="summary">
+                Permission set <code>FSC_Integration_Read</code> rolled back; <code>Contact.Phone</code> &amp; <code>Contact.Email</code> sync silently went null. Mitigated by re-granting permission set.
+              </div>
+              <div class="footer">
+                <div class="sim-bar"><i style="width: 87%"></i></div>
+                <span class="sim-pct">0.87</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- Suggested Fix -->
+      <section class="panel collapsible" id="fix-panel">
+        <div class="panel-head" onclick="toggle('fix-panel')">
+          <svg class="chev" width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M3 4.5L6 7.5 9 4.5"/></svg>
+          <span class="panel-title">Suggested Fix</span>
+          <span class="panel-meta">2 options · auto-applicable</span>
+        </div>
+        <div class="panel-body">
+
+          <div class="fix-block">
+            <div class="fix-head">
+              <span class="label">Option A · Restore FLS read on Integration_User_FSC profile</span>
+              <span class="badge-sm">recommended</span>
+              <span class="badge-sm" style="color:var(--ok); border-color: oklch(0.40 0.10 155); background: oklch(0.24 0.04 155 / 0.4)">low risk</span>
+            </div>
+            <div class="fix-body">
+              <div style="color:var(--fg-2); font-size:12.5px; margin-bottom:10px;">Apply the <b>Permissions.permissionsRead</b> flag on the field via metadata API. Idempotent. Requires Setup change ticket.</div>
+              <div class="code-block"><span class="c"># profile-patch.xml</span>
+<span class="k">&lt;Profile&gt;</span>
+  <span class="k">&lt;fieldPermissions&gt;</span>
+    <span class="k">&lt;field&gt;</span>Contact.Phone<span class="k">&lt;/field&gt;</span>
+    <span class="del">&lt;readable&gt;false&lt;/readable&gt;</span>
+    <span class="add">&lt;readable&gt;true&lt;/readable&gt;</span>
+    <span class="k">&lt;editable&gt;</span>false<span class="k">&lt;/editable&gt;</span>
+  <span class="k">&lt;/fieldPermissions&gt;</span>
+<span class="k">&lt;/Profile&gt;</span></div>
+              <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
+                <button class="btn sm primary">Generate change ticket</button>
+                <button class="btn sm">Open in SFDX</button>
+                <span style="margin-left:auto; font: 500 11px var(--mono); color: var(--fg-3)">est. effect: <b style="color:var(--ok)">2,847 rows backfill</b> on next sync</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="fix-block">
+            <div class="fix-head">
+              <span class="label">Option B · Switch integration user to dedicated permission set</span>
+              <span class="badge-sm" style="color:var(--warn); border-color: oklch(0.50 0.13 75); background: oklch(0.32 0.07 75 / 0.4)">medium risk</span>
+            </div>
+            <div class="fix-body">
+              <div style="color:var(--fg-2); font-size:12.5px;">Create <code style="font-family:var(--mono); background:var(--bg-3); padding:1px 5px; border-radius:3px; color:var(--fg)">FSC_Integration_ReadAll</code> permission set, assign to integration user. Decouples integration access from profile drift. Requires SecOps approval.</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Postmortem draft -->
+      <section class="panel collapsible" id="pm-panel">
+        <div class="panel-head" onclick="toggle('pm-panel')">
+          <svg class="chev" width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M3 4.5L6 7.5 9 4.5"/></svg>
+          <span class="panel-title">Postmortem Draft</span>
+          <span class="panel-meta">auto-generated · 412 tokens · ready to publish</span>
+        </div>
+        <div class="panel-body">
+          <dl class="pm-grid">
+            <dt>Summary</dt>
+            <dd>From <code>2026-04-29 03:11Z</code> onward, <b>2,847</b> Contact.Phone updates from Salesforce FSC failed to materialize in DB2 <code>FSC.PARTY_CONTACT.PHONE_NBR</code>. Records were written as <code>NULL</code> with no error or DLQ signal.</dd>
+
+            <dt>Impact</dt>
+            <dd>Downstream call-center routing (<code>genesys-cti</code>) and KYC outbound campaigns affected. <b>~1,100 customers</b> potentially un-reachable for 4d 22h. No regulatory breach (phone is not a mandatory KYC field for retail tier).</dd>
+
+            <dt>Trigger</dt>
+            <dd>Profile <code>Integration_User_FSC</code> field-level security for <code>Contact.Phone</code> changed from <code>readable=true</code> to <code>readable=false</code> by <code><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="97f6f3fafef9d7f4fbfef2f9e3b9f4f8fa">[email&#160;protected]</a></code> at <code>2026-04-29 03:11:08Z</code>. Change was part of the broader PII-tightening initiative (ticket <code>SEC-4432</code>).</dd>
+
+            <dt>Detection</dt>
+            <dd>ReconAI nightly run <code>run_20260503_0142Z</code> · 4d 22h after trigger. <b>Detection gap acknowledged</b> — see action items.</dd>
+
+            <dt>Resolution</dt>
+            <dd>Pending operator confirmation. Suggested: restore FLS read on profile (Option A above).</dd>
+
+            <dt>Action items</dt>
+            <dd>
+              · Add Splunk alert on FLS audit-log changes that touch integration profiles<br>
+              · Add reconAI scheduled run every <b>4h</b> for fsc-contact-sync (currently nightly)<br>
+              · Document FLS-change review step in SecOps PII change runbook
+            </dd>
+
+            <dt>Confidence</dt>
+            <dd style="font-family:var(--mono); color:var(--fg)"><b style="color:var(--ok)">94%</b> · 3 hypotheses tested, primary confirmed by audit log + DB2 scan + FLS pull</dd>
+          </dl>
+        </div>
+      </section>
+
+      <!-- Jira -->
+      <section class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Jira Summary</span>
+          <span class="panel-meta">project FSC-OPS · type Incident</span>
+        </div>
+        <div class="panel-body">
+          <div class="jira-card">
+            <div class="jira-head">
+              <span class="key">FSC-OPS-8821</span>
+              <span class="summary">[P2] Contact.Phone null in DB2 since 2026-04-29 — FLS regression on Integration_User_FSC</span>
+              <button class="copy" id="copyBtn">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11V3a1 1 0 011-1h7"/></svg>
+                <span id="copyLabel">Copy</span>
+              </button>
+            </div>
+            <div class="jira-body"><span class="lbl">h2.</span> Summary
+2,847 Contact.Phone records null in DB2 FSC.PARTY_CONTACT.PHONE_NBR since 2026-04-29 03:11Z.
+
+<span class="lbl">h2.</span> Root cause
+FLS change on Integration_User_FSC profile blocked Contact.Phone read at egress.
+
+<span class="lbl">h2.</span> Impact
+~1,100 customers affected · genesys-cti routing degraded · no regulatory breach.
+
+<span class="lbl">h2.</span> Recommended fix
+Restore <span class="dim">Permissions.permissionsRead=true</span> on Contact.Phone for Integration_User_FSC.
+
+<span class="lbl">h2.</span> Source
+reconAI run_20260503_0142Z · INC-2026-0507-002 · confidence 94%</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Resolution form -->
+      <section class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Resolution</span>
+          <span class="panel-meta">closes incident · feeds RAG store</span>
+        </div>
+        <div class="panel-body">
+          <form class="form" onsubmit="return false">
+
+            <div class="form-field full">
+              <label class="form-label">Confirmed root cause</label>
+              <textarea class="textarea">FLS change on profile Integration_User_FSC stripped read access to Contact.Phone at egress. MuleSoft received null and persisted null to FSC.PARTY_CONTACT.PHONE_NBR. Confirmed by audit log + FLS pull + DB2 scan.</textarea>
+            </div>
+
+            <div class="form-field">
+              <label class="form-label">Fix type</label>
+              <select class="select">
+                <option>Configuration · FLS / permissions</option>
+                <option>Code · MuleSoft DataWeave</option>
+                <option>Schema · DB2 DDL</option>
+                <option>Mapping · fsc-mappings.yaml</option>
+                <option>Process · runbook / approval</option>
+                <option>No fix · accepted variance</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label class="form-label">Linked ticket</label>
+              <input class="input" value="FSC-OPS-8821" />
+            </div>
+
+            <div class="form-field full">
+              <label class="form-label">Fix applied</label>
+              <textarea class="textarea" placeholder="Describe the change applied (commit / PR / change ticket)…">Restored Permissions.permissionsRead=true on Contact.Phone for profile Integration_User_FSC via metadata deploy (sfdx force:source:deploy). Verified with sf-fls://Contact.Phone/user@client.com → readable=true. Backfill triggered: reconAI rerun queued for 02:00Z.</textarea>
+            </div>
+
+            <div class="form-field full">
+              <div class="toggle-row">
+                <div class="desc">
+                  AI was correct
+                  <small>this signal is fed back into the RAG store and the hypothesis ranker</small>
+                </div>
+                <div class="toggle on" id="aiToggle" onclick="this.classList.toggle('on')"></div>
+              </div>
+            </div>
+
+            <div class="form-field full">
+              <label class="checkbox-row"><input type="checkbox" checked> Add this incident to the &nbsp;<code style="font-family:var(--mono);background:var(--bg-3);padding:1px 5px;border-radius:3px;color:var(--fg);font-size:11.5px;">recon-incidents-v4</code>&nbsp; vector store for future RAG retrieval</label>
+              <label class="checkbox-row"><input type="checkbox"> Open follow-up · add Splunk alert on FLS-audit changes for integration profiles</label>
+            </div>
+
+            <div class="form-foot">
+              <span class="meta">resolver <b style="color:var(--fg-1)">j.kowalski</b> · timestamp will be stamped server-side · <b style="color:var(--fg-1)">irreversible</b></span>
+              <div class="right">
+                <button class="btn">Save draft</button>
+                <button class="btn primary">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8l3 3 7-7"/></svg>
+                  Submit &amp; close incident
+                </button>
+              </div>
+            </div>
+
+          </form>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Right rail -->
+    <aside>
+
+      <section class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Confidence</span>
+          <span class="panel-meta">posterior</span>
+        </div>
+        <div class="panel-body">
+          <div class="conf-big">
+            <span class="num">94</span><span class="pct">% · high</span>
+          </div>
+          <div class="conf-bar"><i style="width: 94%"></i></div>
+          <div class="conf-foot">
+            <span>prior 0.31</span><span>likelihood 0.97</span><span>n=2,847</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Quick Stats</span>
+        </div>
+        <div class="panel-body">
+          <div class="rail-mini">
+            <div class="mini-stat"><div class="l">Records affected</div><div class="v">2,847</div><div class="d">delta window 4d 22h</div></div>
+            <div class="mini-stat"><div class="l">Tool calls</div><div class="v">9</div><div class="d">cost $0.16</div></div>
+            <div class="mini-stat"><div class="l">Time to RCA</div><div class="v high">7.4s</div><div class="d">−68% vs. p50</div></div>
+            <div class="mini-stat"><div class="l">Tokens</div><div class="v">12.8k</div><div class="d">in 10.4k · out 2.4k</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Activity</span>
+          <span class="panel-meta">5 events</span>
+        </div>
+        <div class="panel-body" style="padding-top: 4px;">
+          <div class="actor-row">
+            <div class="actor-av bot">AI</div>
+            <div class="nm">reconAI agent
+              <small>opened incident · ran 3 hypotheses</small>
+            </div>
+            <span class="t">01:38:41Z</span>
+          </div>
+          <div class="actor-row">
+            <div class="actor-av bot">AI</div>
+            <div class="nm">reconAI agent
+              <small>confirmed root cause · 94% confidence</small>
+            </div>
+            <span class="t">01:38:48Z</span>
+          </div>
+          <div class="actor-row">
+            <div class="actor-av">JK</div>
+            <div class="nm">j.kowalski
+              <small>opened incident detail</small>
+            </div>
+            <span class="t">01:39:02Z</span>
+          </div>
+          <div class="actor-row">
+            <div class="actor-av">JK</div>
+            <div class="nm">j.kowalski
+              <small>created Jira FSC-OPS-8821</small>
+            </div>
+            <span class="t">01:39:55Z</span>
+          </div>
+          <div class="actor-row">
+            <div class="actor-av">SR</div>
+            <div class="nm">s.ramos · SecOps
+              <small>assigned · @mention</small>
+            </div>
+            <span class="t">01:42:11Z</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Related Tickets</span>
+        </div>
+        <div class="panel-body">
+          <div style="display:flex; flex-direction: column; gap: 6px;">
+            <div style="display:flex; align-items:center; gap:8px; font:500 12px var(--mono);">
+              <span style="color:oklch(0.74 0.12 220);">SEC-4432</span>
+              <span style="color:var(--fg-2); font-family:var(--sans); font-weight:400;">PII tightening · FLS review</span>
+              <span style="margin-left:auto; color:var(--fg-3); font-size:10.5px;">closed</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; font:500 12px var(--mono);">
+              <span style="color:oklch(0.74 0.12 220);">FSC-OPS-8821</span>
+              <span style="color:var(--fg-2); font-family:var(--sans); font-weight:400;">this incident</span>
+              <span style="margin-left:auto; color:var(--warn); font-size:10.5px;">open</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; font:500 12px var(--mono);">
+              <span style="color:oklch(0.74 0.12 220);">CHG-9982</span>
+              <span style="color:var(--fg-2); font-family:var(--sans); font-weight:400;">FLS restore · awaiting CAB</span>
+              <span style="margin-left:auto; color:var(--fg-3); font-size:10.5px;">draft</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </aside>
+  </div>
+
+</main>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+  function toggle(id) {
+    document.getElementById(id).classList.toggle('collapsed');
+  }
+  // Copy Jira summary
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    const lbl = document.getElementById('copyLabel');
+    lbl.textContent = 'Copied';
+    setTimeout(() => lbl.textContent = 'Copy', 1500);
+  });
+</script>
+</body>
+</html>

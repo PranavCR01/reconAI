@@ -72,6 +72,8 @@ export default function Upload() {
   const [model, setModel] = useState<LlmConfig>('claude')
   const [loading, setLoading] = useState(false)
   const [history, setHistory] = useState<RunHistoryEntry[]>([])
+  const [refreshing, setRefreshing] = useState(false)
+  const [sfdxModalOpen, setSfdxModalOpen] = useState(false)
 
   useEffect(() => {
     setHistory(getRunHistory().slice(0, 3))
@@ -286,7 +288,7 @@ export default function Upload() {
               onChange={onFileChange}
             />
           </label>
-          <button style={{ ...btnBase, background: 'transparent' }}>
+          <button onClick={() => setSfdxModalOpen(true)} style={{ ...btnBase, background: 'transparent' }}>
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <circle cx="8" cy="8" r="6" />
               <path d="M8 5v3l2 2" />
@@ -646,22 +648,6 @@ export default function Upload() {
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
           <button
-            style={{
-              height: 40,
-              padding: '0 18px',
-              borderRadius: 6,
-              fontFamily: 'var(--sans)',
-              fontSize: 13.5,
-              fontWeight: 600,
-              background: 'var(--bg-2)',
-              border: '1px solid var(--line)',
-              color: 'var(--fg-1)',
-              cursor: 'pointer',
-            }}
-          >
-            Save preset
-          </button>
-          <button
             onClick={handleStartAnalysis}
             disabled={!canStart}
             style={{
@@ -712,13 +698,23 @@ export default function Upload() {
         </span>
         <div style={{ marginLeft: 'auto' }}>
           <button
-            onClick={() => setHistory(getRunHistory().slice(0, 3))}
-            style={btnBase}
+            onClick={async () => {
+              setRefreshing(true)
+              await new Promise(r => setTimeout(r, 400))
+              setHistory(getRunHistory().slice(0, 3))
+              setRefreshing(false)
+            }}
+            disabled={refreshing}
+            style={{ ...btnBase, opacity: refreshing ? 0.6 : 1 }}
           >
-            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M14 8a6 6 0 11-1.76-4.24L14 5" />
-              <path d="M14 2v3h-3" />
-            </svg>
+            {refreshing ? (
+              <span style={{ width: 11, height: 11, border: '2px solid var(--fg-3)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block', flexShrink: 0 }} />
+            ) : (
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M14 8a6 6 0 11-1.76-4.24L14 5" />
+                <path d="M14 2v3h-3" />
+              </svg>
+            )}
             Refresh
           </button>
         </div>
@@ -943,6 +939,29 @@ export default function Upload() {
           )
         })}
       </div>
+
+      {sfdxModalOpen && (
+        <div
+          onClick={() => setSfdxModalOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'oklch(0 0 0 / 0.6)', zIndex: 50, display: 'grid', placeItems: 'center' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--bg-1)', border: '1px solid var(--line)', borderRadius: 12, padding: '28px 32px', maxWidth: 440, width: '90%', display: 'flex', flexDirection: 'column', gap: 16 }}
+          >
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: 'var(--fg)' }}>SFDX Integration — Coming Soon</div>
+            <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--fg-2)', lineHeight: 1.6 }}>
+              Direct Salesforce DX connection will be available in a future release. For now, export your recon data as CSV and upload it manually.
+            </div>
+            <button
+              onClick={() => setSfdxModalOpen(false)}
+              style={{ alignSelf: 'flex-end', padding: '6px 18px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-2)', color: 'var(--fg-1)', fontFamily: 'var(--mono)', fontSize: 12, cursor: 'pointer' }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

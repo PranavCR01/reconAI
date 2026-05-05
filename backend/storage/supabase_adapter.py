@@ -100,16 +100,21 @@ class SupabaseAdapter(StorageAdapter):
             .eq("run_id", run_id)
             .execute()
         )
-        row_ids = [r["id"] for r in rows_result.data]
+        row_ids: set[str] = {r["id"] for r in rows_result.data}
         if not row_ids:
             return []
         result = await self._run(
             lambda: self._client.table("rca_incidents")
             .select("*")
-            .in_("recon_row_id", row_ids)
+            .in_("recon_row_id", list(row_ids))
             .execute()
         )
-        return [RCAIncident.model_validate(r) for r in result.data]
+        # Python-level guard ensures cross-run incidents never leak through
+        return [
+            RCAIncident.model_validate(r)
+            for r in result.data
+            if r.get("recon_row_id") in row_ids
+        ]
 
     async def get_incident_by_id(self, incident_id: str) -> RCAIncident:
         result = await self._run(

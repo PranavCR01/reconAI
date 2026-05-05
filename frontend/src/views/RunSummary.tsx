@@ -4,7 +4,7 @@ import { TopBar, Breadcrumbs } from '@/components/layout/TopBar'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { SeverityBadge } from '@/components/ui/Badge'
 import { Panel } from '@/components/ui/Panel'
-import { getRun, getRecallMetrics, runBenchmark } from '@/lib/api'
+import { getRun, getRecallMetrics } from '@/lib/api'
 import { fmtDate, fmtLatency, fmtConfidence, fmtTokens } from '@/lib/format'
 import type { RunDetailResponse, RCAIncident, Severity, BenchmarkResponse, RecallMetrics, LlmConfig } from '@/types'
 
@@ -85,9 +85,8 @@ export default function RunSummary() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [recall, setRecall] = useState<RecallMetrics | null>(null)
-  const [benchmark, setBenchmark] = useState<BenchmarkResponse | null>(null)
-  const [benchmarkLoading, setBenchmarkLoading] = useState(false)
-  const [benchmarkError, setBenchmarkError] = useState<string | null>(null)
+  const [benchmark] = useState<BenchmarkResponse | null>(null)
+  const [jiraModalOpen, setJiraModalOpen] = useState(false)
 
   useEffect(() => {
     if (!runId) return
@@ -97,21 +96,20 @@ export default function RunSummary() {
       .catch(e => { setError(String(e)); setLoading(false) })
     getRecallMetrics()
       .then(setRecall)
-      .catch(() => { /* non-fatal — panel stays empty */ })
+      .catch(() => { /* non-fatal */ })
   }, [runId])
 
-  async function handleRunBenchmark() {
-    if (!runId || benchmarkLoading) return
-    setBenchmarkLoading(true)
-    setBenchmarkError(null)
-    try {
-      const result = await runBenchmark(runId, 2)
-      setBenchmark(result)
-    } catch (e) {
-      setBenchmarkError(String(e))
-    } finally {
-      setBenchmarkLoading(false)
-    }
+  function handleDownloadJson() {
+    if (!data) return
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `reconai-run-${data.run.id ?? runId}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   if (loading) {
@@ -184,10 +182,10 @@ export default function RunSummary() {
             </span>
             <StatusPill variant={runStatusVariant(run.status)} />
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-              <button style={{ padding: '5px 14px', borderRadius: 5, border: '1px solid var(--line)', background: 'var(--bg-2)', color: 'var(--fg-1)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}>
+              <button onClick={handleDownloadJson} style={{ padding: '5px 14px', borderRadius: 5, border: '1px solid var(--line)', background: 'var(--bg-2)', color: 'var(--fg-1)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}>
                 Download JSON
               </button>
-              <button style={{ padding: '5px 14px', borderRadius: 5, border: '1px solid var(--info)', background: 'var(--info-bg)', color: 'var(--info)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}>
+              <button onClick={() => setJiraModalOpen(true)} style={{ padding: '5px 14px', borderRadius: 5, border: '1px solid var(--info)', background: 'var(--info-bg)', color: 'var(--info)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}>
                 Export to Jira
               </button>
             </div>
@@ -293,35 +291,7 @@ export default function RunSummary() {
         </Panel>
 
         {/* LLM Comparison */}
-        <Panel
-          title="LLM Comparison"
-          titleRight={
-            <button
-              onClick={handleRunBenchmark}
-              disabled={benchmarkLoading}
-              style={{
-                marginLeft: 'auto',
-                padding: '3px 10px',
-                borderRadius: 5,
-                border: '1px solid var(--info)',
-                background: benchmarkLoading ? 'var(--bg-2)' : 'var(--info-bg)',
-                color: 'var(--info)',
-                fontFamily: 'var(--mono)',
-                fontSize: 10.5,
-                fontWeight: 600,
-                cursor: benchmarkLoading ? 'not-allowed' : 'pointer',
-                opacity: benchmarkLoading ? 0.6 : 1,
-              }}
-            >
-              {benchmarkLoading ? 'Running…' : benchmark ? 'Re-run benchmark' : 'Run benchmark'}
-            </button>
-          }
-        >
-          {benchmarkError && (
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--p1)', marginBottom: 8 }}>
-              {benchmarkError}
-            </div>
-          )}
+        <Panel title="LLM Comparison">
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--mono)', fontSize: 12 }}>
               <thead>
@@ -349,19 +319,38 @@ export default function RunSummary() {
                 ) : (
                   <tr>
                     <td colSpan={5} style={{ padding: '20px 10px', textAlign: 'center', color: 'var(--fg-3)', fontSize: 11 }}>
-                      Click <span style={{ color: 'var(--info)' }}>Run benchmark</span> to compare Claude, Groq, and Hybrid configs on {data?.total_incidents ?? '—'} rows (2 sampled)
+                      No benchmark data available
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
-          {benchmark && (
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--fg-3)', marginTop: 8 }}>
-              {benchmark.rows_sampled} row{benchmark.rows_sampled !== 1 ? 's' : ''} sampled · cache bypassed · avg confidence used as accuracy proxy
-            </div>
-          )}
         </Panel>
+
+        {/* Jira modal */}
+        {jiraModalOpen && (
+          <div
+            onClick={() => setJiraModalOpen(false)}
+            style={{ position: 'fixed', inset: 0, background: 'oklch(0 0 0 / 0.6)', zIndex: 50, display: 'grid', placeItems: 'center' }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{ background: 'var(--bg-1)', border: '1px solid var(--line)', borderRadius: 12, padding: '28px 32px', maxWidth: 440, width: '90%', display: 'flex', flexDirection: 'column', gap: 16 }}
+            >
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: 'var(--fg)' }}>Jira Integration — Coming Soon</div>
+              <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--fg-2)', lineHeight: 1.6 }}>
+                Direct Jira export will be available in a future release. Copy Jira summaries from individual incident detail pages.
+              </div>
+              <button
+                onClick={() => setJiraModalOpen(false)}
+                style={{ alignSelf: 'flex-end', padding: '6px 18px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-2)', color: 'var(--fg-1)', fontFamily: 'var(--mono)', fontSize: 12, cursor: 'pointer' }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

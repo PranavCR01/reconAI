@@ -94,6 +94,8 @@ export default function LiveAnalysis() {
   const [sevFilter, setSevFilter] = useState<Severity | 'all'>('all')
   const [startTime] = useState(() => Date.now())
   const [elapsed, setElapsed] = useState(0)
+  const [isDone, setIsDone] = useState(false)
+  const [totalRows, setTotalRows] = useState(0)
   const heatCells = useRef<number[]>(Array.from({ length: 80 }, () => Math.random()))
 
   useEffect(() => {
@@ -110,10 +112,11 @@ export default function LiveAnalysis() {
         store.setSseConnected(true)
         store.setRunStatus('streaming')
       },
-      onDone: () => {
+      onDone: (e) => {
         store.setRunStatus('complete')
         store.setSseConnected(false)
-        navigate(`/runs/${runId}/summary`)
+        setIsDone(true)
+        setTotalRows(e.total_rows)
       },
       onError: () => {
         store.setSseConnected(false)
@@ -227,6 +230,56 @@ export default function LiveAnalysis() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', minHeight: 'calc(100vh - 210px)' }}>
         {/* Feed */}
         <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10, borderRight: '1px solid var(--line)' }}>
+          <AnimatePresence>
+            {isDone && (
+              <motion.div
+                key="done-banner"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25 }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  background: 'oklch(0.24 0.05 155 / 0.5)',
+                  border: '1px solid oklch(0.45 0.12 155)',
+                  flexShrink: 0,
+                }}
+              >
+                <span style={{ color: 'var(--ok)', fontSize: 14, lineHeight: 1 }}>✓</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ok)', fontWeight: 600 }}>
+                  Analysis complete
+                </span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>·</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-2)' }}>
+                  {totalRows} rows analyzed
+                </span>
+                <button
+                  onClick={() => navigate(`/runs/${runId}/summary`)}
+                  style={{
+                    marginLeft: 'auto',
+                    padding: '4px 12px',
+                    borderRadius: 5,
+                    border: '1px solid oklch(0.45 0.12 155)',
+                    background: 'oklch(0.30 0.07 155 / 0.6)',
+                    color: 'var(--ok)',
+                    fontFamily: 'var(--mono)',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                  }}
+                >
+                  View Summary →
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <AnimatePresence initial={false}>
             {filtered.map(inc => (
               <IncidentCard key={inc.id ?? inc.recon_row_id ?? String(Math.random())} incident={inc} runId={runId ?? ''} />

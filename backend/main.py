@@ -4,6 +4,7 @@ import asyncio
 import csv
 import io
 import json
+import time
 from contextlib import asynccontextmanager
 import statistics
 from datetime import date, datetime, timedelta, timezone
@@ -587,12 +588,21 @@ async def get_recall_metrics(storage: StorageDep):
 # Analytics endpoints (Slice 8)
 # ---------------------------------------------------------------------------
 
+_analytics_cache: dict = {}
+_ANALYTICS_TTL = 300  # 5 minutes
+
+
 def _since(days: int) -> datetime:
     return datetime.now(timezone.utc) - timedelta(days=days)
 
 
 @app.get("/api/v1/analytics/summary")
 async def analytics_summary(storage: StorageDep, days: int = Query(default=30, ge=1)):
+    _ck = f"summary:{days}"
+    _hit = _analytics_cache.get(_ck)
+    if _hit and (time.time() - _hit["ts"]) < _ANALYTICS_TTL:
+        return _hit["data"]
+
     since = _since(days)
     since_prev = _since(days * 2)
 
@@ -668,7 +678,7 @@ async def analytics_summary(storage: StorageDep, days: int = Query(default=30, g
         if sigma >= 3.0:
             spike_count += 1
 
-    return {
+    _result = {
         "runs": {"count": n_runs_cur, "delta_pct": _delta_pct(n_runs_cur, n_runs_prev)},
         "incidents_triaged": {"count": n_inc_cur, "delta_pct": _delta_pct(n_inc_cur, n_inc_prev)},
         "avg_resolution_rate": {"pct": res_rate_cur, "delta_pt": res_rate_cur - res_rate_prev},
@@ -676,10 +686,17 @@ async def analytics_summary(storage: StorageDep, days: int = Query(default=30, g
         "top_root_cause": {"name": top_rc_name, "pct": top_rc_pct, "count": top_rc_count},
         "deploy_correlations": {"count": spike_count, "total_deploys": len(deploys)},
     }
+    _analytics_cache[_ck] = {"data": _result, "ts": time.time()}
+    return _result
 
 
 @app.get("/api/v1/analytics/incidents-over-time")
 async def analytics_incidents_over_time(storage: StorageDep, days: int = Query(default=30, ge=1)):
+    _ck = f"incidents_over_time:{days}"
+    _hit = _analytics_cache.get(_ck)
+    if _hit and (time.time() - _hit["ts"]) < _ANALYTICS_TTL:
+        return _hit["data"]
+
     since = _since(days)
     incidents = await storage.get_incidents_since(since)
     rows = await storage.get_recon_rows_since(since)
@@ -705,11 +722,18 @@ async def analytics_incidents_over_time(storage: StorageDep, days: int = Query(d
         for dep in deploys
     ]
 
-    return {"dates": dates, "series": series, "deployments": deploy_out}
+    _result = {"dates": dates, "series": series, "deployments": deploy_out}
+    _analytics_cache[_ck] = {"data": _result, "ts": time.time()}
+    return _result
 
 
 @app.get("/api/v1/analytics/by-object")
 async def analytics_by_object(storage: StorageDep, days: int = Query(default=30, ge=1)):
+    _ck = f"by_object:{days}"
+    _hit = _analytics_cache.get(_ck)
+    if _hit and (time.time() - _hit["ts"]) < _ANALYTICS_TTL:
+        return _hit["data"]
+
     since = _since(days)
     incidents = await storage.get_incidents_since(since)
     rows = await storage.get_recon_rows_since(since)
@@ -727,7 +751,7 @@ async def analytics_by_object(storage: StorageDep, days: int = Query(default=30,
         if sev in obj_counts[obj]:
             obj_counts[obj][sev] += 1
 
-    result = [
+    _result = [
         {
             "object": obj,
             "p1": counts["P1"],
@@ -737,12 +761,18 @@ async def analytics_by_object(storage: StorageDep, days: int = Query(default=30,
         }
         for obj, counts in obj_counts.items()
     ]
-    result.sort(key=lambda x: x["total"], reverse=True)
-    return result
+    _result.sort(key=lambda x: x["total"], reverse=True)
+    _analytics_cache[_ck] = {"data": _result, "ts": time.time()}
+    return _result
 
 
 @app.get("/api/v1/analytics/root-cause-distribution")
 async def analytics_root_cause_distribution(storage: StorageDep, days: int = Query(default=30, ge=1)):
+    _ck = f"root_cause:{days}"
+    _hit = _analytics_cache.get(_ck)
+    if _hit and (time.time() - _hit["ts"]) < _ANALYTICS_TTL:
+        return _hit["data"]
+
     since = _since(days)
     incidents = await storage.get_incidents_since(since)
     rows = await storage.get_recon_rows_since(since)
@@ -757,7 +787,7 @@ async def analytics_root_cause_distribution(storage: StorageDep, days: int = Que
         counts[key] = counts.get(key, 0) + 1
         total += 1
 
-    return [
+    _result = [
         {
             "root_cause": rc,
             "count": cnt,
@@ -765,10 +795,17 @@ async def analytics_root_cause_distribution(storage: StorageDep, days: int = Que
         }
         for rc, cnt in sorted(counts.items(), key=lambda x: x[1], reverse=True)
     ]
+    _analytics_cache[_ck] = {"data": _result, "ts": time.time()}
+    return _result
 
 
 @app.get("/api/v1/analytics/deployment-correlation")
 async def analytics_deployment_correlation(storage: StorageDep, days: int = Query(default=30, ge=1)):
+    _ck = f"deploy_corr:{days}"
+    _hit = _analytics_cache.get(_ck)
+    if _hit and (time.time() - _hit["ts"]) < _ANALYTICS_TTL:
+        return _hit["data"]
+
     since = _since(days)
     # Fetch all incidents for a larger window for baseline calculation
     big_since = _since(days + 14)
@@ -855,11 +892,17 @@ async def analytics_deployment_correlation(storage: StorageDep, days: int = Quer
         })
 
     result.sort(key=lambda x: abs(x["sigma"]), reverse=True)
+    _analytics_cache[_ck] = {"data": result, "ts": time.time()}
     return result
 
 
 @app.get("/api/v1/analytics/ai-accuracy")
 async def analytics_ai_accuracy(storage: StorageDep, weeks: int = Query(default=12, ge=1)):
+    _ck = f"ai_accuracy:{weeks}"
+    _hit = _analytics_cache.get(_ck)
+    if _hit and (time.time() - _hit["ts"]) < _ANALYTICS_TTL:
+        return _hit["data"]
+
     since = _since(weeks * 7)
     resolutions = await storage.get_resolutions_since(since)
 
@@ -897,7 +940,7 @@ async def analytics_ai_accuracy(storage: StorageDep, weeks: int = Query(default=
     total_res = len(resolutions)
     overrides = sum(1 for r in resolutions if r.get("ai_was_correct") is False)
 
-    return {
+    _result = {
         "weeks": week_labels,
         "recall_at_1": recall_at_1,
         "recall_at_3": recall_at_3,
@@ -909,6 +952,8 @@ async def analytics_ai_accuracy(storage: StorageDep, weeks: int = Query(default=
             "overrides": overrides,
         },
     }
+    _analytics_cache[_ck] = {"data": _result, "ts": time.time()}
+    return _result
 
 
 @app.post("/api/v1/recon/runs/{run_id}/benchmark")

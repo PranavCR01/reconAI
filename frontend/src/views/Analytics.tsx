@@ -41,10 +41,26 @@ function Panel({ title, meta, children, noPad = false }: { title: string; meta?:
   )
 }
 
-function Spinner() {
+const SKEL: React.CSSProperties = {
+  background: 'var(--bg-2)',
+  borderRadius: 6,
+  animation: 'shimmer-pulse 1.4s ease-in-out infinite',
+}
+
+function SkeletonBlock({ h, w = '100%', mb = 0 }: { h: number; w?: string | number; mb?: number }) {
+  return <div style={{ ...SKEL, height: h, width: w, marginBottom: mb }} />
+}
+
+function ChartSkeleton({ h = 200 }: { h?: number }) {
+  return <SkeletonBlock h={h} />
+}
+
+function StatSkeleton() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: 'var(--fg-3)', font: '500 12px var(--mono)' }}>
-      loading…
+    <div style={{ padding: '16px 18px' }}>
+      <SkeletonBlock h={10} w="55%" mb={10} />
+      <SkeletonBlock h={28} w="65%" mb={8} />
+      <SkeletonBlock h={8} w="40%" />
     </div>
   )
 }
@@ -157,57 +173,65 @@ export default function Analytics() {
         border: '1px solid var(--line)', borderRadius: 10,
         overflow: 'hidden', marginBottom: 18,
       }}>
-        <StatCard
-          label={`Runs · ${days}d`}
-          value={summary?.runs.count.toLocaleString() ?? '—'}
-          delta={summary ? `${summary.runs.delta_pct > 0 ? '+' : ''}${summary.runs.delta_pct}%` : undefined}
-          deltaDir={summary ? (summary.runs.delta_pct > 0 ? 'up' : 'down') : undefined}
-          sparkData={SPARK_RUNS}
-        />
-        <StatCard
-          label="Incidents triaged"
-          value={summary?.incidents_triaged.count.toLocaleString() ?? '—'}
-          delta={summary ? `${summary.incidents_triaged.delta_pct > 0 ? '+' : ''}${summary.incidents_triaged.delta_pct}%` : undefined}
-          deltaDir={summary ? (summary.incidents_triaged.delta_pct > 0 ? 'up' : 'down') : undefined}
-          sparkData={SPARK_INC}
-        />
-        <StatCard
-          label="Avg resolution rate"
-          value={summary?.avg_resolution_rate.pct ?? '—'}
-          unit="%"
-          delta={summary ? `${summary.avg_resolution_rate.delta_pt > 0 ? '+' : ''}${summary.avg_resolution_rate.delta_pt}pt` : undefined}
-          deltaDir={summary ? (summary.avg_resolution_rate.delta_pt >= 0 ? 'down' : 'up') : undefined}
-          valueColor="ok"
-          sparkData={SPARK_RES}
-        />
-        <StatCard
-          label="Avg confidence"
-          value={summary?.avg_confidence.pct ?? '—'}
-          unit="%"
-          delta={summary ? `${summary.avg_confidence.delta_pt > 0 ? '+' : ''}${summary.avg_confidence.delta_pt}pt` : undefined}
-          deltaDir={summary ? (summary.avg_confidence.delta_pt >= 0 ? 'down' : 'up') : undefined}
-          sparkData={SPARK_CONF}
-        />
-        <StatCard
-          label="Top root cause"
-          value=""
-          footer={summary ? (
-            <>
-              {summary.top_root_cause.name}
-              <small style={{ color: 'var(--fg-3)', fontWeight: 500, display: 'block', marginTop: 2, fontSize: 10.5 }}>
-                {summary.top_root_cause.pct}% of incidents · {summary.top_root_cause.count.toLocaleString()} cases
-              </small>
-            </>
-          ) : <span style={{ color: 'var(--fg-3)' }}>—</span>}
-        />
-        <StatCard
-          label="Deploy correlations"
-          value={summary?.deploy_correlations.count ?? '—'}
-          delta={summary ? `/ ${summary.deploy_correlations.total_deploys} deploys` : undefined}
-          deltaDir="neutral"
-          valueColor="warn"
-          footer={undefined}
-        />
+        {loading ? (
+          Array.from({ length: 6 }, (_, i) => (
+            <div key={i} style={{ background: 'var(--bg-1)' }}><StatSkeleton /></div>
+          ))
+        ) : (
+          <>
+            <StatCard
+              label={`Runs · ${days}d`}
+              value={summary?.runs.count.toLocaleString() ?? '—'}
+              delta={summary ? `${summary.runs.delta_pct > 0 ? '+' : ''}${summary.runs.delta_pct}%` : undefined}
+              deltaDir={summary ? (summary.runs.delta_pct > 0 ? 'up' : 'down') : undefined}
+              sparkData={SPARK_RUNS}
+            />
+            <StatCard
+              label="Incidents triaged"
+              value={summary?.incidents_triaged.count.toLocaleString() ?? '—'}
+              delta={summary ? `${summary.incidents_triaged.delta_pct > 0 ? '+' : ''}${summary.incidents_triaged.delta_pct}%` : undefined}
+              deltaDir={summary ? (summary.incidents_triaged.delta_pct > 0 ? 'up' : 'down') : undefined}
+              sparkData={SPARK_INC}
+            />
+            <StatCard
+              label="Avg resolution rate"
+              value={summary?.avg_resolution_rate.pct ?? '—'}
+              unit="%"
+              delta={summary ? `${summary.avg_resolution_rate.delta_pt > 0 ? '+' : ''}${summary.avg_resolution_rate.delta_pt}pt` : undefined}
+              deltaDir={summary ? (summary.avg_resolution_rate.delta_pt >= 0 ? 'down' : 'up') : undefined}
+              valueColor="ok"
+              sparkData={SPARK_RES}
+            />
+            <StatCard
+              label="Avg confidence"
+              value={summary?.avg_confidence.pct ?? '—'}
+              unit="%"
+              delta={summary ? `${summary.avg_confidence.delta_pt > 0 ? '+' : ''}${summary.avg_confidence.delta_pt}pt` : undefined}
+              deltaDir={summary ? (summary.avg_confidence.delta_pt >= 0 ? 'down' : 'up') : undefined}
+              sparkData={SPARK_CONF}
+            />
+            <StatCard
+              label="Top root cause"
+              value=""
+              footer={summary ? (
+                <>
+                  {summary.top_root_cause.name}
+                  <small style={{ color: 'var(--fg-3)', fontWeight: 500, display: 'block', marginTop: 2, fontSize: 10.5 }}>
+                    {summary.top_root_cause.pct}% of incidents · {summary.top_root_cause.count.toLocaleString()} cases
+                  </small>
+                </>
+              ) : <span style={{ color: 'var(--fg-3)' }}>—</span>}
+            />
+            <StatCard
+              label="Deploy correlations"
+              value={summary?.deploy_correlations.count ?? '—'}
+              delta={summary ? `/ ${summary.deploy_correlations.total_deploys} deploys` : undefined}
+              deltaDir="neutral"
+              valueColor="warn"
+              footer={undefined}
+            />
+          </>
+        )}
       </section>
 
       {/* Main: incidents over time (70) + donut (30) */}
@@ -216,25 +240,25 @@ export default function Analytics() {
           title="Incidents Over Time"
           meta={`last ${days}d · 5 categories · ${totalDeploys} deployments`}
         >
-          {loading || !overTime ? <Spinner /> : <IncidentsOverTime data={overTime} />}
+          {loading || !overTime ? <ChartSkeleton h={220} /> : <IncidentsOverTime data={overTime} />}
         </Panel>
 
         <Panel
           title="Root Cause Distribution"
           meta={`${days}d · n=${summary?.incidents_triaged.count.toLocaleString() ?? '…'}`}
         >
-          {loading || !rootCause ? <Spinner /> : <RootCauseDonut data={rootCause} />}
+          {loading || !rootCause ? <ChartSkeleton h={160} /> : <RootCauseDonut data={rootCause} />}
         </Panel>
       </div>
 
       {/* Mid: by object (50) + AI accuracy (50) */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 18 }}>
         <Panel title={`By Object · ${days}d`} meta="P1 · P2 · P3 stacked">
-          {loading || !byObject ? <Spinner /> : <ByObjectChart data={byObject} />}
+          {loading || !byObject ? <ChartSkeleton h={200} /> : <ByObjectChart data={byObject} />}
         </Panel>
 
         <Panel title="AI Accuracy Trend" meta="recall@k · operator confirmation · weekly">
-          {loading || !accuracy ? <Spinner /> : <AIAccuracyChart data={accuracy} />}
+          {loading || !accuracy ? <ChartSkeleton h={200} /> : <AIAccuracyChart data={accuracy} />}
         </Panel>
       </div>
 
@@ -244,7 +268,11 @@ export default function Analytics() {
         meta={`${totalDeploys} deploys · ${spikeCount} with ≥3σ incident spike +24h`}
         noPad
       >
-        {loading || !deployCorr ? <Spinner /> : <DeploymentTable data={deployCorr} />}
+        {loading || !deployCorr ? (
+          <div style={{ padding: 16 }}><ChartSkeleton h={140} /></div>
+        ) : (
+          <DeploymentTable data={deployCorr} />
+        )}
       </Panel>
 
     </div>

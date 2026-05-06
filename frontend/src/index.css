@@ -119,6 +119,11 @@ textarea {
   50% { opacity: 0; }
 }
 
+@keyframes shimmer-pulse {
+  0%, 100% { opacity: 0.35; }
+  50%       { opacity: 0.7; }
+}
+
 /* ---------- BrandMark ---------- */
 .brand-mark {
   display: inline-grid;

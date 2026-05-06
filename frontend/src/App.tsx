@@ -29,8 +29,6 @@ function AppNav() {
   const { pathname } = useLocation()
   const items = [
     { label: 'Runs', href: '/', matchPrefix: ['/runs', '/incidents', '/'] },
-    { label: 'Settings', href: '#', matchPrefix: [] },
-    { label: 'Docs', href: '#', matchPrefix: [] },
   ]
   return (
     <nav style={{ display: 'flex', gap: 2, marginLeft: 18 }}>

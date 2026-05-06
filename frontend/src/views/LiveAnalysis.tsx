@@ -13,6 +13,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import type { SegOption } from '@/components/ui/SegmentedControl'
 import { useReconStore } from '@/store/reconStore'
 import { connectToRun } from '@/lib/sse'
+import { getRunIncidents } from '@/lib/api'
 import { fmtLatency, fmtTokens, fmtCurrency } from '@/lib/format'
 import type { RCAIncident, SSEIncidentEvent, Severity } from '@/types'
 
@@ -44,6 +45,8 @@ function sseToIncident(e: SSEIncidentEvent): RCAIncident {
     latency_ms: 0,
     created_at: null,
     severity: e.severity,
+    sf_object: e.sf_object,
+    sf_field: e.sf_field,
     evidence: [],
   }
 }
@@ -97,7 +100,7 @@ export default function LiveAnalysis() {
   const [isDone, setIsDone] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [totalRows, setTotalRows] = useState(0)
-  const heatCells = useRef<number[]>(Array.from({ length: 80 }, () => Math.random()))
+  const [cacheHits, setCacheHits] = useState(0)
   const sseCleanupRef = useRef<(() => void) | null>(null)
 
   const handleStop = useCallback(() => {
@@ -122,13 +125,31 @@ export default function LiveAnalysis() {
         store.upsertIncident(sseToIncident(e))
         store.setSseConnected(true)
         store.setRunStatus('streaming')
+        if (e.cached) setCacheHits(n => n + 1)
       },
-      onDone: (e) => {
+      onDone: async (e) => {
         store.setRunStatus('complete')
         store.setSseConnected(false)
         setIsDone(true)
         setTotalRows(e.total_rows)
         sseCleanupRef.current = null
+        // Enrich store incidents with real token/tool-call data from the API
+        if (runId) {
+          try {
+            const { incidents: fresh } = await getRunIncidents(runId)
+            const storeSnap = store.incidents
+            for (const inc of fresh) {
+              const existing = storeSnap.get(inc.id ?? '')
+              store.upsertIncident({
+                ...inc,
+                sf_object: existing?.sf_object ?? null,
+                sf_field: existing?.sf_field ?? null,
+              })
+            }
+          } catch {
+            // non-fatal; stats stay at 0 rather than crashing
+          }
+        }
       },
       onError: () => {
         store.setSseConnected(false)
@@ -145,13 +166,29 @@ export default function LiveAnalysis() {
   const allIncidents = store.getIncidentsSorted()
   const total = allIncidents.length
   const p1Count = allIncidents.filter(i => i.severity === 'P1').length
+  const p2Count = allIncidents.filter(i => i.severity === 'P2').length
+  const p3Count = allIncidents.filter(i => i.severity === 'P3').length
   const resolvedCount = allIncidents.filter(i => i.status === 'complete').length
   const needsReviewCount = allIncidents.filter(i => i.status === 'needs_review').length
   const analyzingCount = allIncidents.filter(i => i.status === 'running').length
   const avgLatencyMs = total > 0 ? allIncidents.reduce((s, i) => s + i.latency_ms, 0) / total : 0
   const totalTokens = allIncidents.reduce((s, i) => s + i.total_tokens_used, 0)
   const totalToolCalls = allIncidents.reduce((s, i) => s + i.total_tool_calls, 0)
+  const avgTokensPerIncident = total > 0 ? Math.round(totalTokens / total) : 0
+  const avgToolCalls = total > 0 ? (totalToolCalls / total).toFixed(1) : '—'
+  const cacheHitPct = total > 0 ? Math.round((cacheHits / total) * 100) : null
   const approxSpend = totalTokens * 0.000003
+
+  const topObjects = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const inc of allIncidents) {
+      const obj = inc.sf_object ?? 'Unknown'
+      counts.set(obj, (counts.get(obj) ?? 0) + 1)
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+  }, [allIncidents])
   const elapsedSec = Math.floor(elapsed / 1000)
   const etaStr = total > 0 && analyzingCount > 0
     ? `~${Math.max(0, Math.round((analyzingCount * elapsedSec) / Math.max(resolvedCount, 1)))}s`
@@ -392,10 +429,10 @@ export default function LiveAnalysis() {
           <Panel title="Run Stats">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
-                { label: 'Tokens / incident', value: total > 0 ? fmtTokens(Math.round(totalTokens / total)) : '—' },
-                { label: 'Tool calls', value: String(totalToolCalls) },
-                { label: 'Cache hit %', value: '—' },
-                { label: 'Approx. spend', value: fmtCurrency(approxSpend) },
+                { label: 'Tokens / incident', value: avgTokensPerIncident > 0 ? fmtTokens(avgTokensPerIncident) : '—' },
+                { label: 'Avg tool calls', value: totalToolCalls > 0 ? avgToolCalls : '—' },
+                { label: 'Cache hit %', value: cacheHitPct !== null ? `${cacheHitPct}%` : '—' },
+                { label: 'Approx. spend', value: totalTokens > 0 ? fmtCurrency(approxSpend) : '—' },
               ].map(row => (
                 <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>{row.label}</span>
@@ -419,17 +456,26 @@ export default function LiveAnalysis() {
             </div>
           </Panel>
 
-          <Panel title="Discrepancy Heatmap">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: 3 }}>
-              {heatCells.current.map((heat, i) => {
-                const bg = heat > 0.7
-                  ? `oklch(0.55 0.22 25 / ${Math.max(0.15, heat)})`
-                  : heat > 0.4
-                  ? `oklch(0.60 0.18 75 / ${Math.max(0.15, heat)})`
-                  : `oklch(0.55 0.10 220 / ${Math.max(0.08, heat)})`
-                return <div key={i} style={{ width: '100%', paddingBottom: '100%', background: bg, borderRadius: 2 }} />
-              })}
-            </div>
+          <Panel title="Top SF Objects">
+            {topObjects.length === 0 ? (
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)', textAlign: 'center', padding: '12px 0' }}>
+                Waiting for data…
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {topObjects.map(([obj, count]) => (
+                  <div key={obj} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-1)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '75%' }}>{obj}</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--fg-3)', flexShrink: 0 }}>{count}</span>
+                    </div>
+                    <div style={{ height: 4, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${total > 0 ? (count / total) * 100 : 0}%`, background: 'var(--info)', borderRadius: 2, transition: 'width 0.4s' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </Panel>
         </div>
       </div>

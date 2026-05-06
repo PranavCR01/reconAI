@@ -94,8 +94,10 @@ export interface RCAIncident {
   total_tokens_used: number
   latency_ms: number
   created_at: string | null
-  // Joined field from backend (severity from ReconRow)
+  // Joined fields from ReconRow (populated via SSE or API join)
   severity?: Severity | null
+  sf_object?: string | null
+  sf_field?: string | null
   // Joined evidence (from GET /incidents/:id)
   evidence?: Evidence[]
 }
@@ -121,6 +123,8 @@ export interface SSEIncidentEvent {
   incident_id: string | null
   cached: boolean
   severity: Severity | null
+  sf_object: string | null
+  sf_field: string | null
   root_cause_summary: string | null
   confidence: number | null
   requires_human_review: boolean

@@ -26,7 +26,7 @@ export function TopBar({ center, right }: TopBarProps) {
       {/* Brand */}
       <Link
         to="/"
-        style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', fontWeight: 600, letterSpacing: '-0.01em', flexShrink: 0 }}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', fontWeight: 600, letterSpacing: '-0.01em', flexShrink: 0, cursor: 'pointer' }}
       >
         <BrandMark />
         <span style={{ fontSize: 14 }}>

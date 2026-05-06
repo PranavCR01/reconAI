@@ -5,7 +5,8 @@ import csv
 import io
 import json
 from contextlib import asynccontextmanager
-from datetime import date, datetime, timezone
+import statistics
+from datetime import date, datetime, timedelta, timezone
 from typing import Annotated, Optional
 
 from dotenv import load_dotenv
@@ -628,10 +629,12 @@ async def analytics_summary(storage: StorageDep, days: int = Query(default=30, g
     avg_conf_prev = round(sum(conf_prev_values) / len(conf_prev_values) * 100) if conf_prev_values else 0
 
     # top root cause from discrepancy_type of recon_rows
-    row_ids = [i["recon_row_id"] for i in incidents_cur if i.get("recon_row_id")]
-    rows = await storage.get_recon_rows_by_ids(row_ids)
+    rows = await storage.get_recon_rows_since(since)
+    inc_row_ids = {i["recon_row_id"] for i in incidents_cur if i.get("recon_row_id")}
     disc_counts: dict[str, int] = {}
     for r in rows:
+        if r["id"] not in inc_row_ids:
+            continue
         dt = r.get("discrepancy_type") or "UNKNOWN"
         disc_counts[dt] = disc_counts.get(dt, 0) + 1
     top_rc_name = max(disc_counts, key=disc_counts.get) if disc_counts else "N/A"
@@ -644,7 +647,6 @@ async def analytics_summary(storage: StorageDep, days: int = Query(default=30, g
         dt_str = (inc.get("created_at") or "")[:10]
         all_inc_by_date[dt_str] = all_inc_by_date.get(dt_str, 0) + 1
 
-    import statistics
     baseline_window = 14
     spike_count = 0
     for dep in deploys:
@@ -680,8 +682,7 @@ async def analytics_summary(storage: StorageDep, days: int = Query(default=30, g
 async def analytics_incidents_over_time(storage: StorageDep, days: int = Query(default=30, ge=1)):
     since = _since(days)
     incidents = await storage.get_incidents_since(since)
-    row_ids = [i["recon_row_id"] for i in incidents if i.get("recon_row_id")]
-    rows = await storage.get_recon_rows_by_ids(row_ids)
+    rows = await storage.get_recon_rows_since(since)
     row_map = {r["id"]: r for r in rows}
 
     disc_types = ["NULL_DOWNSTREAM", "VALUE_MISMATCH", "STALE_VALUE", "MISSING_RECORD", "DUPLICATE_DOWNSTREAM"]
@@ -711,8 +712,7 @@ async def analytics_incidents_over_time(storage: StorageDep, days: int = Query(d
 async def analytics_by_object(storage: StorageDep, days: int = Query(default=30, ge=1)):
     since = _since(days)
     incidents = await storage.get_incidents_since(since)
-    row_ids = [i["recon_row_id"] for i in incidents if i.get("recon_row_id")]
-    rows = await storage.get_recon_rows_by_ids(row_ids)
+    rows = await storage.get_recon_rows_since(since)
     row_map = {r["id"]: r for r in rows}
 
     obj_counts: dict[str, dict[str, int]] = {}
@@ -745,8 +745,7 @@ async def analytics_by_object(storage: StorageDep, days: int = Query(default=30,
 async def analytics_root_cause_distribution(storage: StorageDep, days: int = Query(default=30, ge=1)):
     since = _since(days)
     incidents = await storage.get_incidents_since(since)
-    row_ids = [i["recon_row_id"] for i in incidents if i.get("recon_row_id")]
-    rows = await storage.get_recon_rows_by_ids(row_ids)
+    rows = await storage.get_recon_rows_since(since)
     row_map = {r["id"]: r for r in rows}
 
     counts: dict[str, int] = {}
@@ -770,15 +769,11 @@ async def analytics_root_cause_distribution(storage: StorageDep, days: int = Que
 
 @app.get("/api/v1/analytics/deployment-correlation")
 async def analytics_deployment_correlation(storage: StorageDep, days: int = Query(default=30, ge=1)):
-    import statistics as _stats
-
     since = _since(days)
     # Fetch all incidents for a larger window for baseline calculation
     big_since = _since(days + 14)
     all_incidents = await storage.get_incidents_since(big_since)
-
-    row_ids = [i["recon_row_id"] for i in all_incidents if i.get("recon_row_id")]
-    rows = await storage.get_recon_rows_by_ids(row_ids)
+    rows = await storage.get_recon_rows_since(big_since)
     row_map = {r["id"]: r for r in rows}
 
     resolutions = await storage.get_resolutions_since(big_since)
@@ -815,8 +810,8 @@ async def analytics_deployment_correlation(storage: StorageDep, days: int = Quer
         incidents_24h = len(incidents_24h_list)
 
         try:
-            mean = _stats.mean(baseline_vals)
-            std = _stats.stdev(baseline_vals)
+            mean = statistics.mean(baseline_vals)
+            std = statistics.stdev(baseline_vals)
             sigma = round((incidents_24h - mean) / std, 2) if std > 0.01 else 0.0
         except Exception:
             sigma = 0.0

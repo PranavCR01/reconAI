@@ -237,13 +237,13 @@ class SupabaseAdapter(StorageAdapter):
         )
         return result.data
 
-    async def get_recon_rows_by_ids(self, row_ids: list[str]) -> list[dict]:
-        if not row_ids:
-            return []
+    async def get_recon_rows_since(self, since: datetime, limit: int = 5000) -> list[dict]:
+        """Fetch recon_rows by date range — avoids .in_() on large ID lists."""
         result = await self._run(
             lambda: self._client.table("recon_rows")
             .select("id,sf_object,sf_field,discrepancy_type,severity,run_id")
-            .in_("id", row_ids)
+            .gte("created_at", since.isoformat())
+            .limit(limit)
             .execute()
         )
         return result.data

@@ -1007,3 +1007,45 @@ async def benchmark_run(
         })
 
     return {"run_id": run_id, "rows_sampled": len(sample), "results": results}
+
+
+# ── Tracking endpoints ────────────────────────────────────────────────────────
+
+class PageViewRequest(BaseModel):
+    page: str
+    session_id: str
+    referrer: str = ""
+    user_agent: str = ""
+
+
+class DemoRequestPayload(BaseModel):
+    full_name: str
+    work_email: str
+    company: Optional[str] = None
+    session_id: str
+    referrer: str = ""
+
+
+@app.post("/api/v1/track/pageview", status_code=201)
+async def track_page_view(body: PageViewRequest, storage: StorageDep):
+    await storage.insert_page_view({
+        "page": body.page,
+        "session_id": body.session_id,
+        "referrer": body.referrer or None,
+        "user_agent": body.user_agent or None,
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"ok": True}
+
+
+@app.post("/api/v1/track/demo-request", status_code=201)
+async def track_demo_request(body: DemoRequestPayload, storage: StorageDep):
+    await storage.insert_demo_request({
+        "full_name": body.full_name,
+        "work_email": body.work_email,
+        "company": body.company or None,
+        "session_id": body.session_id,
+        "referrer": body.referrer or None,
+        "submitted_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"ok": True}

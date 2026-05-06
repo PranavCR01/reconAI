@@ -1,14 +1,257 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import type { DragEvent, ChangeEvent } from 'react'
+import type { DragEvent, ChangeEvent, FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Papa from 'papaparse'
-import { createRun } from '@/lib/api'
+import { createRun, trackDemoRequest } from '@/lib/api'
 import { useReconStore, getRunHistory, saveRunToHistory } from '@/store/reconStore'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { fmtDate } from '@/lib/format'
 import type { Environment, LlmConfig, RunHistoryEntry } from '@/types'
 import type { SegOption } from '@/components/ui/SegmentedControl'
+
+// ---- access gate ------------------------------------------------------------
+
+const PERSONAL_DOMAINS = new Set(['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'live.com', 'me.com'])
+
+function isPersonalEmail(email: string): boolean {
+  const domain = email.split('@')[1]?.toLowerCase() ?? ''
+  return PERSONAL_DOMAINS.has(domain)
+}
+
+function LockIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
+      <rect x="3" y="7" width="10" height="8" rx="1.5" />
+      <path d="M5 7V5a3 3 0 016 0v2" />
+    </svg>
+  )
+}
+
+function AccessGate({ onAccess }: { onAccess: () => void }) {
+  const [showCode, setShowCode] = useState(false)
+  const [code, setCode] = useState('')
+  const [codeError, setCodeError] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [workEmail, setWorkEmail] = useState('')
+  const [company, setCompany] = useState('')
+  const [formError, setFormError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+
+  function checkCode() {
+    const expected = (import.meta.env.VITE_DEMO_CODE as string | undefined) ?? 'reconai2025'
+    if (code.trim() === expected) {
+      localStorage.setItem('recon_access', 'granted')
+      onAccess()
+    } else {
+      setCodeError('Invalid access code')
+    }
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setFormError('')
+    if (!fullName.trim()) { setFormError('Full name is required'); return }
+    if (!workEmail.trim()) { setFormError('Work email is required'); return }
+    if (!workEmail.includes('@')) { setFormError('Enter a valid email address'); return }
+    if (isPersonalEmail(workEmail)) { setFormError('Please use a work email address'); return }
+    setSubmitting(true)
+    try {
+      await trackDemoRequest({ full_name: fullName.trim(), work_email: workEmail.trim(), company: company.trim() || undefined })
+      setSubmitted(true)
+    } catch {
+      setFormError('Failed to submit. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    height: 38,
+    padding: '0 12px',
+    background: 'var(--bg-0)',
+    border: '1px solid var(--line)',
+    borderRadius: 7,
+    color: 'var(--fg)',
+    fontFamily: 'var(--sans)',
+    fontSize: 13,
+    outline: 'none',
+    boxSizing: 'border-box',
+  }
+
+  return (
+    <div style={{
+      minHeight: 'calc(100vh - 52px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '40px 24px',
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: 440,
+        background: 'var(--bg-1)',
+        border: '1px solid var(--line)',
+        borderRadius: 14,
+        overflow: 'hidden',
+      }}>
+        {/* header */}
+        <div style={{ padding: '28px 28px 0', textAlign: 'center' }}>
+          <div style={{
+            width: 44,
+            height: 44,
+            borderRadius: 10,
+            background: 'linear-gradient(135deg, oklch(0.55 0.15 260), oklch(0.45 0.14 240))',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 16px',
+            color: '#fff',
+          }}>
+            <LockIcon />
+          </div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 8 }}>
+            ReconAI · Private Beta
+          </div>
+          <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em' }}>
+            Request demo access
+          </h2>
+          <p style={{ margin: '0 0 24px', fontSize: 13, color: 'var(--fg-2)', lineHeight: 1.6 }}>
+            ReconAI is in private beta for Salesforce integration teams. Submit your details and we'll reach out within 1 business day.
+          </p>
+        </div>
+
+        <div style={{ padding: '0 28px 28px' }}>
+          {submitted ? (
+            <div style={{
+              background: 'oklch(0.22 0.04 155 / 0.5)',
+              border: '1px solid var(--ok)',
+              borderRadius: 8,
+              padding: '16px 18px',
+              textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 13, color: 'var(--ok)', fontWeight: 600, marginBottom: 4 }}>Request submitted</div>
+              <div style={{ fontSize: 12, color: 'var(--fg-2)' }}>We'll reach out to {workEmail} shortly.</div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--fg-2)', marginBottom: 6 }}>
+                  Full name <span style={{ color: 'var(--p1)' }}>*</span>
+                </label>
+                <input
+                  style={inputStyle}
+                  placeholder="Jane Smith"
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  autoComplete="name"
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--fg-2)', marginBottom: 6 }}>
+                  Work email <span style={{ color: 'var(--p1)' }}>*</span>
+                </label>
+                <input
+                  style={inputStyle}
+                  type="email"
+                  placeholder="j.smith@company.com"
+                  value={workEmail}
+                  onChange={e => setWorkEmail(e.target.value)}
+                  autoComplete="email"
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--fg-2)', marginBottom: 6 }}>
+                  Company <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>(optional)</span>
+                </label>
+                <input
+                  style={inputStyle}
+                  placeholder="Acme Corp"
+                  value={company}
+                  onChange={e => setCompany(e.target.value)}
+                  autoComplete="organization"
+                />
+              </div>
+
+              {formError && (
+                <div style={{ fontSize: 12, color: 'var(--p1)', fontFamily: 'var(--mono)', padding: '8px 12px', background: 'oklch(0.22 0.06 25 / 0.4)', border: '1px solid var(--p1)', borderRadius: 6 }}>
+                  {formError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                style={{
+                  height: 40,
+                  borderRadius: 8,
+                  border: 0,
+                  background: 'linear-gradient(135deg, oklch(0.55 0.15 260), oklch(0.45 0.14 240))',
+                  color: '#fff',
+                  fontFamily: 'var(--sans)',
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  opacity: submitting ? 0.7 : 1,
+                }}
+              >
+                {submitting ? 'Submitting…' : 'Request access'}
+              </button>
+            </form>
+          )}
+
+          {/* code toggle */}
+          <div style={{ marginTop: 20, textAlign: 'center' }}>
+            <button
+              onClick={() => { setShowCode(!showCode); setCodeError('') }}
+              style={{ background: 'none', border: 0, color: 'var(--fg-3)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--mono)' }}
+            >
+              {showCode ? '— hide' : 'Already have a code?'}
+            </button>
+          </div>
+
+          {showCode && (
+            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+              <input
+                style={{ ...inputStyle, flex: 1 }}
+                type="password"
+                placeholder="Access code"
+                value={code}
+                onChange={e => { setCode(e.target.value); setCodeError('') }}
+                onKeyDown={e => e.key === 'Enter' && checkCode()}
+              />
+              <button
+                onClick={checkCode}
+                style={{
+                  height: 38,
+                  padding: '0 16px',
+                  borderRadius: 7,
+                  border: '1px solid var(--line)',
+                  background: 'var(--bg-2)',
+                  color: 'var(--fg-1)',
+                  fontFamily: 'var(--mono)',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Unlock
+              </button>
+            </div>
+          )}
+          {codeError && (
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--p1)', fontFamily: 'var(--mono)' }}>
+              {codeError}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -61,6 +304,12 @@ const btnBase: React.CSSProperties = {
 // ---- component --------------------------------------------------------------
 
 export default function Upload() {
+  const [access, setAccess] = useState(() => localStorage.getItem('recon_access') === 'granted')
+  if (!access) return <AccessGate onAccess={() => setAccess(true)} />
+  return <UploadForm />
+}
+
+function UploadForm() {
   const navigate = useNavigate()
   const store = useReconStore()
   const fileInputRef = useRef<HTMLInputElement>(null)

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom'
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { Shell } from '@/components/layout/Shell'
+import { trackPageView } from '@/lib/api'
 
 const Landing = lazy(() => import('./views/Landing'))
 const Upload = lazy(() => import('./views/Upload'))
@@ -8,6 +9,14 @@ const LiveAnalysis = lazy(() => import('./views/LiveAnalysis'))
 const IncidentDetail = lazy(() => import('./views/IncidentDetail'))
 const RunSummary = lazy(() => import('./views/RunSummary'))
 const Analytics = lazy(() => import('./views/Analytics'))
+
+function RouteTracker() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    trackPageView(pathname)
+  }, [pathname])
+  return null
+}
 
 function Loading() {
   return (
@@ -151,6 +160,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Shell topBarCenter={<AppNav />} topBarRight={<AppRight />}>
+        <RouteTracker />
         <Suspense fallback={<Loading />}>
           <Routes>
             <Route path="/" element={<Landing />} />

@@ -104,3 +104,42 @@ export async function getDeploymentCorrelation(days = 30): Promise<DeploymentCor
 export async function getAIAccuracy(weeks = 12): Promise<AIAccuracyResponse> {
   return apiFetch<AIAccuracyResponse>(`/analytics/ai-accuracy?weeks=${weeks}`)
 }
+
+function getSessionId(): string {
+  const key = 'recon_session_id'
+  let id = sessionStorage.getItem(key)
+  if (!id) {
+    id = crypto.randomUUID()
+    sessionStorage.setItem(key, id)
+  }
+  return id
+}
+
+export function trackPageView(page: string): void {
+  fetch(`${API_URL}/track/pageview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      page,
+      session_id: getSessionId(),
+      referrer: document.referrer,
+      user_agent: navigator.userAgent,
+    }),
+  }).catch(() => {/* fire-and-forget */})
+}
+
+export async function trackDemoRequest(data: {
+  full_name: string
+  work_email: string
+  company?: string
+}): Promise<void> {
+  await apiFetch('/track/demo-request', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...data,
+      session_id: getSessionId(),
+      referrer: document.referrer,
+    }),
+  })
+}

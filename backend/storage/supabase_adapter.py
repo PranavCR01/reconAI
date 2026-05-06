@@ -290,3 +290,17 @@ class SupabaseAdapter(StorageAdapter):
             .execute()
         )
         return result.data
+
+    # -----------------------------------------------------------------------
+    # Tracking methods
+    # -----------------------------------------------------------------------
+
+    async def insert_page_view(self, data: dict) -> None:
+        await self._run(
+            lambda: self._client.table("page_views").insert(data).execute()
+        )
+
+    async def insert_demo_request(self, data: dict) -> None:
+        await self._run(
+            lambda: self._client.table("demo_requests").insert(data).execute()
+        )

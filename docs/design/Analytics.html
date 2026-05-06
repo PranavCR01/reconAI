@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ReconAI — Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: oklch(0.16 0.006 250);
+    --bg-1: oklch(0.19 0.006 250);
+    --bg-2: oklch(0.22 0.007 250);
+    --bg-3: oklch(0.26 0.008 250);
+    --line: oklch(0.30 0.008 250);
+    --line-soft: oklch(0.25 0.007 250);
+    --fg: oklch(0.96 0.005 250);
+    --fg-1: oklch(0.82 0.006 250);
+    --fg-2: oklch(0.66 0.008 250);
+    --fg-3: oklch(0.50 0.008 250);
+
+    --p1: oklch(0.65 0.20 25);
+    --p1-bg: oklch(0.30 0.09 25);
+    --p2: oklch(0.78 0.15 75);
+    --p2-bg: oklch(0.32 0.07 75);
+    --p3: oklch(0.60 0.012 250);
+
+    --ok: oklch(0.74 0.16 155);
+    --warn: oklch(0.78 0.15 75);
+    --info: oklch(0.74 0.12 220);
+    --teal: oklch(0.78 0.13 195);
+    --violet: oklch(0.72 0.14 295);
+    --pink: oklch(0.72 0.15 0);
+
+    /* category palette for time series */
+    --c-null: oklch(0.70 0.16 25);     /* NULL_DOWNSTREAM */
+    --c-mismatch: oklch(0.78 0.13 75); /* VALUE_MISMATCH */
+    --c-stale: oklch(0.72 0.13 295);   /* STALE_VALUE */
+    --c-missing: oklch(0.72 0.13 220); /* MISSING_RECORD */
+    --c-dup: oklch(0.78 0.13 195);     /* DUPLICATE_DOWNSTREAM */
+
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: var(--sans); font-size: 13px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased; min-height: 100vh;
+  }
+
+  /* Topbar */
+  .topbar {
+    height: 52px; border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--bg-1), var(--bg));
+    display: flex; align-items: center; padding: 0 18px; gap: 18px;
+    position: sticky; top: 0; z-index: 20;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .brand-mark {
+    width: 22px; height: 22px; border-radius: 5px;
+    background: linear-gradient(135deg, oklch(0.55 0.14 250), oklch(0.42 0.12 295));
+    box-shadow: inset 0 0 0 1px oklch(0.70 0.10 250 / 0.3);
+    position: relative;
+  }
+  .brand-mark::after {
+    content: ''; position: absolute; inset: 5px; border-radius: 2px;
+    border: 1.5px solid var(--fg);
+    border-right-color: transparent; border-bottom-color: transparent;
+    transform: rotate(45deg);
+  }
+  .nav { display: flex; gap: 2px; margin-left: 18px; }
+  .nav a {
+    padding: 6px 12px; border-radius: 6px;
+    color: var(--fg-2); text-decoration: none;
+    font-size: 13px; font-weight: 500;
+  }
+  .nav a:hover { color: var(--fg); background: var(--bg-2); }
+  .nav a.active { color: var(--fg); background: var(--bg-2); }
+
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 26px; padding: 0 10px;
+    border-radius: 6px; background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--fg-1); font: 500 12px var(--mono);
+  }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px oklch(0.74 0.16 155 / 0.18); }
+  .badge .label { color: var(--fg-3); font-weight: 400; }
+  .badge.user { font-family: var(--sans); }
+
+  /* Page */
+  .page { max-width: 1440px; margin: 0 auto; padding: 18px 24px 80px; }
+
+  .page-head { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .page-head h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .page-head .sub { color: var(--fg-3); font-size: 12.5px; font-family: var(--mono); margin-top: 4px; }
+  .page-head .right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+
+  /* Date range segmented */
+  .seg {
+    display: inline-flex; background: var(--bg-2);
+    border: 1px solid var(--line); border-radius: 7px; padding: 2px;
+  }
+  .seg button {
+    background: transparent; border: 0;
+    color: var(--fg-2); font: 500 12px var(--sans);
+    padding: 5px 12px; border-radius: 5px; cursor: pointer;
+    font-family: var(--mono); font-weight: 500;
+  }
+  .seg button.active { background: var(--bg-3); color: var(--fg); box-shadow: 0 1px 0 oklch(0.34 0.008 250); }
+
+  .filter-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 30px; padding: 0 12px;
+    border-radius: 7px; background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--fg-1); font: 500 12px var(--mono);
+    cursor: pointer;
+  }
+  .filter-chip svg { color: var(--fg-3); }
+  .filter-chip:hover { background: var(--bg-3); }
+
+  /* Stats row */
+  .stats {
+    display: grid; grid-template-columns: repeat(6, 1fr);
+    gap: 1px; background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 10px; overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .stat { background: var(--bg-1); padding: 14px 16px; }
+  .stat .l {
+    font: 500 10.5px var(--mono); color: var(--fg-3);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .stat .v { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; }
+  .stat .v .num { font: 600 22px var(--mono); color: var(--fg); letter-spacing: -0.02em; line-height: 1; }
+  .stat .v .num.ok { color: var(--ok); }
+  .stat .v .num.warn { color: var(--warn); }
+  .stat .v .num.crit { color: var(--p1); }
+  .stat .v .delta { font: 500 11px var(--mono); color: var(--fg-3); }
+  .stat .v .delta.up { color: var(--p1); }
+  .stat .v .delta.down { color: var(--ok); }
+  .stat .spark {
+    display: flex; gap: 1px; align-items: flex-end;
+    height: 18px; margin-top: 8px;
+  }
+  .stat .spark i { flex: 1; background: var(--bg-3); border-radius: 1px; }
+  .stat .text {
+    margin-top: 6px;
+    font: 500 12px var(--mono); color: var(--fg);
+  }
+  .stat .text small { color: var(--fg-3); font-weight: 500; display: block; margin-top: 2px; font-size: 10.5px; }
+
+  /* Panel */
+  .panel {
+    background: var(--bg-1); border: 1px solid var(--line);
+    border-radius: 10px; overflow: hidden;
+  }
+  .panel-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px; border-bottom: 1px solid var(--line);
+  }
+  .panel-title {
+    font: 600 11px var(--mono);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--fg-2);
+  }
+  .panel-meta { margin-left: auto; font: 500 11px var(--mono); color: var(--fg-3); }
+  .panel-body { padding: 16px; }
+
+  /* Layout grids */
+  .grid-main {
+    display: grid; grid-template-columns: 2fr 1fr; gap: 18px;
+    margin-bottom: 18px;
+  }
+  .grid-mid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+    margin-bottom: 18px;
+  }
+
+  /* Legend */
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; }
+  .legend .item {
+    display: inline-flex; align-items: center; gap: 6px;
+    font: 500 11px var(--mono); color: var(--fg-2);
+  }
+  .legend .sw { width: 10px; height: 3px; border-radius: 2px; }
+  .legend .item .pct { color: var(--fg); margin-left: 4px; }
+
+  /* SVG axis text */
+  .ax-text { font: 500 10.5px var(--mono); fill: var(--fg-3); }
+  .ax-text-strong { font: 500 11px var(--mono); fill: var(--fg-2); }
+  .grid-line { stroke: var(--line-soft); stroke-width: 1; }
+  .grid-line-dashed { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 3; }
+
+  /* Tooltip card on chart */
+  .tip {
+    position: absolute;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    box-shadow: 0 4px 18px oklch(0.05 0.005 250 / 0.6);
+    pointer-events: none;
+    min-width: 200px;
+  }
+  .tip .ts {
+    font: 500 11px var(--mono); color: var(--fg-3);
+    margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed var(--line);
+  }
+  .tip .row {
+    display: flex; align-items: center; gap: 8px;
+    font: 500 11.5px var(--mono); color: var(--fg-1);
+    padding: 2px 0;
+  }
+  .tip .row .sw { width: 8px; height: 8px; border-radius: 2px; }
+  .tip .row .v { margin-left: auto; color: var(--fg); font-weight: 600; }
+  .tip .total {
+    margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line);
+    display: flex; justify-content: space-between;
+    font: 500 11px var(--mono); color: var(--fg-3);
+  }
+  .tip .total b { color: var(--fg); font-weight: 600; }
+
+  /* Object bars */
+  .obj-row {
+    display: grid; grid-template-columns: 130px 1fr 70px;
+    gap: 12px; align-items: center; padding: 8px 0;
+  }
+  .obj-row + .obj-row { border-top: 1px dashed var(--line-soft); }
+  .obj-name { font: 500 12.5px var(--mono); color: var(--fg-1); }
+  .obj-bar { height: 18px; background: var(--bg-2); border-radius: 3px; display: flex; overflow: hidden; border: 1px solid var(--line-soft); }
+  .obj-bar .seg-p1 { background: var(--p1); }
+  .obj-bar .seg-p2 { background: var(--warn); }
+  .obj-bar .seg-p3 { background: var(--p3); }
+  .obj-total { font: 600 13px var(--mono); color: var(--fg); text-align: right; }
+  .obj-total small { color: var(--fg-3); font-weight: 500; font-size: 10.5px; display: block; margin-top: 1px; }
+
+  /* Donut */
+  .donut-wrap {
+    display: grid; grid-template-columns: 180px 1fr;
+    gap: 18px; align-items: center;
+  }
+  .donut-center {
+    text-anchor: middle;
+  }
+  .donut-leg { display: flex; flex-direction: column; gap: 6px; }
+  .donut-leg .row {
+    display: grid; grid-template-columns: 14px 1fr 50px 36px;
+    gap: 8px; align-items: center;
+    padding: 4px 0;
+    font: 500 12px var(--mono); color: var(--fg-1);
+  }
+  .donut-leg .row + .row { border-top: 1px dashed var(--line-soft); }
+  .donut-leg .sw { width: 10px; height: 10px; border-radius: 2px; }
+  .donut-leg .pct { color: var(--fg); font-weight: 600; text-align: right; }
+  .donut-leg .n { color: var(--fg-3); font-weight: 500; text-align: right; }
+
+  /* Deployment table */
+  .dep-tbl { width: 100%; border-collapse: collapse; }
+  .dep-tbl th {
+    font: 600 10.5px var(--mono); text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--fg-3); text-align: left;
+    padding: 8px 12px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .dep-tbl th.right { text-align: right; }
+  .dep-tbl td {
+    padding: 11px 12px;
+    border-bottom: 1px dashed var(--line-soft);
+    font-size: 12.5px;
+  }
+  .dep-tbl tr:last-child td { border-bottom: 0; }
+  .dep-tbl tr:hover td { background: var(--bg-2); }
+  .dep-tbl .commit { font: 500 12px var(--mono); color: var(--fg); }
+  .dep-tbl .commit small { display: block; color: var(--fg-3); font-size: 10.5px; margin-top: 2px; font-weight: 500; }
+  .dep-tbl .ts { font: 500 11.5px var(--mono); color: var(--fg-1); }
+  .dep-tbl .ts small { display: block; color: var(--fg-3); font-size: 10.5px; margin-top: 2px; font-weight: 500; }
+  .dep-tbl .delta-cell { font: 600 13px var(--mono); }
+  .dep-tbl .delta-cell.up { color: var(--p1); }
+  .dep-tbl .delta-cell.down { color: var(--ok); }
+  .dep-tbl .delta-cell.flat { color: var(--fg-2); }
+  .dep-tbl .delta-cell .s { display: inline-block; font-size: 10.5px; color: var(--fg-3); font-weight: 500; margin-left: 4px; }
+  .dep-tbl .obj-cell { font: 500 12px var(--mono); color: var(--fg-1); }
+  .dep-tbl .rc-cell { font: 500 11.5px var(--mono); color: var(--fg-2); }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 22px; padding: 0 8px; border-radius: 4px;
+    font: 500 11px var(--mono); border: 1px solid var(--line);
+  }
+  .status-pill .d { width: 7px; height: 7px; border-radius: 50%; }
+  .status-pill.invest { background: oklch(0.32 0.07 75 / 0.5); color: oklch(0.93 0.10 75); border-color: oklch(0.50 0.13 75); }
+  .status-pill.invest .d { background: var(--warn); animation: bk 1.4s ease-in-out infinite; }
+  @keyframes bk { 0%,100% {opacity:.5} 50% {opacity:1} }
+  .status-pill.ok { background: oklch(0.30 0.07 155 / 0.5); color: oklch(0.92 0.10 155); border-color: oklch(0.40 0.10 155); }
+  .status-pill.ok .d { background: var(--ok); }
+  .status-pill.rb { background: oklch(0.30 0.09 25 / 0.5); color: oklch(0.92 0.10 25); border-color: oklch(0.45 0.15 25); }
+  .status-pill.rb .d { background: var(--p1); }
+
+  /* Accuracy trend */
+  .trend-foot {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line-soft);
+  }
+  .trend-foot .item { font: 500 11px var(--mono); color: var(--fg-3); }
+  .trend-foot .item b {
+    display: block; color: var(--fg); font-size: 18px; font-weight: 600;
+    letter-spacing: -0.01em; margin-top: 2px; font-family: var(--mono);
+  }
+  .trend-foot .item b.ok { color: var(--ok); }
+  .trend-foot .item b.warn { color: var(--warn); }
+
+  /* Responsive svg containers */
+  .chart-host { position: relative; width: 100%; }
+
+  .footnote {
+    margin-top: 14px;
+    font: 500 11px var(--mono);
+    color: var(--fg-3);
+    line-height: 1.6;
+  }
+  .footnote code {
+    background: var(--bg-2); padding: 1px 5px; border-radius: 3px; color: var(--fg-1);
+  }
+
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark"></div>
+    <span style="font-size:14px"><b>reconAI</b></span>
+  </div>
+  <nav class="nav">
+    <a href="#">Runs</a>
+    <a href="#" class="active">Analytics</a>
+    <a href="#">Settings</a>
+    <a href="#">Docs</a>
+  </nav>
+  <div class="topbar-right">
+    <span class="badge"><span class="dot"></span><span class="label">org</span> td-bank-na</span>
+    <span class="badge user"><span style="width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg, oklch(0.6 0.12 295), oklch(0.5 0.10 250));display:inline-grid;place-items:center;font-size:9.5px;font-weight:600;color:var(--fg)">JK</span> j.kowalski</span>
+  </div>
+</header>
+
+<main class="page">
+
+  <div class="page-head">
+    <div>
+      <h1>Analytics</h1>
+      <div class="sub">historical trends · all runs · org-wide</div>
+    </div>
+    <div class="right">
+      <span class="filter-chip">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M4 8h8M6 12h4"/></svg>
+        env: PROD + UAT
+        <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor" style="color:var(--fg-3)"><path d="M3 4.5L6 7.5 9 4.5"/></svg>
+      </span>
+      <span class="filter-chip">
+        integrations: all (4)
+        <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor" style="color:var(--fg-3)"><path d="M3 4.5L6 7.5 9 4.5"/></svg>
+      </span>
+      <div class="seg">
+        <button>7d</button>
+        <button class="active">30d</button>
+        <button>90d</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top stats -->
+  <section class="stats">
+    <div class="stat">
+      <div class="l">Runs · 30d</div>
+      <div class="v"><span class="num">147</span><span class="delta down">+12%</span></div>
+      <div class="spark" id="sp1"></div>
+    </div>
+    <div class="stat">
+      <div class="l">Incidents triaged</div>
+      <div class="v"><span class="num">1,284</span><span class="delta up">+8%</span></div>
+      <div class="spark" id="sp2"></div>
+    </div>
+    <div class="stat">
+      <div class="l">Avg resolution rate</div>
+      <div class="v"><span class="num ok">82<span style="font-size:13px; color:var(--fg-3);">%</span></span><span class="delta down">+3pt</span></div>
+      <div class="spark" id="sp3"></div>
+    </div>
+    <div class="stat">
+      <div class="l">Avg confidence</div>
+      <div class="v"><span class="num">88<span style="font-size:13px; color:var(--fg-3);">%</span></span><span class="delta down">+2pt</span></div>
+      <div class="spark" id="sp4"></div>
+    </div>
+    <div class="stat">
+      <div class="l">Top root cause</div>
+      <div class="text">FLS_STRIPPED <small>34% of incidents · 437 cases</small></div>
+    </div>
+    <div class="stat">
+      <div class="l">Deploy correlations</div>
+      <div class="v"><span class="num warn">9</span><span class="delta">/ 22 deploys</span></div>
+      <div class="text" style="margin-top:4px"><small style="color:var(--fg-3)">≥3σ spike within 24h</small></div>
+    </div>
+  </section>
+
+  <!-- Main: Time series + Donut -->
+  <div class="grid-main">
+
+    <!-- Incidents over time -->
+    <section class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Incidents Over Time</span>
+        <span class="panel-meta">last 30 days · 5 categories · 22 deployments</span>
+      </div>
+      <div class="panel-body">
+        <div class="legend" style="margin-bottom: 12px;">
+          <span class="item"><span class="sw" style="background:var(--c-null)"></span>NULL_DOWNSTREAM<span class="pct">412</span></span>
+          <span class="item"><span class="sw" style="background:var(--c-mismatch)"></span>VALUE_MISMATCH<span class="pct">348</span></span>
+          <span class="item"><span class="sw" style="background:var(--c-stale)"></span>STALE_VALUE<span class="pct">221</span></span>
+          <span class="item"><span class="sw" style="background:var(--c-missing)"></span>MISSING_RECORD<span class="pct">187</span></span>
+          <span class="item"><span class="sw" style="background:var(--c-dup)"></span>DUPLICATE_DOWNSTREAM<span class="pct">116</span></span>
+          <span class="item" style="margin-left:auto"><span class="sw" style="background:transparent; border-left: 2px dashed var(--fg-2); height:12px"></span>deployment</span>
+        </div>
+        <div class="chart-host" id="ts-host">
+          <svg id="ts-svg" viewBox="0 0 800 280" preserveAspectRatio="none" style="width:100%; height:280px; display:block"></svg>
+          <div id="ts-tip" class="tip" style="display:none"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Donut -->
+    <section class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Root Cause Distribution</span>
+        <span class="panel-meta">30d · n=1,284</span>
+      </div>
+      <div class="panel-body">
+        <div class="donut-wrap">
+          <svg viewBox="0 0 160 160" style="width:160px; height:160px;">
+            <circle cx="80" cy="80" r="58" fill="none" stroke="var(--bg-2)" stroke-width="22"/>
+            <!-- segments computed: 34, 22, 18, 14, 12 -->
+            <g transform="rotate(-90 80 80)">
+              <circle cx="80" cy="80" r="58" fill="none" stroke="oklch(0.65 0.20 25)" stroke-width="22"
+                stroke-dasharray="123.97 364.42" stroke-dashoffset="0"/>
+              <circle cx="80" cy="80" r="58" fill="none" stroke="oklch(0.74 0.12 220)" stroke-width="22"
+                stroke-dasharray="80.21 364.42" stroke-dashoffset="-123.97"/>
+              <circle cx="80" cy="80" r="58" fill="none" stroke="oklch(0.78 0.15 75)" stroke-width="22"
+                stroke-dasharray="65.62 364.42" stroke-dashoffset="-204.18"/>
+              <circle cx="80" cy="80" r="58" fill="none" stroke="oklch(0.72 0.14 295)" stroke-width="22"
+                stroke-dasharray="51.04 364.42" stroke-dashoffset="-269.80"/>
+              <circle cx="80" cy="80" r="58" fill="none" stroke="oklch(0.50 0.008 250)" stroke-width="22"
+                stroke-dasharray="43.74 364.42" stroke-dashoffset="-320.84"/>
+            </g>
+            <text class="donut-center" x="80" y="76" style="font:600 22px var(--mono); fill: var(--fg)">1,284</text>
+            <text class="donut-center" x="80" y="92" style="font:500 9.5px var(--mono); fill: var(--fg-3); letter-spacing: 0.08em; text-transform: uppercase">incidents</text>
+          </svg>
+
+          <div class="donut-leg">
+            <div class="row"><span class="sw" style="background:oklch(0.65 0.20 25)"></span><span>FLS_STRIPPED</span><span class="pct">34%</span><span class="n">437</span></div>
+            <div class="row"><span class="sw" style="background:oklch(0.74 0.12 220)"></span><span>CDC_EXCLUDED</span><span class="pct">22%</span><span class="n">282</span></div>
+            <div class="row"><span class="sw" style="background:oklch(0.78 0.15 75)"></span><span>DATAWAVE_ERROR</span><span class="pct">18%</span><span class="n">231</span></div>
+            <div class="row"><span class="sw" style="background:oklch(0.72 0.14 295)"></span><span>DELIVERY_GAP</span><span class="pct">14%</span><span class="n">180</span></div>
+            <div class="row"><span class="sw" style="background:oklch(0.50 0.008 250)"></span><span>UNKNOWN</span><span class="pct">12%</span><span class="n">154</span></div>
+          </div>
+        </div>
+        <div class="footnote">
+          <code>FLS_STRIPPED</code> share is up <b style="color:var(--p1)">+6pt</b> vs. prior 30d window. Correlates with PII tightening campaign <code>SEC-4432</code>.
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Mid: By object + AI accuracy -->
+  <div class="grid-mid">
+
+    <section class="panel">
+      <div class="panel-head">
+        <span class="panel-title">By Object · 30d</span>
+        <span class="panel-meta">P1 · P2 · P3 stacked</span>
+      </div>
+      <div class="panel-body">
+        <!-- Account: P1 14, P2 86, P3 122 -> 222 -->
+        <div class="obj-row">
+          <span class="obj-name">Account</span>
+          <span class="obj-bar">
+            <i class="seg-p1" style="width: 6.3%"></i>
+            <i class="seg-p2" style="width: 38.7%"></i>
+            <i class="seg-p3" style="width: 55.0%"></i>
+          </span>
+          <span class="obj-total">222<small>P1·14 P2·86 P3·122</small></span>
+        </div>
+        <!-- Contact: 9, 71, 91 -> 171 -->
+        <div class="obj-row">
+          <span class="obj-name">Contact</span>
+          <span class="obj-bar">
+            <i class="seg-p1" style="width: 5.3%"></i>
+            <i class="seg-p2" style="width: 41.5%"></i>
+            <i class="seg-p3" style="width: 53.2%"></i>
+          </span>
+          <span class="obj-total">171<small>P1·9 P2·71 P3·91</small></span>
+        </div>
+        <!-- FinancialAccount: 22, 64, 64 -> 150 -->
+        <div class="obj-row">
+          <span class="obj-name">FinancialAccount</span>
+          <span class="obj-bar">
+            <i class="seg-p1" style="width: 14.7%"></i>
+            <i class="seg-p2" style="width: 42.7%"></i>
+            <i class="seg-p3" style="width: 42.6%"></i>
+          </span>
+          <span class="obj-total">150<small>P1·22 P2·64 P3·64</small></span>
+        </div>
+        <!-- KYC_Record: 18, 49, 51 -> 118 -->
+        <div class="obj-row">
+          <span class="obj-name">KYC_Record</span>
+          <span class="obj-bar">
+            <i class="seg-p1" style="width: 15.3%"></i>
+            <i class="seg-p2" style="width: 41.5%"></i>
+            <i class="seg-p3" style="width: 43.2%"></i>
+          </span>
+          <span class="obj-total">118<small>P1·18 P2·49 P3·51</small></span>
+        </div>
+        <!-- Asset: 6, 38, 53 -> 97 -->
+        <div class="obj-row">
+          <span class="obj-name">Asset</span>
+          <span class="obj-bar">
+            <i class="seg-p1" style="width: 6.2%"></i>
+            <i class="seg-p2" style="width: 39.2%"></i>
+            <i class="seg-p3" style="width: 54.6%"></i>
+          </span>
+          <span class="obj-total">97<small>P1·6 P2·38 P3·53</small></span>
+        </div>
+        <!-- Address: 3, 24, 47 -> 74 -->
+        <div class="obj-row">
+          <span class="obj-name">Address</span>
+          <span class="obj-bar">
+            <i class="seg-p1" style="width: 4.1%"></i>
+            <i class="seg-p2" style="width: 32.4%"></i>
+            <i class="seg-p3" style="width: 63.5%"></i>
+          </span>
+          <span class="obj-total">74<small>P1·3 P2·24 P3·47</small></span>
+        </div>
+        <!-- Lead: 1, 18, 30 -> 49 -->
+        <div class="obj-row">
+          <span class="obj-name">Lead</span>
+          <span class="obj-bar">
+            <i class="seg-p1" style="width: 2.0%"></i>
+            <i class="seg-p2" style="width: 36.7%"></i>
+            <i class="seg-p3" style="width: 61.3%"></i>
+          </span>
+          <span class="obj-total">49<small>P1·1 P2·18 P3·30</small></span>
+        </div>
+
+        <div class="legend" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line-soft);">
+          <span class="item"><span class="sw" style="background:var(--p1); height:10px; width:10px; border-radius: 2px"></span>P1 critical</span>
+          <span class="item"><span class="sw" style="background:var(--warn); height:10px; width:10px; border-radius: 2px"></span>P2 major</span>
+          <span class="item"><span class="sw" style="background:var(--p3); height:10px; width:10px; border-radius: 2px"></span>P3 minor</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Accuracy trend -->
+    <section class="panel">
+      <div class="panel-head">
+        <span class="panel-title">AI Accuracy Trend</span>
+        <span class="panel-meta">recall@k · operator confirmation · weekly</span>
+      </div>
+      <div class="panel-body">
+        <div class="legend" style="margin-bottom: 12px;">
+          <span class="item"><span class="sw" style="background:var(--ok)"></span>recall@1<span class="pct">87.0%</span></span>
+          <span class="item"><span class="sw" style="background:var(--teal)"></span>recall@3<span class="pct">97.4%</span></span>
+          <span class="item"><span class="sw" style="background:var(--info)"></span>ai_was_correct<span class="pct">84.2%</span></span>
+        </div>
+        <svg viewBox="0 0 480 220" preserveAspectRatio="none" style="width:100%; height:220px; display:block" id="acc-svg"></svg>
+
+        <div class="trend-foot">
+          <div class="item">recall@1<b class="ok">87.0%</b></div>
+          <div class="item">Δ vs. 30d ago<b class="ok">+4.2pt</b></div>
+          <div class="item">resolutions<b>1,054</b></div>
+          <div class="item">overrides<b class="warn">167</b></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Deployment correlation -->
+  <section class="panel">
+    <div class="panel-head">
+      <span class="panel-title">Deployment Correlation</span>
+      <span class="panel-meta">22 deploys · 9 with ≥3σ incident spike +24h</span>
+    </div>
+    <div class="panel-body" style="padding: 0;">
+      <table class="dep-tbl">
+        <thead>
+          <tr>
+            <th>Deployment</th>
+            <th>Date</th>
+            <th class="right">Incidents +24h</th>
+            <th>Most affected</th>
+            <th>Suspected root cause</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="commit">SEC-4432<small>profile · PII tightening</small></span></td>
+            <td><span class="ts">2026-04-29 03:11Z<small>6 days ago</small></span></td>
+            <td class="right"><span class="delta-cell up">+148<span class="s">σ=4.7</span></span></td>
+            <td><span class="obj-cell">Contact · Account</span></td>
+            <td><span class="rc-cell">FLS_STRIPPED</span></td>
+            <td><span class="status-pill invest"><span class="d"></span>investigating</span></td>
+          </tr>
+          <tr>
+            <td><span class="commit"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="78150d141d55191b1b0c55170d0c380e4b564c5649">[email&#160;protected]</a><small>fsc-mappings · acct-out.dwl</small></span></td>
+            <td><span class="ts">2026-04-26 14:02Z<small>9 days ago</small></span></td>
+            <td class="right"><span class="delta-cell up">+47<span class="s">σ=3.1</span></span></td>
+            <td><span class="obj-cell">Account</span></td>
+            <td><span class="rc-cell">DATAWAVE_ERROR</span></td>
+            <td><span class="status-pill ok"><span class="d"></span>resolved</span></td>
+          </tr>
+          <tr>
+            <td><span class="commit">db2-fsc · DDL-2026-04-22<small>FSC.PARTY_TAX_ID schema</small></span></td>
+            <td><span class="ts">2026-04-22 18:30Z<small>13 days ago</small></span></td>
+            <td class="right"><span class="delta-cell up">+89<span class="s">σ=3.8</span></span></td>
+            <td><span class="obj-cell">Contact</span></td>
+            <td><span class="rc-cell">VALUE_MISMATCH · hash drift</span></td>
+            <td><span class="status-pill ok"><span class="d"></span>resolved</span></td>
+          </tr>
+          <tr>
+            <td><span class="commit"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="395a5d5a144950495c5550575c794f0b1708011709">[email&#160;protected]</a><small>fsc-contact-sync</small></span></td>
+            <td><span class="ts">2026-04-19 09:15Z<small>16 days ago</small></span></td>
+            <td class="right"><span class="delta-cell flat">+8<span class="s">σ=0.6</span></span></td>
+            <td><span class="obj-cell">—</span></td>
+            <td><span class="rc-cell" style="color:var(--fg-3)">no significant correlation</span></td>
+            <td><span class="status-pill ok"><span class="d"></span>resolved</span></td>
+          </tr>
+          <tr>
+            <td><span class="commit">sf-fsc · sandbox refresh<small>org-00D5g · UAT</small></span></td>
+            <td><span class="ts">2026-04-15 22:00Z<small>20 days ago</small></span></td>
+            <td class="right"><span class="delta-cell up">+62<span class="s">σ=3.4</span></span></td>
+            <td><span class="obj-cell">FinancialAccount</span></td>
+            <td><span class="rc-cell">STALE_VALUE · timezone drift</span></td>
+            <td><span class="status-pill rb"><span class="d"></span>rolled back</span></td>
+          </tr>
+          <tr>
+            <td><span class="commit"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="28455d444d055844495c4e475a45685e1e061a0618">[email&#160;protected]</a><small>cloudhub runtime</small></span></td>
+            <td><span class="ts">2026-04-11 06:00Z<small>24 days ago</small></span></td>
+            <td class="right"><span class="delta-cell down">−12<span class="s">σ=−0.8</span></span></td>
+            <td><span class="obj-cell">—</span></td>
+            <td><span class="rc-cell" style="color:var(--ok)">no negative effect</span></td>
+            <td><span class="status-pill ok"><span class="d"></span>resolved</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="padding: 14px 16px 16px; border-top: 1px solid var(--line);" class="footnote">
+      Significance threshold <code>σ ≥ 3.0</code> against 14-day baseline · jump-detection algorithm · <code>SEC-4432</code> remains the largest unresolved correlation in the window.
+    </div>
+  </section>
+
+</main>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+  /* ---- Sparklines ---- */
+  function spark(id, data, color, baseline) {
+    const el = document.getElementById(id);
+    const max = Math.max(...data);
+    el.innerHTML = data.map(v => {
+      const h = Math.max(8, (v / max) * 100);
+      const c = baseline ? (v < baseline ? 'var(--p1)' : color) : color;
+      return `<i style="height:${h}%; background:${c}; opacity:${0.45 + (v/max)*0.55}"></i>`;
+    }).join('');
+  }
+  spark('sp1', [4,6,5,7,4,5,6,8,5,7,6,5,8,7,9,6,5,7,6,8,7,5,6,8,5,7,6,8,7,5], 'var(--info)');
+  spark('sp2', [38,42,35,48,40,52,46,55,42,58,49,44,62,55,68,49,42,55,48,64,55,42,49,62,40,55,48,62,55,42], 'var(--teal)');
+  spark('sp3', [78,80,82,79,83,84,82,85,83,84,86,85,87,86,84,83,84,86,85,84,86,85,87,86,82,84,85,87,86,82], 'var(--ok)');
+  spark('sp4', [82,84,85,83,86,87,85,88,86,87,89,88,89,88,87,86,87,89,88,87,89,88,90,89,86,87,89,90,89,88], 'var(--ok)');
+
+  /* ---- Time series chart ---- */
+  const W = 800, H = 280, pad = { l: 36, r: 14, t: 14, b: 28 };
+  const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
+  const days = 30;
+
+  // Synthesize 30-day series. Peaks tied to deployment events at days 6, 9, 13, 20.
+  const rng = (() => { let s = 7; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
+  function gen(base, peakAt, peakBoost) {
+    const arr = [];
+    for (let i = 0; i < days; i++) {
+      let v = base + Math.round(rng() * 4);
+      peakAt.forEach((d, idx) => {
+        const dist = Math.abs(i - d);
+        if (dist <= 3) v += Math.round(peakBoost[idx] * Math.exp(-dist * 0.7));
+      });
+      arr.push(v);
+    }
+    return arr;
+  }
+  const series = [
+    { key: 'NULL_DOWNSTREAM',     color: 'var(--c-null)',     data: gen(8,  [6, 13, 20], [22, 9, 12]) },
+    { key: 'VALUE_MISMATCH',      color: 'var(--c-mismatch)', data: gen(7,  [9, 13],     [10, 14]) },
+    { key: 'STALE_VALUE',         color: 'var(--c-stale)',    data: gen(5,  [20],        [11]) },
+    { key: 'MISSING_RECORD',      color: 'var(--c-missing)',  data: gen(4,  [9],         [7]) },
+    { key: 'DUPLICATE_DOWNSTREAM',color: 'var(--c-dup)',      data: gen(3,  [13],        [5]) },
+  ];
+  const deployments = [
+    { day: 6,  label: 'SEC-4432' },
+    { day: 9,  label: 'mule-acct-out@v3.4.1' },
+    { day: 13, label: 'db2 DDL-2026-04-22' },
+    { day: 20, label: 'sf sandbox refresh' },
+  ];
+
+  const allMax = Math.max(...series.flatMap(s => s.data));
+  const yMax = Math.ceil(allMax / 5) * 5 + 5;
+
+  const x = i => pad.l + (i / (days - 1)) * innerW;
+  const y = v => pad.t + (1 - v / yMax) * innerH;
+
+  let svg = '';
+
+  // y grid + labels
+  const yTicks = 5;
+  for (let i = 0; i <= yTicks; i++) {
+    const v = Math.round((yMax / yTicks) * i);
+    const yy = y(v);
+    svg += `<line class="grid-line" x1="${pad.l}" x2="${W - pad.r}" y1="${yy}" y2="${yy}" />`;
+    svg += `<text class="ax-text" x="${pad.l - 6}" y="${yy + 3}" text-anchor="end">${v}</text>`;
+  }
+  // x labels (every 5 days)
+  const today = new Date('2026-05-05T00:00:00Z');
+  for (let i = 0; i < days; i += 5) {
+    const d = new Date(today.getTime() - (days - 1 - i) * 86400000);
+    const lbl = (d.getUTCMonth() + 1) + '/' + d.getUTCDate();
+    svg += `<text class="ax-text" x="${x(i)}" y="${H - 8}" text-anchor="middle">${lbl}</text>`;
+  }
+  // deployment vertical lines
+  deployments.forEach(d => {
+    svg += `<line class="grid-line-dashed" x1="${x(d.day)}" x2="${x(d.day)}" y1="${pad.t}" y2="${H - pad.b}" stroke="var(--fg-2)" />`;
+    svg += `<circle cx="${x(d.day)}" cy="${pad.t + 4}" r="3" fill="var(--fg-2)" />`;
+  });
+
+  // lines
+  series.forEach(s => {
+    const path = s.data.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(v)}`).join(' ');
+    // soft area
+    const area = `M ${x(0)} ${H - pad.b} ` + s.data.map((v, i) => `L ${x(i)} ${y(v)}`).join(' ') + ` L ${x(days - 1)} ${H - pad.b} Z`;
+    svg += `<path d="${area}" fill="${s.color}" opacity="0.04"/>`;
+    svg += `<path d="${path}" fill="none" stroke="${s.color}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`;
+  });
+
+  // hover crosshair group (hidden by default)
+  svg += `<line id="ts-cross" x1="0" x2="0" y1="${pad.t}" y2="${H - pad.b}" stroke="var(--info)" stroke-width="1" stroke-dasharray="2 2" opacity="0"/>`;
+  series.forEach((s, idx) => {
+    svg += `<circle id="ts-pt-${idx}" cx="0" cy="0" r="3.5" fill="${s.color}" stroke="var(--bg)" stroke-width="2" opacity="0"/>`;
+  });
+
+  // hover hit area
+  svg += `<rect id="ts-hit" x="${pad.l}" y="${pad.t}" width="${innerW}" height="${innerH}" fill="transparent" />`;
+
+  document.getElementById('ts-svg').innerHTML = svg;
+
+  // tooltip
+  const host = document.getElementById('ts-host');
+  const tip = document.getElementById('ts-tip');
+  const tsSvg = document.getElementById('ts-svg');
+  const cross = document.getElementById('ts-cross');
+
+  function dayDate(i) {
+    const d = new Date(today.getTime() - (days - 1 - i) * 86400000);
+    return d.toISOString().slice(0, 10);
+  }
+
+  tsSvg.addEventListener('mousemove', (e) => {
+    const rect = tsSvg.getBoundingClientRect();
+    const px = ((e.clientX - rect.left) / rect.width) * W;
+    if (px < pad.l || px > W - pad.r) return;
+    const i = Math.round(((px - pad.l) / innerW) * (days - 1));
+    const cx = x(i);
+    const dep = deployments.find(d => d.day === i);
+
+    cross.setAttribute('x1', cx);
+    cross.setAttribute('x2', cx);
+    cross.setAttribute('opacity', 1);
+
+    let total = 0;
+    series.forEach((s, idx) => {
+      const pt = document.getElementById('ts-pt-' + idx);
+      pt.setAttribute('cx', cx);
+      pt.setAttribute('cy', y(s.data[i]));
+      pt.setAttribute('opacity', 1);
+      total += s.data[i];
+    });
+
+    tip.style.display = 'block';
+    tip.innerHTML =
+      `<div class="ts">${dayDate(i)} · day ${i + 1}/${days}${dep ? ' · <span style="color:var(--info)">deploy: ' + dep.label + '</span>' : ''}</div>` +
+      series.map(s => `<div class="row"><span class="sw" style="background:${s.color}"></span><span>${s.key}</span><span class="v">${s.data[i]}</span></div>`).join('') +
+      `<div class="total"><span>total</span><b>${total}</b></div>`;
+
+    const hostRect = host.getBoundingClientRect();
+    const tipW = tip.offsetWidth;
+    const left = (cx / W) * hostRect.width + 14;
+    tip.style.left = (left + tipW > hostRect.width ? left - tipW - 28 : left) + 'px';
+    tip.style.top = '12px';
+  });
+  tsSvg.addEventListener('mouseleave', () => {
+    cross.setAttribute('opacity', 0);
+    series.forEach((_, idx) => document.getElementById('ts-pt-' + idx).setAttribute('opacity', 0));
+    tip.style.display = 'none';
+  });
+
+  /* ---- Accuracy trend ---- */
+  (function() {
+    const W = 480, H = 220, pad = { l: 30, r: 12, t: 10, b: 22 };
+    const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
+    const weeks = 13;
+    const r1 = [78.0, 79.2, 80.1, 80.8, 81.5, 82.4, 83.0, 83.8, 84.6, 85.3, 86.0, 86.6, 87.0];
+    const r3 = [91.0, 92.0, 92.6, 93.4, 94.1, 94.7, 95.3, 95.8, 96.3, 96.7, 96.9, 97.2, 97.4];
+    const aw = [76.0, 77.5, 78.4, 79.2, 79.9, 80.8, 81.5, 82.3, 82.9, 83.4, 83.7, 83.9, 84.2];
+
+    const yMin = 70, yMax = 100;
+    const x = i => pad.l + (i / (weeks - 1)) * innerW;
+    const y = v => pad.t + (1 - (v - yMin) / (yMax - yMin)) * innerH;
+
+    let s = '';
+    for (let v = yMin; v <= yMax; v += 5) {
+      const yy = y(v);
+      s += `<line class="grid-line" x1="${pad.l}" x2="${W - pad.r}" y1="${yy}" y2="${yy}" />`;
+      s += `<text class="ax-text" x="${pad.l - 6}" y="${yy + 3}" text-anchor="end">${v}%</text>`;
+    }
+    for (let i = 0; i < weeks; i += 3) {
+      s += `<text class="ax-text" x="${x(i)}" y="${H - 6}" text-anchor="middle">w-${weeks - 1 - i}</text>`;
+    }
+    function plot(data, color, dash) {
+      const path = data.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(v)}`).join(' ');
+      s += `<path d="${path}" fill="none" stroke="${color}" stroke-width="1.7" ${dash ? 'stroke-dasharray="3 3"' : ''} stroke-linejoin="round" stroke-linecap="round"/>`;
+      // end dot
+      s += `<circle cx="${x(data.length - 1)}" cy="${y(data[data.length - 1])}" r="3" fill="${color}" stroke="var(--bg)" stroke-width="1.5"/>`;
+    }
+    plot(r3, 'var(--teal)');
+    plot(r1, 'var(--ok)');
+    plot(aw, 'var(--info)', true);
+
+    document.getElementById('acc-svg').innerHTML = s;
+  })();
+
+  /* ---- Date-range segmented ---- */
+  document.querySelectorAll('.seg').forEach(seg => {
+    seg.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      seg.querySelectorAll('button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>

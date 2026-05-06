@@ -40,12 +40,13 @@ reconai/
 │   ├── config.py     # AgentConfig — LLM routing per agent
 │   └── main.py       # FastAPI app + all endpoints
 ├── frontend/src/
-│   ├── views/        # Upload, LiveAnalysis, IncidentDetail, RunSummary, Analytics
+│   ├── views/        # Landing, Upload, LiveAnalysis, IncidentDetail, RunSummary, Analytics
 │   ├── components/analytics/  # StatCard, IncidentsOverTime, RootCauseDonut,
 │   │                          # ByObjectChart, AIAccuracyChart, DeploymentTable
 │   ├── store/        # reconStore.ts (Zustand)
 │   └── lib/          # api.ts, sse.ts
 ├── data/sample_fsc_recon.csv
+├── vercel.json       # SPA rewrite rule (all paths → /index.html)
 └── docs/ADR.md + slices/slice-1.md … slice-8.md
 ```
 
@@ -83,7 +84,12 @@ Hypothesis decides *what* to check. Evidence *executes* the check. Never merge t
 - `/plan` before any implementation — resolve ambiguities first
 - Never break the non-negotiables above
 - Always verify only one Python process on port 8000 before debugging: `netstat -ano | findstr :8000`
-- Analytics adapter methods use date-range queries (`get_recon_rows_since`) — never `.in_()` on large ID lists (PostgREST URL limit). CSS vars don't resolve in Recharts tooltips — use hex colors.
+- Analytics adapter methods use date-range queries (`get_recon_rows_since`) — never `.in_()` on large ID lists (PostgREST URL limit).
+- CSS vars don't resolve in Recharts tooltips — use hex colors. Use `contentStyle` + `itemStyle` + `labelStyle` props directly; custom `content` prop is an alternative but `contentStyle` is reliable when all colors are hex.
+- Recharts Tooltip `formatter` return is `[displayValue, displayName]` — the second element replaces the dataKey label, not the segment name.
+- Analytics endpoints have 5-min in-memory cache (`_analytics_cache` in main.py). Cache key format: `f"{endpoint}:{days}"`. TTL = 300s.
+- Routing: `/` = Landing (public), `/upload` = Upload (app entry). Vercel SPA rewrite in `vercel.json` required for direct-URL navigation to work on Vercel deployment.
+- Landing page is standalone (no Shell/TopBar wrapper) — has its own nav with brand mark and "Open app →" CTA.
 
 ---
 
@@ -113,3 +119,5 @@ Hypothesis decides *what* to check. Evidence *executes* the check. Never merge t
 | 2026-05-04 | 6 | All 4 views, SSE client, Zustand, Framer Motion, 0 TS errors. CORS fix: Vite proxy + relative API_URL | Evidence empty on sample runs — hypothesis branches missing for new discrepancy types |
 | 2026-05-05 | debug | Fixed evidence/hypothesis bug (stale uvicorn), H4 dedup guard, evidence retry counter, cache path evidence re-save. All 5 discrepancy types verified. | — |
 | 2026-05-06 | 8 | Analytics dashboard — 6 backend endpoints, analytics_seed.py, 6 frontend components, /analytics route. 0 TS errors. | `.in_()` on 2000 IDs hits PostgREST URL limit — use date-range queries for analytics. CSS vars fail in Recharts tooltips — use hex. |
+| 2026-05-06 | polish | RootCauseDonut tooltip fixed (contentStyle hex colors, removed custom DonutTooltip). Skeleton loading states in Analytics (shimmer-pulse keyframe). 5-min in-memory cache on all 6 analytics endpoints. | — |
+| 2026-05-06 | landing | Landing page at `/` (hero, problem, how-it-works, arch, built-by). Upload moved to `/upload`. vercel.json SPA rewrite added. 0 TS errors. | — |

@@ -443,7 +443,7 @@ export default function Landing() {
 
             <div className="land-links-row" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 32 }}>
               {[
-                { label: '→ LinkedIn', href: 'https://linkedin.com/in/pranav-cr' },
+                { label: '→ LinkedIn', href: 'https://www.linkedin.com/in/pranav-c-r-852752202/' },
                 { label: '→ Portfolio', href: 'https://pranavcr01.github.io/' },
                 { label: '→ GitHub', href: 'https://github.com/PranavCR01' },
                 { label: '→ Research Notes', href: 'https://www.notion.so/ReconAI-Research-Architecture-Notes-358a47a2b4cf8000944fefad0ddf1349?source=copy_link' },

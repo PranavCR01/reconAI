@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { PieChart, Pie, Cell, Tooltip } from 'recharts'
 import type { RootCauseRow } from '@/types'
 
@@ -18,11 +19,17 @@ function getColor(name: string, idx: number): string {
   return DISC_COLORS[name] ?? FALLBACK_COLORS[idx % FALLBACK_COLORS.length]
 }
 
+interface ActiveSegment {
+  name: string
+  pct: number
+}
+
 export function RootCauseDonut({ data }: Props) {
+  const [active, setActive] = useState<ActiveSegment | null>(null)
   const total = data.reduce((s, r) => s + r.count, 0)
 
   if (!data.length) return (
-    <div style={{ color: 'var(--fg-3)', font: '500 12px var(--mono)', padding: '16px 0' }}>No data</div>
+    <div style={{ color: '#808090', font: '500 12px var(--mono)', padding: '16px 0' }}>No data</div>
   )
 
   const pieData = data.map((r, i) => ({
@@ -46,31 +53,61 @@ export function RootCauseDonut({ data }: Props) {
             startAngle={90}
             endAngle={-270}
             strokeWidth={0}
+            onMouseEnter={(_, idx) => setActive({ name: pieData[idx].name, pct: pieData[idx].pct })}
+            onMouseLeave={() => setActive(null)}
           >
-            {pieData.map((entry, idx) => (
+            {pieData.map((entry) => (
               <Cell key={entry.name} fill={entry.color} />
             ))}
           </Pie>
           <Tooltip
-            content={({ active, payload }) => {
-              if (!active || !payload?.length) return null
-              const d = payload[0].payload
-              return (
-                <div style={{ background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 12px', font: '500 11.5px var(--mono)', color: 'var(--fg-1)' }}>
-                  <div style={{ color: 'var(--fg-3)', marginBottom: 4 }}>{d.name}</div>
-                  <div>{d.pct}% · {d.value.toLocaleString()} incidents</div>
-                </div>
-              )
+            contentStyle={{
+              background: '#2a2a38',
+              border: '1px solid #3a3a50',
+              borderRadius: 8,
+              padding: '7px 11px',
+              fontFamily: 'var(--mono)',
+              fontSize: 11.5,
+              fontWeight: 500,
+              color: '#d4d4e8',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
             }}
+            itemStyle={{ color: '#d4d4e8', fontFamily: 'var(--mono)' }}
+            labelStyle={{ color: '#8080a0', fontFamily: 'var(--mono)', marginBottom: 2 }}
+            formatter={(value: number, name: string, props) => {
+              const pct = props.payload?.pct ?? 0
+              return [`${pct}%`, name]
+            }}
+            separator=" · "
           />
         </PieChart>
-        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -55%)', textAlign: 'center', pointerEvents: 'none' }}>
-          <div style={{ font: '600 20px var(--mono)', color: 'var(--fg)', letterSpacing: '-0.02em', lineHeight: 1 }}>
-            {total.toLocaleString()}
-          </div>
-          <div style={{ font: '500 9.5px var(--mono)', color: 'var(--fg-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 3 }}>
-            incidents
-          </div>
+
+        {/* Center label — static total or hover segment */}
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%, -55%)',
+          textAlign: 'center', pointerEvents: 'none',
+          transition: 'opacity 0.1s',
+        }}>
+          {active ? (
+            <>
+              <div style={{ font: '600 15px var(--mono)', color: '#d4d4e8', letterSpacing: '-0.01em', lineHeight: 1 }}>
+                {active.pct}%
+              </div>
+              <div style={{ font: '500 9px var(--mono)', color: '#8080a0', letterSpacing: '0.04em', marginTop: 3, maxWidth: 70, lineHeight: 1.3 }}>
+                {active.name.replace(/_/g, '_​')}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ font: '600 20px var(--mono)', color: '#e8e8f4', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                {total.toLocaleString()}
+              </div>
+              <div style={{ font: '500 9.5px var(--mono)', color: '#8080a0', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 3 }}>
+                incidents
+              </div>
+            </>
+          )}
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom'
-import { Suspense, lazy, useEffect } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { Shell } from '@/components/layout/Shell'
 import { trackPageView } from '@/lib/api'
 
@@ -9,6 +9,62 @@ const LiveAnalysis = lazy(() => import('./views/LiveAnalysis'))
 const IncidentDetail = lazy(() => import('./views/IncidentDetail'))
 const RunSummary = lazy(() => import('./views/RunSummary'))
 const Analytics = lazy(() => import('./views/Analytics'))
+
+const _API = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api/v1'
+
+function HealthBanner() {
+  const [down, setDown] = useState(false)
+  const [dismissed, setDismissed] = useState(false)
+
+  useEffect(() => {
+    async function check() {
+      try {
+        const res = await fetch(`${_API}/health`, { signal: AbortSignal.timeout(5000) })
+        if (res.ok) {
+          setDown(false)
+          setDismissed(false)
+        } else {
+          setDown(true)
+        }
+      } catch {
+        setDown(true)
+      }
+    }
+    check()
+    const id = setInterval(check, 60_000)
+    return () => clearInterval(id)
+  }, [])
+
+  if (!down || dismissed) return null
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+      background: 'oklch(0.18 0.06 25)',
+      borderBottom: '1px solid oklch(0.55 0.20 25)',
+      padding: '9px 20px',
+      display: 'flex', alignItems: 'center', gap: 10,
+      fontFamily: 'var(--mono)', fontSize: 12,
+      color: 'oklch(0.80 0.12 25)',
+    }}>
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ flexShrink: 0 }}>
+        <path d="M8 2L14.9 14H1.1L8 2z" /><path d="M8 7v3M8 12v.5" />
+      </svg>
+      ReconAI is temporarily unavailable. Our team has been notified.
+      <button
+        onClick={() => setDismissed(true)}
+        style={{
+          marginLeft: 'auto', background: 'none', border: 0,
+          color: 'oklch(0.65 0.10 25)', cursor: 'pointer',
+          fontFamily: 'var(--mono)', fontSize: 14, lineHeight: 1, padding: '0 4px',
+        }}
+        aria-label="Dismiss"
+      >
+        ×
+      </button>
+    </div>
+  )
+}
 
 function RouteTracker() {
   const { pathname } = useLocation()
@@ -159,6 +215,7 @@ function AppRight() {
 export default function App() {
   return (
     <BrowserRouter>
+      <HealthBanner />
       <Shell topBarCenter={<AppNav />} topBarRight={<AppRight />}>
         <RouteTracker />
         <Suspense fallback={<Loading />}>

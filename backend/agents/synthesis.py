@@ -10,11 +10,20 @@ import json
 import re
 import time
 
+import sentry_sdk
 from pydantic import ValidationError
 
 from backend.config import AgentConfig
 from backend.models.outputs import RCAOutput
 from backend.models.state import ReconState
+
+_API_UNAVAILABLE_OUTPUT = {
+    "root_cause": "Analysis temporarily unavailable. Please try again shortly.",
+    "suggested_fix": "Manual investigation required. The AI analysis service is temporarily unavailable.",
+    "postmortem_draft": "",
+    "jira_summary": "RCA: API_UNAVAILABLE — manual review required",
+    "confidence": 0.0,
+}
 
 _MAX_RETRIES = 2
 
@@ -144,6 +153,22 @@ def _parse_and_validate(raw: str) -> tuple[dict, str]:
     return data, ""
 
 
+def _is_api_unavailable(exc: Exception) -> bool:
+    try:
+        import anthropic
+        if isinstance(exc, (anthropic.APIError, anthropic.APIStatusError)):
+            return True
+    except ImportError:
+        pass
+    try:
+        import groq as groq_sdk
+        if isinstance(exc, groq_sdk.APIError):
+            return True
+    except ImportError:
+        pass
+    return False
+
+
 def run_synthesis(state: ReconState, config: AgentConfig) -> dict:
     model = config.synthesis_llm
 
@@ -153,13 +178,18 @@ def run_synthesis(state: ReconState, config: AgentConfig) -> dict:
     data: dict = {}
     error_context = ""
 
+    api_unavailable = False
     for attempt in range(_MAX_RETRIES):
         prompt = _build_prompt(state, error_context)
         try:
             raw, in_tok, out_tok, lat_ms = _call_llm(prompt, model)
         except Exception as exc:
+            if _is_api_unavailable(exc):
+                sentry_sdk.capture_exception(exc)
+                data = dict(_API_UNAVAILABLE_OUTPUT)
+                api_unavailable = True
+                break
             error_context = str(exc)
-            total_latency_ms += 0
             continue
 
         total_input_tokens += in_tok
@@ -176,7 +206,7 @@ def run_synthesis(state: ReconState, config: AgentConfig) -> dict:
     suggested_fix = data.get("suggested_fix") or "Manual investigation required by on-call engineer."
     postmortem_draft = data.get("postmortem_draft") or ""
     jira_summary = data.get("jira_summary") or f"RCA: {root_cause[:80]}"
-    requires_human_review = confidence < 0.75
+    requires_human_review = confidence < 0.75 or api_unavailable
 
     rca_output = RCAOutput(
         root_cause=root_cause,
@@ -197,7 +227,7 @@ def run_synthesis(state: ReconState, config: AgentConfig) -> dict:
         "latency_ms": total_latency_ms,
     }
 
-    return {
+    out: dict = {
         "rca_output": rca_output.model_dump(mode="json"),
         "root_cause": root_cause,
         "confidence": confidence,
@@ -205,3 +235,6 @@ def run_synthesis(state: ReconState, config: AgentConfig) -> dict:
         "llm_calls": (state.get("llm_calls") or []) + [llm_call_entry],
         "total_latency_ms": (state.get("total_latency_ms") or 0) + total_latency_ms,
     }
+    if api_unavailable:
+        out["current_hypothesis"] = "API_UNAVAILABLE"
+    return out

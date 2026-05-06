@@ -99,6 +99,8 @@ export default function LiveAnalysis() {
   const [elapsed, setElapsed] = useState(0)
   const [isDone, setIsDone] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
+  const [sseError, setSseError] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
   const [totalRows, setTotalRows] = useState(0)
   const [cacheHits, setCacheHits] = useState(0)
   const sseCleanupRef = useRef<(() => void) | null>(null)
@@ -153,6 +155,7 @@ export default function LiveAnalysis() {
       },
       onError: () => {
         store.setSseConnected(false)
+        if (!isDone) setSseError(true)
       },
     }, store.llmConfig)
     sseCleanupRef.current = cleanup
@@ -161,7 +164,7 @@ export default function LiveAnalysis() {
       sseCleanupRef.current = null
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runId])
+  }, [runId, retryKey])
 
   const allIncidents = store.getIncidentsSorted()
   const total = allIncidents.length
@@ -254,6 +257,37 @@ export default function LiveAnalysis() {
           </div>
         }
       />
+
+      {/* SSE error banner */}
+      {sseError && !isDone && (
+        <div style={{
+          background: 'oklch(0.18 0.04 45)',
+          borderBottom: '1px solid oklch(0.55 0.16 45)',
+          padding: '10px 18px',
+          display: 'flex', alignItems: 'center', gap: 10,
+          fontFamily: 'var(--mono)', fontSize: 12,
+          color: 'oklch(0.80 0.10 45)',
+        }}>
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ flexShrink: 0 }}>
+            <circle cx="8" cy="8" r="6" /><path d="M8 5v3M8 10v.5" />
+          </svg>
+          Analysis interrupted — the service may be temporarily unavailable. Your partial results are shown above.
+          <button
+            onClick={() => { setSseError(false); setRetryKey(k => k + 1) }}
+            style={{
+              marginLeft: 'auto',
+              height: 26, padding: '0 12px', borderRadius: 5,
+              border: '1px solid oklch(0.55 0.16 45)',
+              background: 'oklch(0.22 0.05 45)',
+              color: 'oklch(0.80 0.10 45)',
+              fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Stats bar */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', borderBottom: '1px solid var(--line)', background: 'var(--bg-1)' }}>

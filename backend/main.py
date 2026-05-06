@@ -10,6 +10,9 @@ import statistics
 from datetime import date, datetime, timedelta, timezone
 from typing import Annotated, Optional
 
+import os
+
+import sentry_sdk
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,6 +37,10 @@ from backend.storage.supabase_adapter import SupabaseAdapter
 from backend.tools.rag_tools import compute_recall_at_k, embed_text
 
 load_dotenv()
+
+_dsn = os.getenv("SENTRY_DSN", "")
+if _dsn:
+    sentry_sdk.init(dsn=_dsn, traces_sample_rate=0.1)
 
 _storage: SupabaseAdapter | None = None
 _recall_metrics_cache: dict | None = None

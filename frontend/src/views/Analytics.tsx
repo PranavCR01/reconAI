@@ -225,7 +225,7 @@ export default function Analytics() {
             <StatCard
               label="Deploy correlations"
               value={summary?.deploy_correlations.count ?? '—'}
-              delta={summary ? `/ ${summary.deploy_correlations.total_deploys} deploys` : undefined}
+              delta={summary ? `/ ${summary.deploy_correlations.total_deploys} deployments` : undefined}
               deltaDir="neutral"
               valueColor="warn"
               footer={undefined}
@@ -265,7 +265,7 @@ export default function Analytics() {
       {/* Full-width: deployment correlation */}
       <Panel
         title="Deployment Correlation"
-        meta={`${totalDeploys} deploys · ${spikeCount} with ≥3σ incident spike +24h`}
+        meta={`${totalDeploys} deployments · ${spikeCount} with ≥3σ incident spike +24h`}
         noPad
       >
         {loading || !deployCorr ? (

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, Link } from 'react
 import { Suspense, lazy } from 'react'
 import { Shell } from '@/components/layout/Shell'
 
+const Landing = lazy(() => import('./views/Landing'))
 const Upload = lazy(() => import('./views/Upload'))
 const LiveAnalysis = lazy(() => import('./views/LiveAnalysis'))
 const IncidentDetail = lazy(() => import('./views/IncidentDetail'))
@@ -29,15 +30,13 @@ function Loading() {
 function AppNav() {
   const { pathname } = useLocation()
   const items = [
-    { label: 'Runs', href: '/', matchPrefix: ['/runs', '/incidents', '/'] },
+    { label: 'Runs', href: '/upload', matchPrefix: ['/upload', '/runs', '/incidents'] },
     { label: 'Analytics', href: '/analytics', matchPrefix: ['/analytics'] },
   ]
   return (
     <nav style={{ display: 'flex', gap: 2, marginLeft: 18 }}>
       {items.map(({ label, href, matchPrefix }) => {
-        const active = matchPrefix.some((p) =>
-          p === '/' ? pathname === '/' : pathname.startsWith(p)
-        )
+        const active = matchPrefix.some((p) => pathname.startsWith(p))
         return (
           <Link
             key={label}
@@ -154,7 +153,8 @@ export default function App() {
       <Shell topBarCenter={<AppNav />} topBarRight={<AppRight />}>
         <Suspense fallback={<Loading />}>
           <Routes>
-            <Route path="/" element={<Upload />} />
+            <Route path="/" element={<Landing />} />
+            <Route path="/upload" element={<Upload />} />
             <Route path="/runs/:runId" element={<LiveAnalysis />} />
             <Route path="/runs/:runId/summary" element={<RunSummary />} />
             <Route path="/runs/:runId/incidents/:incidentId" element={<IncidentDetail />} />

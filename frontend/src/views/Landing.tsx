@@ -221,7 +221,7 @@ export default function Landing() {
               color: C.fg2, lineHeight: 1.6,
               maxWidth: 560,
             }}>
-              ReconAI diagnoses root causes in 42 seconds — with cited evidence,
+              ReconAI diagnoses root causes in just a couple of minutes — with cited evidence,
               suggested fixes, and a postmortem draft ready to send.
             </p>
 
@@ -435,7 +435,7 @@ export default function Landing() {
               className="land-by-name"
               style={{ margin: '16px 0 8px', fontSize: 40, fontWeight: 700, letterSpacing: '-0.02em', color: C.fg }}
             >
-              Pranav CR
+              Pranav Charakondala
             </h2>
             <p style={{ margin: '0 0 36px', fontSize: 14, color: C.fg2, lineHeight: 1.6 }}>
               Graduate Researcher · UIUC Information Management · ex-Deloitte Analyst · ML Intern at Drongo AI
@@ -444,9 +444,10 @@ export default function Landing() {
             <div className="land-links-row" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 32 }}>
               {[
                 { label: '→ LinkedIn', href: 'https://linkedin.com/in/pranav-cr' },
+                { label: '→ Portfolio', href: 'https://pranavcr01.github.io/' },
                 { label: '→ GitHub', href: 'https://github.com/PranavCR01' },
-                { label: '→ Research Notes', href: '#' },
-                { label: '→ Dev Journal', href: '#' },
+                { label: '→ Research Notes', href: 'https://www.notion.so/ReconAI-Research-Architecture-Notes-358a47a2b4cf8000944fefad0ddf1349?source=copy_link' },
+                { label: '→ Dev Journal', href: 'https://www.notion.so/ReconAI-Project-Arc-358a47a2b4cf8004a38bee6d50283911?source=copy_link' },
               ].map(({ label, href }) => (
                 <a
                   key={label}
@@ -471,7 +472,7 @@ export default function Landing() {
             <p style={{ margin: 0, fontSize: 12.5, color: C.fg3, maxWidth: 520, lineHeight: 1.7, fontFamily: 'var(--mono)' }}>
               ReconAI is a portfolio project demonstrating production AI engineering
               patterns for Salesforce FSC integration observability. Built at UIUC
-              Information Management, 2025.
+              Information Management, 2026.
             </p>
           </div>
         </section>

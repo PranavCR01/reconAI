@@ -216,3 +216,58 @@ export interface RecallMetrics {
   'recall@3': number
   'recall@5': number
 }
+
+// Analytics — Slice 8
+export interface AnalyticsSummary {
+  runs: { count: number; delta_pct: number }
+  incidents_triaged: { count: number; delta_pct: number }
+  avg_resolution_rate: { pct: number; delta_pt: number }
+  avg_confidence: { pct: number; delta_pt: number }
+  top_root_cause: { name: string; pct: number; count: number }
+  deploy_correlations: { count: number; total_deploys: number }
+}
+
+export interface IncidentsOverTimeResponse {
+  dates: string[]
+  series: Record<string, number[]>
+  deployments: { date: string; name: string }[]
+}
+
+export interface ByObjectRow {
+  object: string
+  p1: number
+  p2: number
+  p3: number
+  total: number
+}
+
+export interface RootCauseRow {
+  root_cause: string
+  count: number
+  pct: number
+}
+
+export interface AIAccuracyResponse {
+  weeks: string[]
+  recall_at_1: number[]
+  recall_at_3: number[]
+  ai_was_correct: number[]
+  summary: {
+    recall_at_1: number
+    recall_at_3: number
+    resolutions: number
+    overrides: number
+  }
+}
+
+export interface DeploymentCorrelation {
+  deploy_name: string
+  description: string | null
+  deployed_at: string
+  deploy_type: string
+  incidents_24h: number
+  sigma: number
+  most_affected_object: string | null
+  suspected_root_cause: string | null
+  status: 'investigating' | 'resolved' | 'normal'
+}

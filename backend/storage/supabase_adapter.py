@@ -221,3 +221,72 @@ class SupabaseAdapter(StorageAdapter):
             {"query_embedding": embedding, "match_threshold": 0.4, "match_count": limit},
         ).execute()
         return result.data
+
+    # -----------------------------------------------------------------------
+    # Analytics query methods (Slice 8)
+    # -----------------------------------------------------------------------
+
+    async def get_incidents_since(self, since: datetime, limit: int = 2000) -> list[dict]:
+        result = await self._run(
+            lambda: self._client.table("rca_incidents")
+            .select("id,recon_row_id,created_at,confidence,status,requires_human_review,total_tokens_used,total_tool_calls,latency_ms")
+            .gte("created_at", since.isoformat())
+            .order("created_at")
+            .limit(limit)
+            .execute()
+        )
+        return result.data
+
+    async def get_recon_rows_by_ids(self, row_ids: list[str]) -> list[dict]:
+        if not row_ids:
+            return []
+        result = await self._run(
+            lambda: self._client.table("recon_rows")
+            .select("id,sf_object,sf_field,discrepancy_type,severity,run_id")
+            .in_("id", row_ids)
+            .execute()
+        )
+        return result.data
+
+    async def get_resolutions_since(self, since: datetime) -> list[dict]:
+        result = await self._run(
+            lambda: self._client.table("resolutions")
+            .select("id,resolved_at,ai_was_correct,fix_type,incident_id")
+            .gte("resolved_at", since.isoformat())
+            .execute()
+        )
+        return result.data
+
+    async def get_runs_since(self, since: datetime) -> list[dict]:
+        result = await self._run(
+            lambda: self._client.table("recon_runs")
+            .select("id,created_at,status")
+            .gte("created_at", since.isoformat())
+            .execute()
+        )
+        return result.data
+
+    async def get_total_runs_count(self) -> int:
+        result = await self._run(
+            lambda: self._client.table("recon_runs").select("id", count="exact").execute()
+        )
+        return result.count or 0
+
+    async def get_deployment_events_since(self, since: datetime) -> list[dict]:
+        result = await self._run(
+            lambda: self._client.table("deployment_events")
+            .select("*")
+            .gte("deployed_at", since.isoformat())
+            .order("deployed_at", desc=True)
+            .execute()
+        )
+        return result.data
+
+    async def get_all_deployment_events(self) -> list[dict]:
+        result = await self._run(
+            lambda: self._client.table("deployment_events")
+            .select("*")
+            .order("deployed_at", desc=True)
+            .execute()
+        )
+        return result.data

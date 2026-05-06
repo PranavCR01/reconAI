@@ -1,8 +1,14 @@
 import type {
+  AIAccuracyResponse,
+  AnalyticsSummary,
   BenchmarkResponse,
+  ByObjectRow,
   CreateRunResponse,
+  DeploymentCorrelation,
+  IncidentsOverTimeResponse,
   LlmConfig,
   RecallMetrics,
+  RootCauseRow,
   RunDetailResponse,
   RunIncidentsResponse,
   RCAIncident,
@@ -73,4 +79,28 @@ export async function runBenchmark(runId: string, nRows = 2): Promise<BenchmarkR
     `/recon/runs/${runId}/benchmark?n_rows=${nRows}`,
     { method: 'POST' },
   )
+}
+
+export async function getAnalyticsSummary(days = 30): Promise<AnalyticsSummary> {
+  return apiFetch<AnalyticsSummary>(`/analytics/summary?days=${days}`)
+}
+
+export async function getIncidentsOverTime(days = 30): Promise<IncidentsOverTimeResponse> {
+  return apiFetch<IncidentsOverTimeResponse>(`/analytics/incidents-over-time?days=${days}`)
+}
+
+export async function getByObject(days = 30): Promise<ByObjectRow[]> {
+  return apiFetch<ByObjectRow[]>(`/analytics/by-object?days=${days}`)
+}
+
+export async function getRootCauseDistribution(days = 30): Promise<RootCauseRow[]> {
+  return apiFetch<RootCauseRow[]>(`/analytics/root-cause-distribution?days=${days}`)
+}
+
+export async function getDeploymentCorrelation(days = 30): Promise<DeploymentCorrelation[]> {
+  return apiFetch<DeploymentCorrelation[]>(`/analytics/deployment-correlation?days=${days}`)
+}
+
+export async function getAIAccuracy(weeks = 12): Promise<AIAccuracyResponse> {
+  return apiFetch<AIAccuracyResponse>(`/analytics/ai-accuracy?weeks=${weeks}`)
 }

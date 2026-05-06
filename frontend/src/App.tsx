@@ -6,6 +6,7 @@ const Upload = lazy(() => import('./views/Upload'))
 const LiveAnalysis = lazy(() => import('./views/LiveAnalysis'))
 const IncidentDetail = lazy(() => import('./views/IncidentDetail'))
 const RunSummary = lazy(() => import('./views/RunSummary'))
+const Analytics = lazy(() => import('./views/Analytics'))
 
 function Loading() {
   return (
@@ -29,6 +30,7 @@ function AppNav() {
   const { pathname } = useLocation()
   const items = [
     { label: 'Runs', href: '/', matchPrefix: ['/runs', '/incidents', '/'] },
+    { label: 'Analytics', href: '/analytics', matchPrefix: ['/analytics'] },
   ]
   return (
     <nav style={{ display: 'flex', gap: 2, marginLeft: 18 }}>
@@ -156,6 +158,7 @@ export default function App() {
             <Route path="/runs/:runId" element={<LiveAnalysis />} />
             <Route path="/runs/:runId/summary" element={<RunSummary />} />
             <Route path="/runs/:runId/incidents/:incidentId" element={<IncidentDetail />} />
+            <Route path="/analytics" element={<Analytics />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

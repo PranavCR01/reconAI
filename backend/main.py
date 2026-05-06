@@ -582,6 +582,340 @@ async def get_recall_metrics(storage: StorageDep):
     return metrics
 
 
+# ---------------------------------------------------------------------------
+# Analytics endpoints (Slice 8)
+# ---------------------------------------------------------------------------
+
+def _since(days: int) -> datetime:
+    return datetime.now(timezone.utc) - timedelta(days=days)
+
+
+@app.get("/api/v1/analytics/summary")
+async def analytics_summary(storage: StorageDep, days: int = Query(default=30, ge=1)):
+    since = _since(days)
+    since_prev = _since(days * 2)
+
+    runs_cur = await storage.get_runs_since(since)
+    runs_prev_all = await storage.get_runs_since(since_prev)
+    runs_prev = [r for r in runs_prev_all if r["created_at"] < since.isoformat()]
+
+    incidents_cur = await storage.get_incidents_since(since)
+    incidents_prev_all = await storage.get_incidents_since(since_prev)
+    incidents_prev = [i for i in incidents_prev_all if i["created_at"] < since.isoformat()]
+
+    resolutions_cur = await storage.get_resolutions_since(since)
+
+    def _delta_pct(cur: int, prev: int) -> int:
+        if prev == 0:
+            return 0
+        return round((cur - prev) / prev * 100)
+
+    n_runs_cur = len(runs_cur)
+    n_runs_prev = len(runs_prev)
+    n_inc_cur = len(incidents_cur)
+    n_inc_prev = len(incidents_prev)
+
+    res_rate_cur = round(len(resolutions_cur) / n_inc_cur * 100) if n_inc_cur else 0
+
+    res_prev_ids = {i["id"] for i in incidents_prev}
+    prev_res = await storage.get_resolutions_since(since_prev)
+    prev_res_filtered = [r for r in prev_res if r.get("incident_id") in res_prev_ids]
+    res_rate_prev = round(len(prev_res_filtered) / len(incidents_prev) * 100) if incidents_prev else 0
+
+    conf_values = [float(i["confidence"]) for i in incidents_cur if i.get("confidence")]
+    avg_conf_cur = round(sum(conf_values) / len(conf_values) * 100) if conf_values else 0
+    conf_prev_values = [float(i["confidence"]) for i in incidents_prev if i.get("confidence")]
+    avg_conf_prev = round(sum(conf_prev_values) / len(conf_prev_values) * 100) if conf_prev_values else 0
+
+    # top root cause from discrepancy_type of recon_rows
+    row_ids = [i["recon_row_id"] for i in incidents_cur if i.get("recon_row_id")]
+    rows = await storage.get_recon_rows_by_ids(row_ids)
+    disc_counts: dict[str, int] = {}
+    for r in rows:
+        dt = r.get("discrepancy_type") or "UNKNOWN"
+        disc_counts[dt] = disc_counts.get(dt, 0) + 1
+    top_rc_name = max(disc_counts, key=disc_counts.get) if disc_counts else "N/A"
+    top_rc_count = disc_counts.get(top_rc_name, 0)
+    top_rc_pct = round(top_rc_count / n_inc_cur * 100) if n_inc_cur else 0
+
+    deploys = await storage.get_deployment_events_since(since)
+    all_inc_by_date: dict[str, int] = {}
+    for inc in incidents_cur:
+        dt_str = (inc.get("created_at") or "")[:10]
+        all_inc_by_date[dt_str] = all_inc_by_date.get(dt_str, 0) + 1
+
+    import statistics
+    baseline_window = 14
+    spike_count = 0
+    for dep in deploys:
+        dep_at_str = dep.get("deployed_at", "")
+        try:
+            dep_at = datetime.fromisoformat(dep_at_str.replace("Z", "+00:00"))
+        except Exception:
+            continue
+        baseline_dates = [(dep_at - timedelta(days=x)).date().isoformat() for x in range(1, baseline_window + 1)]
+        baseline_vals = [all_inc_by_date.get(d, 0) for d in baseline_dates]
+        post_date = dep_at.date().isoformat()
+        post_count = all_inc_by_date.get(post_date, 0)
+        try:
+            mean = statistics.mean(baseline_vals)
+            std = statistics.stdev(baseline_vals)
+            sigma = (post_count - mean) / std if std > 0.01 else 0.0
+        except Exception:
+            sigma = 0.0
+        if sigma >= 3.0:
+            spike_count += 1
+
+    return {
+        "runs": {"count": n_runs_cur, "delta_pct": _delta_pct(n_runs_cur, n_runs_prev)},
+        "incidents_triaged": {"count": n_inc_cur, "delta_pct": _delta_pct(n_inc_cur, n_inc_prev)},
+        "avg_resolution_rate": {"pct": res_rate_cur, "delta_pt": res_rate_cur - res_rate_prev},
+        "avg_confidence": {"pct": avg_conf_cur, "delta_pt": avg_conf_cur - avg_conf_prev},
+        "top_root_cause": {"name": top_rc_name, "pct": top_rc_pct, "count": top_rc_count},
+        "deploy_correlations": {"count": spike_count, "total_deploys": len(deploys)},
+    }
+
+
+@app.get("/api/v1/analytics/incidents-over-time")
+async def analytics_incidents_over_time(storage: StorageDep, days: int = Query(default=30, ge=1)):
+    since = _since(days)
+    incidents = await storage.get_incidents_since(since)
+    row_ids = [i["recon_row_id"] for i in incidents if i.get("recon_row_id")]
+    rows = await storage.get_recon_rows_by_ids(row_ids)
+    row_map = {r["id"]: r for r in rows}
+
+    disc_types = ["NULL_DOWNSTREAM", "VALUE_MISMATCH", "STALE_VALUE", "MISSING_RECORD", "DUPLICATE_DOWNSTREAM"]
+    dates = [(since + timedelta(days=i)).date().isoformat() for i in range(days)]
+    series: dict[str, list[int]] = {dt: [0] * days for dt in disc_types}
+
+    for inc in incidents:
+        dt_str = (inc.get("created_at") or "")[:10]
+        if dt_str not in dates:
+            continue
+        idx = dates.index(dt_str)
+        row = row_map.get(str(inc.get("recon_row_id", "")))
+        disc = row.get("discrepancy_type") if row else None
+        if disc and disc in series:
+            series[disc][idx] += 1
+
+    deploys = await storage.get_deployment_events_since(since)
+    deploy_out = [
+        {"date": dep["deployed_at"][:10], "name": dep["deploy_name"]}
+        for dep in deploys
+    ]
+
+    return {"dates": dates, "series": series, "deployments": deploy_out}
+
+
+@app.get("/api/v1/analytics/by-object")
+async def analytics_by_object(storage: StorageDep, days: int = Query(default=30, ge=1)):
+    since = _since(days)
+    incidents = await storage.get_incidents_since(since)
+    row_ids = [i["recon_row_id"] for i in incidents if i.get("recon_row_id")]
+    rows = await storage.get_recon_rows_by_ids(row_ids)
+    row_map = {r["id"]: r for r in rows}
+
+    obj_counts: dict[str, dict[str, int]] = {}
+    for inc in incidents:
+        row = row_map.get(str(inc.get("recon_row_id", "")))
+        if not row:
+            continue
+        obj = row.get("sf_object") or "Unknown"
+        sev = row.get("severity") or "P3"
+        if obj not in obj_counts:
+            obj_counts[obj] = {"P1": 0, "P2": 0, "P3": 0}
+        if sev in obj_counts[obj]:
+            obj_counts[obj][sev] += 1
+
+    result = [
+        {
+            "object": obj,
+            "p1": counts["P1"],
+            "p2": counts["P2"],
+            "p3": counts["P3"],
+            "total": counts["P1"] + counts["P2"] + counts["P3"],
+        }
+        for obj, counts in obj_counts.items()
+    ]
+    result.sort(key=lambda x: x["total"], reverse=True)
+    return result
+
+
+@app.get("/api/v1/analytics/root-cause-distribution")
+async def analytics_root_cause_distribution(storage: StorageDep, days: int = Query(default=30, ge=1)):
+    since = _since(days)
+    incidents = await storage.get_incidents_since(since)
+    row_ids = [i["recon_row_id"] for i in incidents if i.get("recon_row_id")]
+    rows = await storage.get_recon_rows_by_ids(row_ids)
+    row_map = {r["id"]: r for r in rows}
+
+    counts: dict[str, int] = {}
+    total = 0
+    for inc in incidents:
+        row = row_map.get(str(inc.get("recon_row_id", "")))
+        disc = row.get("discrepancy_type") if row else "UNKNOWN"
+        key = disc or "UNKNOWN"
+        counts[key] = counts.get(key, 0) + 1
+        total += 1
+
+    return [
+        {
+            "root_cause": rc,
+            "count": cnt,
+            "pct": round(cnt / total * 100) if total else 0,
+        }
+        for rc, cnt in sorted(counts.items(), key=lambda x: x[1], reverse=True)
+    ]
+
+
+@app.get("/api/v1/analytics/deployment-correlation")
+async def analytics_deployment_correlation(storage: StorageDep, days: int = Query(default=30, ge=1)):
+    import statistics as _stats
+
+    since = _since(days)
+    # Fetch all incidents for a larger window for baseline calculation
+    big_since = _since(days + 14)
+    all_incidents = await storage.get_incidents_since(big_since)
+
+    row_ids = [i["recon_row_id"] for i in all_incidents if i.get("recon_row_id")]
+    rows = await storage.get_recon_rows_by_ids(row_ids)
+    row_map = {r["id"]: r for r in rows}
+
+    resolutions = await storage.get_resolutions_since(big_since)
+    resolved_incident_ids = {r["incident_id"] for r in resolutions}
+
+    daily_counts: dict[str, int] = {}
+    for inc in all_incidents:
+        dt_str = (inc.get("created_at") or "")[:10]
+        daily_counts[dt_str] = daily_counts.get(dt_str, 0) + 1
+
+    deployments = await storage.get_all_deployment_events()
+
+    result = []
+    for dep in deployments:
+        dep_at_str = dep.get("deployed_at", "")
+        try:
+            dep_at = datetime.fromisoformat(dep_at_str.replace("Z", "+00:00"))
+        except Exception:
+            continue
+
+        if dep_at < since:
+            continue
+
+        baseline_dates = [(dep_at - timedelta(days=x)).date().isoformat() for x in range(1, 15)]
+        baseline_vals = [daily_counts.get(d, 0) for d in baseline_dates]
+
+        post_start = dep_at
+        post_end = dep_at + timedelta(hours=24)
+        incidents_24h_list = [
+            inc for inc in all_incidents
+            if (inc.get("created_at") or "") >= post_start.isoformat()
+            and (inc.get("created_at") or "") < post_end.isoformat()
+        ]
+        incidents_24h = len(incidents_24h_list)
+
+        try:
+            mean = _stats.mean(baseline_vals)
+            std = _stats.stdev(baseline_vals)
+            sigma = round((incidents_24h - mean) / std, 2) if std > 0.01 else 0.0
+        except Exception:
+            sigma = 0.0
+
+        # Most affected object
+        obj_counts: dict[str, int] = {}
+        rc_counts: dict[str, int] = {}
+        for inc in incidents_24h_list:
+            row = row_map.get(str(inc.get("recon_row_id", "")))
+            if row:
+                obj = row.get("sf_object", "")
+                if obj:
+                    obj_counts[obj] = obj_counts.get(obj, 0) + 1
+                disc = row.get("discrepancy_type", "")
+                if disc:
+                    rc_counts[disc] = rc_counts.get(disc, 0) + 1
+
+        most_obj = max(obj_counts, key=obj_counts.get) if obj_counts else None
+        most_rc = max(rc_counts, key=rc_counts.get) if rc_counts else None
+
+        # Status
+        incident_ids_24h = {inc["id"] for inc in incidents_24h_list}
+        has_resolution = bool(incident_ids_24h & resolved_incident_ids)
+        if sigma >= 3.0 and not has_resolution:
+            status = "investigating"
+        elif has_resolution:
+            status = "resolved"
+        else:
+            status = "normal"
+
+        result.append({
+            "deploy_name": dep["deploy_name"],
+            "description": dep.get("description"),
+            "deployed_at": dep_at_str,
+            "deploy_type": dep.get("deploy_type", ""),
+            "incidents_24h": incidents_24h,
+            "sigma": sigma,
+            "most_affected_object": most_obj,
+            "suspected_root_cause": most_rc,
+            "status": status,
+        })
+
+    result.sort(key=lambda x: abs(x["sigma"]), reverse=True)
+    return result
+
+
+@app.get("/api/v1/analytics/ai-accuracy")
+async def analytics_ai_accuracy(storage: StorageDep, weeks: int = Query(default=12, ge=1)):
+    since = _since(weeks * 7)
+    resolutions = await storage.get_resolutions_since(since)
+
+    # Recall@k current values (flat line)
+    try:
+        recall = await asyncio.to_thread(compute_recall_at_k, storage)
+        r1_val = round(recall.get("recall@1", 0.0) * 100, 1)
+        r3_val = round(recall.get("recall@3", 0.0) * 100, 1)
+    except Exception:
+        r1_val = 0.0
+        r3_val = 0.0
+
+    # Weekly ai_was_correct from resolutions
+    weekly_correct: dict[int, list[bool]] = {}
+    for res in resolutions:
+        if res.get("resolved_at") and res.get("ai_was_correct") is not None:
+            try:
+                dt = datetime.fromisoformat(res["resolved_at"].replace("Z", "+00:00"))
+                delta_days = (datetime.now(timezone.utc) - dt).days
+                week_idx = delta_days // 7
+                if 0 <= week_idx < weeks:
+                    weekly_correct.setdefault(week_idx, []).append(bool(res["ai_was_correct"]))
+            except Exception:
+                pass
+
+    week_labels = [f"w-{weeks - 1 - i}" for i in range(weeks)]
+    recall_at_1 = [r1_val] * weeks
+    recall_at_3 = [r3_val] * weeks
+    ai_was_correct_series = []
+    for i in range(weeks):
+        w_idx = weeks - 1 - i
+        vals = weekly_correct.get(w_idx, [])
+        ai_was_correct_series.append(round(sum(vals) / len(vals) * 100, 1) if vals else 0.0)
+
+    total_res = len(resolutions)
+    overrides = sum(1 for r in resolutions if r.get("ai_was_correct") is False)
+
+    return {
+        "weeks": week_labels,
+        "recall_at_1": recall_at_1,
+        "recall_at_3": recall_at_3,
+        "ai_was_correct": ai_was_correct_series,
+        "summary": {
+            "recall_at_1": r1_val,
+            "recall_at_3": r3_val,
+            "resolutions": total_res,
+            "overrides": overrides,
+        },
+    }
+
+
 @app.post("/api/v1/recon/runs/{run_id}/benchmark")
 async def benchmark_run(
     run_id: str,

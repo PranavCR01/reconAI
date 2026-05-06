@@ -16,14 +16,12 @@ AI-powered Salesforce integration reconciliation and RCA tool. Replaces a manual
 | Output validation | Pydantic v2 |
 | LLM default | Claude Haiku (classification) + Sonnet (reasoning) |
 | LLM comparison | Groq Llama 3.3 70B |
-| LLM dev | Ollama (local, never in demo) |
 | Embedding | OpenAI text-embedding-3-small (1536 dims) |
 | Vector + structured store | Supabase (pgvector + Postgres) |
 | Backend | FastAPI on Render |
 | Frontend | React + Vite + TypeScript + Tailwind + shadcn/ui (New York) |
 | State management | Zustand |
 | Charts | Recharts |
-| Tables | TanStack Table |
 | Streaming | Native SSE (EventSource, no library) |
 
 ---
@@ -32,26 +30,23 @@ AI-powered Salesforce integration reconciliation and RCA tool. Replaces a manual
 ```
 reconai/
 ├── backend/
-│   ├── agents/          # ingestion.py, hypothesis.py, evidence.py, synthesis.py
-│   ├── tools/           # splunk_sim.py, salesforce_sim.py, db2_sim.py, rag_tools.py
-│   ├── graph/           # recon_graph.py (LangGraph state machine)
-│   ├── models/          # state.py, entities.py, outputs.py
-│   ├── storage/         # adapter.py, supabase_adapter.py, sf_adapter.py
-│   ├── cache/           # rca_cache.py
-│   ├── seed/            # fsc_incidents.py (synthetic FSC data)
-│   ├── config.py        # AgentConfig — LLM routing per agent
-│   └── main.py          # FastAPI app
-├── frontend/
-│   └── src/
-│       ├── views/       # Upload, LiveAnalysis, IncidentDetail, RunSummary
-│       ├── store/       # reconStore.ts (Zustand)
-│       └── lib/         # sse.ts
-├── data/
-│   └── sample_fsc_recon.csv
-├── docs/
-│   ├── ADR.md
-│   └── slices/          # slice-1.md through slice-7.md
-└── CLAUDE.md
+│   ├── agents/       # ingestion.py, hypothesis.py, evidence.py, synthesis.py
+│   ├── tools/        # splunk_sim.py, salesforce_sim.py, db2_sim.py, rag_tools.py
+│   ├── graph/        # recon_graph.py (LangGraph state machine)
+│   ├── models/       # state.py, entities.py, outputs.py
+│   ├── storage/      # adapter.py, supabase_adapter.py
+│   ├── cache/        # rca_cache.py
+│   ├── seed/         # fsc_incidents.py, analytics_seed.py
+│   ├── config.py     # AgentConfig — LLM routing per agent
+│   └── main.py       # FastAPI app + all endpoints
+├── frontend/src/
+│   ├── views/        # Upload, LiveAnalysis, IncidentDetail, RunSummary, Analytics
+│   ├── components/analytics/  # StatCard, IncidentsOverTime, RootCauseDonut,
+│   │                          # ByObjectChart, AIAccuracyChart, DeploymentTable
+│   ├── store/        # reconStore.ts (Zustand)
+│   └── lib/          # api.ts, sse.ts
+├── data/sample_fsc_recon.csv
+└── docs/ADR.md + slices/slice-1.md … slice-8.md
 ```
 
 ---
@@ -77,8 +72,8 @@ Hypothesis decides *what* to check. Evidence *executes* the check. Never merge t
 
 ---
 
-## Supabase Tables (recon_ prefix)
-`recon_runs`, `recon_rows` (includes embedding vector(1536)), `rca_incidents`, `rca_evidence`, `resolutions`, `recon_artifacts` (pgvector + HNSW), `rca_cache`
+## Supabase Tables
+`recon_runs`, `recon_rows` (embedding vector(1536)), `rca_incidents`, `rca_evidence`, `resolutions`, `recon_artifacts` (pgvector + HNSW), `rca_cache`, `deployment_events`
 
 ---
 
@@ -86,9 +81,9 @@ Hypothesis decides *what* to check. Evidence *executes* the check. Never merge t
 - Read CLAUDE.md at the start of every session
 - Read the relevant slice brief before implementing that slice
 - `/plan` before any implementation — resolve ambiguities first
-- One risk flag after each completed slice
-- `/compact` when context gets long
 - Never break the non-negotiables above
+- Always verify only one Python process on port 8000 before debugging: `netstat -ano | findstr :8000`
+- Analytics adapter methods use date-range queries (`get_recon_rows_since`) — never `.in_()` on large ID lists (PostgREST URL limit). CSS vars don't resolve in Recharts tooltips — use hex colors.
 
 ---
 
@@ -102,6 +97,7 @@ Hypothesis decides *what* to check. Evidence *executes* the check. Never merge t
 | 5 | All 8 API endpoints, SSE streaming, RCA cache, batch embedding | `docs/slices/slice-5.md` |
 | 6 | Frontend — all 4 views, SSE client, Zustand, sample data escape hatch | `docs/slices/slice-6.md` |
 | 7 | Groq benchmarking, LLM config switcher, recall@k display | `docs/slices/slice-7.md` |
+| 8 | Analytics dashboard — 6 endpoints, 6 components, deployment correlation, seed | `docs/slices/slice-8.md` |
 
 ---
 
@@ -109,15 +105,11 @@ Hypothesis decides *what* to check. Evidence *executes* the check. Never merge t
 | Date | Slice | What shipped | Risk flag |
 |---|---|---|---|
 | — | — | Architecture + ADR + CLAUDE.md complete | Splunk simulator realism is highest demo risk |
-| 2026-05-02 | 1 | Models, storage adapter, FastAPI skeleton, sample CSV — all endpoints verified | supabase-py sync→async upgrade risk on v3 |
-| 2026-05-03 | 2 | Slice 2 complete — evidence.py, ingestion.py, hypothesis.py, recon_graph.py, supabase_adapter edit, config fix, /analyze endpoint. All 4 checks pass. | Evidence retry no-ops when tool_calls cleared — re-queue original args in Slice 3 |
-| 2026-05-03 | 3 | Slice 3 complete — splunk_sim.py, evidence.py replaced, hypothesis.py H2 evaluation added. Both termination paths verified (H2 early exit + H3 fan-out). | EvidenceResult citations are deterministic strings — not RAG-grounded until Slice 4 |
-| 2026-05-03 | 4 | Slice 4 complete — RAG pipeline, 23 seed artifacts embedded, Synthesis Agent producing real LLM output, evidence table populated with cited sources. Full pipeline verified: recon row → hypothesis graph → evidence → RAG → synthesis → postmortem. | RAG similar_incidents returning empty (threshold too high). llm_model not persisted. Fix both in Slice 5. |
-| 2026-05-03 | 5 | Slice 5 complete — all 8 endpoints verified, SSE streaming working, resolution endpoint saving to Supabase, evidence populated on hypothesis-graph incidents, cache working (cache_hits: 10 on repeat calls). | llm_model stored inside rca_output JSONB to avoid Supabase schema cache issues with ALTER TABLE columns. |
-| 2026-05-04 | 6 | Slice 6 complete — all 4 views built (Upload, LiveAnalysis, IncidentDetail, RunSummary), 42 files, 0 TS errors. SSE streaming, Framer Motion animations, resolution form, all routes navigable. Design matches Claude Design HTML mockups. | Browser testing needed in fresh session — verify SSE connects to real backend, sample data button, resolution form submit |
-| 2026-05-04 | 6 (verify) | Browser verification: all 5 checks pass. Fixed CORS bug — added Vite proxy (`/api`→8000) + changed API_URL default to relative `/api/v1`. | Evidence/hypotheses empty (tool_calls=0) in sample runs — non-negotiable #1 gap; hypothesis-graph agents not persisting evidence for this CSV shape. Investigate before demo. |
-| 2026-05-04 | 6 (hotfix) | PARTIAL — hypothesis.py expanded with real branches for all 5 discrepancy types, Upload.tsx label fixed, rca_cache cleared. Evidence still empty on test run — hypothesis node may be throwing silent exception on new branches. RESUME: check uvicorn stderr for AttributeError/KeyError in _value_mismatch/_stale_value/_missing_record/_duplicate_downstream methods in hypothesis.py |
-| 2026-05-05 | debug | Fixed evidence/hypothesis persistence bug. Root cause: stale uvicorn running pre-hotfix hypothesis.py (no branches for VALUE_MISMATCH/STALE_VALUE/MISSING_RECORD/DUPLICATE_DOWNSTREAM → all fell through to unknown fallback, tool_calls=[], empty evidence). Three additional bugs fixed: (1) hypothesis.py H4 early-termination appended "H4" every loop iteration → deduplicated with `if "H4" not in tested` guard; (2) evidence.py retry path returned `{}` leaving evidence_retry_count=0 forever → now increments counter; (3) main.py cache path created RCAIncident without hypotheses_tested/total_tool_calls → now stored as `_hypotheses_tested/_total_tool_calls` in rca_output blob and read back on cache hit. All 5 discrepancy types verified: VALUE_MISMATCH→[HVM1,HVM2,HVM3]/4 evidence, NULL_DOWNSTREAM→[H1,H2,H3]/5 evidence, STALE_VALUE→[HSV1,HSV2]/2 evidence, DUPLICATE_DOWNSTREAM→[HDD1,HDD2]/2 evidence. | Slice 7 (Groq benchmarking) is the only remaining slice — ready to implement. |
-| 2026-05-05 | hotfix | All 5 discrepancy types now produce non-empty hypotheses_tested. Root cause was two uvicorn processes on port 8000 — old pre-fix process still handling requests. Code was already correct. Fixed by killing orphan processes, clearing cache, fresh restart. | Always verify only one Python process on port 8000 before debugging — run `netstat -ano \| findstr :8000` |
-| 2026-05-05 | 6+hotfix | Full end-to-end verified in browser. Upload, LiveAnalysis, IncidentDetail, RunSummary all working. One remaining gap: Evidence section shows 0 sources on IncidentDetail even though rca_evidence rows exist in Supabase. Frontend is not fetching/displaying evidence correctly. Fix this before demo. | — |
-| 2026-05-05 | hotfix | Evidence display fixed — cache hit path now re-saves evidence to rca_evidence for new incident UUID. Full end-to-end verified: Upload → LiveAnalysis → IncidentDetail with evidence cards → RunSummary all working in browser. Core build complete. Ready for Slice 7 (Groq benchmarking). | — |
+| 2026-05-02 | 1 | Models, storage adapter, FastAPI skeleton, sample CSV | supabase-py sync→async upgrade risk on v3 |
+| 2026-05-03 | 2 | Ingestion, Hypothesis, Evidence agents, LangGraph graph, /analyze endpoint | Evidence retry no-ops when tool_calls cleared |
+| 2026-05-03 | 3 | splunk_sim.py, evidence.py parallel fan-out, H2 early-exit + H3 fan-out verified | Citations not RAG-grounded until Slice 4 |
+| 2026-05-03 | 4 | RAG pipeline, 23 artifacts embedded, Synthesis Agent, full pipeline verified | RAG threshold too high; llm_model not persisted — fix in Slice 5 |
+| 2026-05-03 | 5 | All 8 endpoints, SSE streaming, resolution→Supabase, cache (10 cache_hits verified) | llm_model stored inside rca_output JSONB to avoid ALTER TABLE schema cache issues |
+| 2026-05-04 | 6 | All 4 views, SSE client, Zustand, Framer Motion, 0 TS errors. CORS fix: Vite proxy + relative API_URL | Evidence empty on sample runs — hypothesis branches missing for new discrepancy types |
+| 2026-05-05 | debug | Fixed evidence/hypothesis bug (stale uvicorn), H4 dedup guard, evidence retry counter, cache path evidence re-save. All 5 discrepancy types verified. | — |
+| 2026-05-06 | 8 | Analytics dashboard — 6 backend endpoints, analytics_seed.py, 6 frontend components, /analytics route. 0 TS errors. | `.in_()` on 2000 IDs hits PostgREST URL limit — use date-range queries for analytics. CSS vars fail in Recharts tooltips — use hex. |

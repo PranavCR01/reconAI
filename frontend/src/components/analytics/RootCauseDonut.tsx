@@ -24,6 +24,36 @@ interface ActiveSegment {
   pct: number
 }
 
+interface TooltipEntry {
+  payload?: { name: string; value: number; pct: number; color: string }
+}
+
+function DonutTooltip({ active, payload }: { active?: boolean; payload?: TooltipEntry[] }) {
+  if (!active || !payload?.length) return null
+  const seg = payload[0].payload
+  if (!seg) return null
+  return (
+    <div style={{
+      background: '#1a1a2e',
+      border: '1px solid #3a3a50',
+      borderRadius: 8,
+      padding: '7px 12px',
+      boxShadow: '0 4px 14px rgba(0,0,0,0.55)',
+      minWidth: 110,
+    }}>
+      <div style={{ color: '#8080a0', fontSize: 10, fontWeight: 500, marginBottom: 3 }}>
+        {seg.name.replace(/_/g, ' ')}
+      </div>
+      <div style={{ color: '#e8e8f4', fontSize: 15, fontWeight: 700, lineHeight: 1 }}>
+        {seg.pct}%
+      </div>
+      <div style={{ color: '#a0a0c0', fontSize: 10.5, marginTop: 2 }}>
+        {seg.value.toLocaleString()} incidents
+      </div>
+    </div>
+  )
+}
+
 export function RootCauseDonut({ data }: Props) {
   const [active, setActive] = useState<ActiveSegment | null>(null)
   const total = data.reduce((s, r) => s + r.count, 0)
@@ -60,26 +90,7 @@ export function RootCauseDonut({ data }: Props) {
               <Cell key={entry.name} fill={entry.color} />
             ))}
           </Pie>
-          <Tooltip
-            contentStyle={{
-              background: '#2a2a38',
-              border: '1px solid #3a3a50',
-              borderRadius: 8,
-              padding: '7px 11px',
-              fontFamily: 'var(--mono)',
-              fontSize: 11.5,
-              fontWeight: 500,
-              color: '#d4d4e8',
-              boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
-            }}
-            itemStyle={{ color: '#d4d4e8', fontFamily: 'var(--mono)' }}
-            labelStyle={{ color: '#8080a0', fontFamily: 'var(--mono)', marginBottom: 2 }}
-            formatter={(value: number, name: string, props) => {
-              const pct = props.payload?.pct ?? 0
-              return [`${pct}%`, name]
-            }}
-            separator=" · "
-          />
+          <Tooltip content={<DonutTooltip />} />
         </PieChart>
 
         {/* Center label — static total or hover segment */}

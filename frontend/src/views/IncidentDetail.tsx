@@ -370,7 +370,7 @@ export default function IncidentDetail() {
 
             {/* Resolution form */}
             <Panel title="Resolve Incident">
-              {(resolveSuccess || (inc.resolution && !editingResolution)) ? (
+              {(!editingResolution && (resolveSuccess || inc.resolution)) ? (
                 <div style={{ padding: '16px 0' }}>
                   <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--ok)', marginBottom: 12 }}>
                     ✓ Resolution already recorded
@@ -445,13 +445,24 @@ export default function IncidentDetail() {
                     <label style={labelStyle}>Correction Notes (optional)</label>
                     <textarea style={{ ...fieldStyle, minHeight: 60 }} value={formNotes} onChange={e => setFormNotes(e.target.value)} />
                   </div>
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    style={{ padding: '8px 20px', borderRadius: 6, border: 'none', background: 'var(--ok)', color: 'oklch(0.15 0 0)', fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 600, cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.6 : 1 }}
-                  >
-                    {submitting ? 'Submitting…' : 'Submit Resolution'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      style={{ padding: '8px 20px', borderRadius: 6, border: 'none', background: 'var(--ok)', color: 'oklch(0.15 0 0)', fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 600, cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.6 : 1 }}
+                    >
+                      {submitting ? 'Submitting…' : 'Submit Resolution'}
+                    </button>
+                    {editingResolution && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingResolution(false)}
+                        style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid var(--line)', background: 'transparent', color: 'var(--fg-2)', fontFamily: 'var(--mono)', fontSize: 12, cursor: 'pointer' }}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
                 </form>
               )}
             </Panel>

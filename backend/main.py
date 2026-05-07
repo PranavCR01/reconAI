@@ -450,12 +450,12 @@ async def stream_run_analysis(
                 }
                 yield f"id: {incident.id}\n"
                 yield f"event: incident\ndata: {json.dumps(payload)}\n\n"
-        await storage.update_run_status(
-            run_id,
-            status="complete",
-            completed_at=datetime.now(timezone.utc),
-        )
-        yield f"event: done\ndata: {json.dumps({'total_rows': len(existing_incidents)})}\n\n"
+            await storage.update_run_status(
+                run_id,
+                status="complete",
+                completed_at=datetime.now(timezone.utc),
+            )
+            yield f"event: done\ndata: {json.dumps({'total_rows': len(existing_incidents)})}\n\n"
 
         return StreamingResponse(
             _stream_existing(),

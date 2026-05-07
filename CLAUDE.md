@@ -98,14 +98,15 @@ Hypothesis decides *what* to check. Evidence *executes* the check. Never merge t
 - Synthesis graceful degradation: `anthropic.APIError`/`APIStatusError` (and `groq.APIError`) caught in `_call_llm` → returns degraded RCAOutput (confidence 0.0, requires_human_review True, final_hypothesis "API_UNAVAILABLE"). SSE stream never crashes.
 - `HealthBanner` in App.tsx polls `GET /api/v1/health` every 60s — fixed top banner when down, auto-hides on recovery, dismissible.
 - SSE error banner in LiveAnalysis: `sseError` state set when SSE closes before `done` fires; "Retry" button increments `retryKey` to reconnect.
-- SSE connection guard: `sseOpenedRef` prevents duplicate connections on re-render. Reset in cleanup so retry works. `[runId, retryKey]` deps.
 - `upsertIncident` in Zustand: skips update if incoming incident has no improvement (same/fewer hypotheses_tested, same/lower confidence, same status) over stored entry.
 - `needsReviewCount` uses `requires_human_review && status !== 'complete'` — `IncidentStatus` is `'running' | 'complete' | 'needs_review' | 'escalated'`, no `'resolved'`.
 - `get_run` endpoint returns `rows_scanned: len(rows)` (from `recon_rows` table) as authoritative row count — not `len(incidents)` which can be inflated by duplicates.
 - `get_incident` endpoint returns `resolution` field (from `resolutions` table) if one exists. IncidentDetail shows read-only resolution view with Edit toggle when already resolved.
 - Cache hit % in LiveAnalysis capped at `Math.min(100, ...)` — cacheHits accumulates across SSE reconnects but total is deduplicated.
-- SSE `_stream_existing` only fires when `len(existing_incidents) >= len(rows)` — partial runs (some rows unprocessed) fall through to full analysis.
+- SSE `_stream_existing` fires when `not bypass_cache and len(existing_incidents) >= len(rows)` — partial runs fall through to full re-analysis. Pass `?bypass_cache=true` to force fresh LangGraph run.
 - `updateRunInHistory(runId, { status: 'complete' })` called in SSE `onDone` — keeps localStorage run history in sync without page reload.
+- SSE async generators (`_generate`, `_stream_existing`): `await`/`yield` must be inside the generator body — a `yield` in the outer endpoint scope turns it into a generator, making `return StreamingResponse(...)` a SyntaxError.
+- `/recall` uses `_recall_cache` dict with 1hr TTL (not the old bare `_recall_metrics_cache`). Cold start takes 20s+; always serve from cache on subsequent requests.
 
 ---
 
@@ -128,23 +129,13 @@ Hypothesis decides *what* to check. Evidence *executes* the check. Never merge t
 |---|---|---|---|
 | — | — | Architecture + ADR + CLAUDE.md complete | Splunk simulator realism is highest demo risk |
 | 2026-05-02 | 1 | Models, storage adapter, FastAPI skeleton, sample CSV | supabase-py sync→async upgrade risk on v3 |
-| 2026-05-03 | 2 | Ingestion, Hypothesis, Evidence agents, LangGraph graph, /analyze endpoint | Evidence retry no-ops when tool_calls cleared |
-| 2026-05-03 | 3 | splunk_sim.py, evidence.py parallel fan-out, H2 early-exit + H3 fan-out verified | Citations not RAG-grounded until Slice 4 |
-| 2026-05-03 | 4 | RAG pipeline, 23 artifacts embedded, Synthesis Agent, full pipeline verified | RAG threshold too high; llm_model not persisted — fix in Slice 5 |
-| 2026-05-03 | 5 | All 8 endpoints, SSE streaming, resolution→Supabase, cache (10 cache_hits verified) | llm_model stored inside rca_output JSONB to avoid ALTER TABLE schema cache issues |
-| 2026-05-04 | 6 | All 4 views, SSE client, Zustand, Framer Motion, 0 TS errors. CORS fix: Vite proxy + relative API_URL | Evidence empty on sample runs — hypothesis branches missing for new discrepancy types |
-| 2026-05-05 | debug | Fixed evidence/hypothesis bug (stale uvicorn), H4 dedup guard, evidence retry counter, cache path evidence re-save. All 5 discrepancy types verified. | — |
-| 2026-05-06 | 8 | Analytics dashboard — 6 backend endpoints, analytics_seed.py, 6 frontend components, /analytics route. 0 TS errors. | `.in_()` on 2000 IDs hits PostgREST URL limit — use date-range queries for analytics. CSS vars fail in Recharts tooltips — use hex. |
-| 2026-05-06 | polish | RootCauseDonut tooltip fixed (contentStyle hex colors, removed custom DonutTooltip). Skeleton loading states in Analytics (shimmer-pulse keyframe). 5-min in-memory cache on all 6 analytics endpoints. | — |
-| 2026-05-06 | landing | Landing page at `/` (hero, problem, how-it-works, arch, built-by). Upload moved to `/upload`. vercel.json SPA rewrite added. 0 TS errors. | — |
-| 2026-05-06 | tracking | Page view tracking (trackPageView + RouteTracker). Access gate on /upload with demo-request form + code bypass. POST /track/pageview + /track/demo-request endpoints. | demo_requests table columns must match exactly: name/email/company/requested_at |
-| 2026-05-06 | infra | Sentry init (SENTRY_DSN gated). Synthesis graceful degradation on API errors. HealthBanner polls /health every 60s. SSE error banner + Retry button. resend>=2.0 for demo request notifications. | RESEND_API_KEY + NOTIFY_EMAIL needed in Render |
-| 2026-05-06 | bugfix | SSE guard (sseOpenedRef), upsertIncident dedup, needsReviewCount fix, rows_scanned source of truth, resolution dedup in IncidentDetail, activity log "Resolution recorded", cache hit % capped at 100%, partial-run SSE fix, run status sync to localStorage. 0 TS errors. | IncidentStatus has no 'resolved' — use 'complete' |
-| 2026-05-06 | bugs | Fixed SSE duplicate incident bug (Map key changed to recon_row_id), NEEDS REVIEW count now matches REVIEW badge (uses requires_human_review as single source of truth), progress bar shows correct count, Run Stats and Mean Time populate from API after done event. Diagnostic log left in onDone — remove before demo. | — |
-| 2026-05-06 | bugs | ANALYZING count fixed — counts down from 10→0 as SSE events arrive. Remove [DONE] diagnostic console.log from LiveAnalysis.tsx onDone handler before demo. | — |
-| 2026-05-07 | bugfix | Removed [DONE] diagnostic console.log from onDone. Topbar progress bar removed — shows ● LIVE during streaming, ✓ N rows analyzed · ETA Done after done. analyzedCount state removed (was inflating on SSE reconnects). | — |
-| 2026-05-07 | bugfix | fix_applied made optional (default "") in ResolveRequest. Frontend always sends fix_applied and correction_notes as "" not undefined. | resolutions table needed fix_verified + verification_recon_run_id columns + UNIQUE constraint on incident_id — run SQL in Supabase before resolve works |
-| 2026-05-07 | sse | Proper SSE event IDs implemented. Backend emits id: {incident_id} before each incident event; reads Last-Event-ID header on reconnect and skips incidents with created_at ≤ cutoff. sseOpenedRef and retryKey removed — EventSource handles reconnects natively. | — |
-| 2026-05-07 | ui | Removed redundant View button from IncidentCard (Open Detail covers it). P1 count in recent runs table fixed — written to localStorage on done event, was hardcoded 0. p1Count added to RunHistoryEntry type. | — |
-| 2026-05-07 | ui | Runs breadcrumb in LiveAnalysis fixed (/ → /upload). Edit resolution pre-populates form from existing resolution data. Mean Time shows 'cache hit' subtitle when cacheHitPct===100 and done. StatCell gets optional note prop. | — |
-| 2026-05-07 | bugfix | Edit resolution button was unclickable — resolveSuccess short-circuited the editingResolution guard. Fixed condition order: (!editingResolution && (resolveSuccess \|\| inc.resolution)). Added Cancel button to resolution form. | — |
+| 2026-05-03 | 2–5 | Ingestion/Hypothesis/Evidence agents, LangGraph, RAG pipeline, Synthesis Agent, all 8 endpoints, SSE streaming, RCA cache | llm_model stored inside rca_output JSONB; Evidence retry no-ops when tool_calls cleared |
+| 2026-05-04 | 6 | All 4 views, SSE client, Zustand, Framer Motion, 0 TS errors. CORS fix. | Evidence empty on new discrepancy types |
+| 2026-05-05 | debug | Fixed evidence/hypothesis bug, H4 dedup guard, evidence retry. All 5 discrepancy types verified. | — |
+| 2026-05-06 | 8 | Analytics dashboard — 6 endpoints, 6 components, analytics_seed.py. 0 TS errors. | .in_() hits PostgREST URL limit — use date-range. CSS vars fail in Recharts — use hex. |
+| 2026-05-06 | landing/tracking/infra | Landing at `/`, Upload at `/upload`, vercel.json SPA rewrite. Tracking endpoints, access gate, Sentry, HealthBanner, SSE retry banner. | demo_requests cols: name/email/company/requested_at |
+| 2026-05-06 | bugfix | SSE dedup, upsertIncident, needsReviewCount, rows_scanned, resolution UX, cache hit % cap, ANALYZING count. | IncidentStatus has no 'resolved' — use 'complete' |
+| 2026-05-07 | sse | SSE event IDs (id: header, Last-Event-ID reconnect). sseOpenedRef/retryKey removed. fix_applied optional. | resolutions needs fix_verified + UNIQUE on incident_id |
+| 2026-05-07 | ui | Topbar → LIVE dot. P1 count fix. Runs breadcrumb → /upload (LiveAnalysis + RunSummary). Edit resolution pre-populates + Cancel + guard fix. Upload view-all → showAll button. | — |
+| 2026-05-07 | backend | update_run_status in SSE _generate + _stream_existing before done yield. Hotfix: SyntaxError (await/yield outside generator body). | await/yield must be inside async generator, not outer endpoint |
+| 2026-05-07 | tooling/perf | scripts/health_check.py — 40 E2E checks. /recall 1hr TTL cache. bypass_cache=bool on SSE stream; getStreamUrl uses URLSearchParams. | Run: python scripts/health_check.py |

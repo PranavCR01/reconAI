@@ -163,7 +163,7 @@ export default function RunSummary() {
       <TopBar
         center={
           <Breadcrumbs crumbs={[
-            { label: 'Runs', to: '/' },
+            { label: 'Runs', to: '/upload' },
             { label: run.id?.slice(0, 8) ?? runId ?? '…' },
             { label: 'Summary' },
           ]} />

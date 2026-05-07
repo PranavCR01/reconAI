@@ -1,0 +1,76 @@
+{
+  "configs": [
+    {
+      "name": "Claude Sonnet",
+      "color": "#22c55e",
+      "root_cause_accuracy": 70,
+      "human_review_accuracy": 56,
+      "avg_confidence": 80,
+      "avg_latency_s": 12.5,
+      "cost_per_incident": 0.006,
+      "needs_review_count": 24,
+      "total": 50
+    },
+    {
+      "name": "Groq Llama 3.3 70B",
+      "color": "#a855f7",
+      "root_cause_accuracy": 62,
+      "human_review_accuracy": 50,
+      "avg_confidence": 85,
+      "avg_latency_s": 1.4,
+      "cost_per_incident": 0.001,
+      "needs_review_count": 5,
+      "total": 50
+    },
+    {
+      "name": "Hybrid",
+      "color": "#3b82f6",
+      "root_cause_accuracy": 67,
+      "human_review_accuracy": 65,
+      "avg_confidence": 81,
+      "avg_latency_s": 9.0,
+      "cost_per_incident": 0.004,
+      "needs_review_count": 17,
+      "total": 43
+    }
+  ],
+  "failure_patterns": [
+    {
+      "pattern": "H2/H3a Confusion",
+      "description": "Splunk delivery check (H2) fires before FLS check (H3a). On NULL_DOWNSTREAM incidents where CDC events are missing AND FLS is restricted, all three configs terminated at H2 without reaching H3a. 5 incidents misclassified this way.",
+      "incident_count": 5,
+      "color": "#ef4444"
+    },
+    {
+      "pattern": "STALE_VALUE RAG Fallback",
+      "description": "STALE_VALUE incidents where the HSV hypothesis branch exhausted without confirming DELIVERY_GAP. System fell back to RAG instead of confirming consumer lag at H2. 3 incidents affected across all configs.",
+      "incident_count": 3,
+      "color": "#f59e0b"
+    },
+    {
+      "pattern": "CDC Exclusion Fallback",
+      "description": "CDC_FIELD_EXCLUDED incidents where H3b failed to confirm and system fell through to H5 RAG fallback. Strongest in Claude config — 3 incidents including Task.Priority, Contact.Email, Contact.MailingCity.",
+      "incident_count": 3,
+      "color": "#3b82f6"
+    }
+  ],
+  "meta": {
+    "total_incidents": 50,
+    "objects_covered": 10,
+    "discrepancy_types": 5,
+    "run_date": "May 7, 2026",
+    "ground_truth_method": "Manual labeling against known FSC integration failure patterns"
+  },
+  "written": {
+    "why": "Production AI tools need to balance accuracy against cost and latency. A single FSC reconciliation run processes 10-50 discrepancies daily — at scale, model choice directly impacts both reliability and operating cost. We benchmarked three configurations to find the optimal tradeoff for Salesforce FSC integration triage.",
+    "methodology": "50 synthetic Salesforce FSC incidents were generated across 10 objects and 5 discrepancy types, each with manually labeled ground truth root causes. The same 50 incidents were run through all three LLM configurations with cache bypassed to ensure fresh analysis. Root cause accuracy was measured by comparing the AI final hypothesis category against ground truth labels.",
+    "key_findings": [
+      "Claude Sonnet achieves the highest root cause accuracy at 70%, correctly identifying FLS, CDC, and DataWeave failure patterns more reliably",
+      "Groq Llama 3.3 70B is 9x faster and 6x cheaper but trades 8 percentage points of accuracy",
+      "Hybrid config achieves the best human review calibration at 65% — knowing when to escalate matters as much as getting the answer right",
+      "All three configs share the same failure modes — these are graph-level issues, not model-level, making improvements model-agnostic"
+    ],
+    "recommendation": "For P1 incidents involving financial data or KYC compliance fields, use Claude Sonnet. For high-volume P3 NULL_DOWNSTREAM triage at scale, Groq offers acceptable accuracy at dramatically lower cost. Hybrid is the recommended default: Groq handles fast classification while Claude Sonnet handles synthesis, achieving near-Claude accuracy at near-Groq cost.",
+    "conclusion": "Model choice is a meaningful variable in AI-powered RCA. The hypothesis graph architecture means failure modes are consistent across models, which makes targeted improvements like better H3a signaling and STALE_VALUE detection model-agnostic and high-leverage."
+  }
+}

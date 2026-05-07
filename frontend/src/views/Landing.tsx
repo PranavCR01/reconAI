@@ -228,10 +228,13 @@ export default function Landing() {
             {/* CTAs */}
             <div className="land-hero-btns" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <Link to="/upload" className="land-btn-primary">
-                → Run your first recon
+                Run your first recon →
               </Link>
               <Link to="/analytics" className="land-btn-ghost">
                 View analytics →
+              </Link>
+              <Link to="/benchmark" className="land-btn-ghost">
+                Benchmark results →
               </Link>
             </div>
           </div>

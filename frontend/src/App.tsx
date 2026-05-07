@@ -9,6 +9,7 @@ const LiveAnalysis = lazy(() => import('./views/LiveAnalysis'))
 const IncidentDetail = lazy(() => import('./views/IncidentDetail'))
 const RunSummary = lazy(() => import('./views/RunSummary'))
 const Analytics = lazy(() => import('./views/Analytics'))
+const Benchmark = lazy(() => import('./views/Benchmark'))
 
 const _API = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api/v1'
 
@@ -226,6 +227,7 @@ export default function App() {
             <Route path="/runs/:runId/summary" element={<RunSummary />} />
             <Route path="/runs/:runId/incidents/:incidentId" element={<IncidentDetail />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/benchmark" element={<Benchmark />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

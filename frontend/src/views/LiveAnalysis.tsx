@@ -64,11 +64,12 @@ function statusVariant(inc: RCAIncident): 'ok' | 'review' | 'analyzing' | 'queue
   return 'queued'
 }
 
-function StatCell({ label, value, color }: { label: string; value: string | number; color?: string }) {
+function StatCell({ label, value, color, note }: { label: string; value: string | number; color?: string; note?: string }) {
   return (
     <div style={{ padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
       <span style={{ fontFamily: 'var(--mono)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--fg-3)' }}>{label}</span>
       <span style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: color ?? 'var(--fg)' }}>{value}</span>
+      {note && <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--fg-3)', letterSpacing: '0.04em' }}>{note}</span>}
     </div>
   )
 }
@@ -223,7 +224,7 @@ export default function LiveAnalysis() {
       <TopBar
         center={
           <Breadcrumbs crumbs={[
-            { label: 'Runs', to: '/' },
+            { label: 'Runs', to: '/upload' },
             { label: runId ?? '…' },
             { label: 'Live Analysis' },
           ]} />
@@ -300,7 +301,7 @@ export default function LiveAnalysis() {
         <StatCell label="Resolved" value={resolvedCount} color="var(--ok)" />
         <StatCell label="Needs Review" value={needsReviewCount} color="var(--warn)" />
         <StatCell label="Analyzing" value={analyzingCount} />
-        <StatCell label="Mean Time / Incident" value={displayAvgLatencyMs > 0 ? fmtLatency(displayAvgLatencyMs) : '—'} />
+        <StatCell label="Mean Time / Incident" value={displayAvgLatencyMs > 0 ? fmtLatency(displayAvgLatencyMs) : '—'} note={isDone && cacheHitPct === 100 && displayAvgLatencyMs === 0 ? 'cache hit' : undefined} />
       </div>
 
       {/* Toolbar */}

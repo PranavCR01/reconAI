@@ -387,7 +387,20 @@ export default function IncidentDetail() {
                       )}
                     </div>
                   )}
-                  <button onClick={() => setEditingResolution(true)} style={{ marginTop: 10, padding: '5px 14px', borderRadius: 5, border: '1px solid var(--line)', background: 'var(--bg-2)', color: 'var(--fg-2)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}>
+                  <button
+                    onClick={() => {
+                      const r = inc.resolution
+                      if (!r) return
+                      setFormRoot(r.confirmed_root_cause || '')
+                      setFormFix(r.fix_applied || '')
+                      setFormFixType(r.fix_type || 'apex_code_change')
+                      setFormAiCorrect(r.ai_was_correct ?? true)
+                      setFormResolvedBy(r.resolved_by || '')
+                      setFormNotes(r.correction_notes || '')
+                      setEditingResolution(true)
+                    }}
+                    style={{ marginTop: 10, padding: '5px 14px', borderRadius: 5, border: '1px solid var(--line)', background: 'var(--bg-2)', color: 'var(--fg-2)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}
+                  >
                     Edit resolution
                   </button>
                 </div>

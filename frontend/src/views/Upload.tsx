@@ -1155,7 +1155,7 @@ function UploadForm() {
                     border: '1px solid var(--line)',
                   }}
                 >
-                  ● 0
+                  ● {run.p1Count ?? 0}
                 </span>
               </div>
 

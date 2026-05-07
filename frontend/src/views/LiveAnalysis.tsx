@@ -135,7 +135,8 @@ export default function LiveAnalysis() {
         setIsDone(true)
         setTotalRows(e.total_rows)
         sseCleanupRef.current = null
-        if (runId) updateRunInHistory(runId, { status: 'complete' })
+        const p1Count = store.getIncidentsSorted().filter(i => i.severity === 'P1').length
+        if (runId) updateRunInHistory(runId, { status: 'complete', p1Count })
         if (runId) {
           try {
             const { incidents: fresh } = await getRunIncidents(runId)
@@ -600,12 +601,6 @@ function IncidentCard({ incident: inc, runId }: { incident: RCAIncident; runId: 
                 Open Detail
               </button>
             )}
-            <button
-              onClick={() => navigate(`/runs/${runId}/summary`)}
-              style={{ padding: '4px 10px', borderRadius: 5, border: '1px solid var(--line)', background: 'transparent', color: 'var(--fg-2)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}
-            >
-              View
-            </button>
           </div>
         </div>
       </div>

@@ -190,6 +190,7 @@ export interface RunHistoryEntry {
   rowCount: number
   status: 'pending' | 'running' | 'complete' | 'error'
   integrationName?: string
+  p1Count?: number
 }
 
 // Derived UI types

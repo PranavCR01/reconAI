@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 from backend.models.entities import (
     Evidence,
@@ -63,3 +64,6 @@ class StorageAdapter(ABC):
 
     @abstractmethod
     async def update_recon_row_embedding(self, row_id: str, embedding: list[float]) -> None: ...
+
+    @abstractmethod
+    async def update_run_status(self, run_id: str, status: str, completed_at: datetime) -> None: ...

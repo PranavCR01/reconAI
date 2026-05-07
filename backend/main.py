@@ -378,6 +378,12 @@ async def analyze_run(run_id: str, storage: StorageDep):
         if result["cached"]:
             cache_hits += 1
 
+    await storage.update_run_status(
+        run_id,
+        status="complete",
+        completed_at=datetime.now(timezone.utc),
+    )
+
     return {
         "run_id": run_id,
         "rows_processed": len(rows),

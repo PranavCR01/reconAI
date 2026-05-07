@@ -189,6 +189,14 @@ class SupabaseAdapter(StorageAdapter):
             .execute()
         )
 
+    async def update_run_status(self, run_id: str, status: str, completed_at: datetime) -> None:
+        await self._run(
+            lambda: self._client.table("recon_runs")
+            .update({"status": status, "completed_at": completed_at.isoformat()})
+            .eq("id", run_id)
+            .execute()
+        )
+
     async def save_artifact(self, artifact: ReconArtifact, embedding: list[float] | None = None) -> str:
         payload = _dump(artifact)
         if embedding is not None:

@@ -13,7 +13,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import type { SegOption } from '@/components/ui/SegmentedControl'
 import { useReconStore, updateRunInHistory } from '@/store/reconStore'
 import { connectToRun } from '@/lib/sse'
-import { getRunIncidents } from '@/lib/api'
+import { getRunIncidents, getRun } from '@/lib/api'
 import { fmtLatency, fmtTokens, fmtCurrency } from '@/lib/format'
 import type { RCAIncident, SSEIncidentEvent, Severity } from '@/types'
 
@@ -105,6 +105,7 @@ export default function LiveAnalysis() {
   const [totalRows, setTotalRows] = useState(0)
   const [cacheHits, setCacheHits] = useState(0)
   const [analyzedCount, setAnalyzedCount] = useState(0)
+  const [expectedRows, setExpectedRows] = useState(0)
   const [apiStats, setApiStats] = useState<{ avgTokens: number; totalCalls: number; avgLatencyMs: number; count: number } | null>(null)
   const sseCleanupRef = useRef<(() => void) | null>(null)
   const sseOpenedRef = useRef(false)
@@ -122,6 +123,11 @@ export default function LiveAnalysis() {
     const id = setInterval(() => setElapsed(Date.now() - startTime), 1000)
     return () => clearInterval(id)
   }, [startTime])
+
+  useEffect(() => {
+    if (!runId) return
+    getRun(runId).then(data => setExpectedRows(data.rows_scanned)).catch(() => {})
+  }, [runId])
 
   useEffect(() => {
     if (!runId) return
@@ -190,7 +196,7 @@ export default function LiveAnalysis() {
   // resolvedCount: only 'complete' (not needs_review) — used for Resolved stat cell and tab
   const resolvedCount = allIncidents.filter(i => i.status === 'complete').length
   const needsReviewCount = allIncidents.filter(i => i.requires_human_review === true).length
-  const analyzingCount = allIncidents.filter(i => i.status === 'running').length
+  const analyzingCount = Math.max(0, (expectedRows || totalRows) - analyzedCount)
   const cacheHitPct = total > 0 ? Math.min(100, Math.round((cacheHits / total) * 100)) : null
 
   // Stats sourced from API response after done — reliable since SSE carries zero for these

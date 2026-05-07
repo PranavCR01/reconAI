@@ -392,14 +392,15 @@ export default function Benchmark() {
             </h2>
             <div style={{ maxWidth: 720 }}>
               {written.key_findings.map((finding, i) => (
-                <div key={i} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 18 }}>
-                  <span style={{
-                    flexShrink: 0, width: 24,
-                    font: `700 13px var(--mono)`, color: C.info, lineHeight: 1.7,
-                  }}>
-                    {i + 1}.
-                  </span>
-                  <p style={{ margin: 0, fontSize: 14.5, color: C.fg2, lineHeight: 1.7 }}>{finding}</p>
+                <div key={i} style={{
+                  borderLeft: '2px solid var(--info)',
+                  paddingLeft: '12px',
+                  marginBottom: '12px',
+                  color: 'var(--fg-1)',
+                  fontSize: '14px',
+                  lineHeight: '1.6',
+                }}>
+                  {finding}
                 </div>
               ))}
             </div>

@@ -74,7 +74,7 @@ Hypothesis decides *what* to check. Evidence *executes* the check. Never merge t
 ---
 
 ## Supabase Tables
-`recon_runs`, `recon_rows` (embedding vector(1536)), `rca_incidents`, `rca_evidence`, `resolutions`, `recon_artifacts` (pgvector + HNSW), `rca_cache`, `deployment_events`
+`recon_runs`, `recon_rows` (embedding vector(1536)), `rca_incidents`, `rca_evidence`, `resolutions`, `recon_artifacts` (pgvector + HNSW), `rca_cache`, `deployment_events`, `page_views`, `demo_requests`
 
 ---
 
@@ -90,6 +90,22 @@ Hypothesis decides *what* to check. Evidence *executes* the check. Never merge t
 - Analytics endpoints have 5-min in-memory cache (`_analytics_cache` in main.py). Cache key format: `f"{endpoint}:{days}"`. TTL = 300s.
 - Routing: `/` = Landing (public), `/upload` = Upload (app entry). Vercel SPA rewrite in `vercel.json` required for direct-URL navigation to work on Vercel deployment.
 - Landing page is standalone (no Shell/TopBar wrapper) — has its own nav with brand mark and "Open app →" CTA.
+- Access gate on `/upload`: checks `localStorage.recon_access === 'granted'`. Gate submits to `POST /api/v1/track/demo-request`. Bypass via code input checking `VITE_DEMO_CODE` env var (default `reconai2025`). Gate always shows success (fail-open) — backend insert is best-effort.
+- Tracking endpoints (`/track/pageview`, `/track/demo-request`) always return 200 — Supabase errors are caught and sent to Sentry, never surfaced to the client.
+- `demo_requests` table columns: `id, name, email, company, requested_at, code_sent, notes`. Insert payload uses these exact keys (not `full_name`/`work_email`/`submitted_at`).
+- Resend email notification on demo request: gated on `RESEND_API_KEY` + `NOTIFY_EMAIL` env vars. No-op if either is unset. Render env vars needed.
+- Sentry init in `main.py` gated on `SENTRY_DSN` env var — no-op if unset. `sentry_sdk.capture_exception()` used in synthesis and tracking endpoints.
+- Synthesis graceful degradation: `anthropic.APIError`/`APIStatusError` (and `groq.APIError`) caught in `_call_llm` → returns degraded RCAOutput (confidence 0.0, requires_human_review True, final_hypothesis "API_UNAVAILABLE"). SSE stream never crashes.
+- `HealthBanner` in App.tsx polls `GET /api/v1/health` every 60s — fixed top banner when down, auto-hides on recovery, dismissible.
+- SSE error banner in LiveAnalysis: `sseError` state set when SSE closes before `done` fires; "Retry" button increments `retryKey` to reconnect.
+- SSE connection guard: `sseOpenedRef` prevents duplicate connections on re-render. Reset in cleanup so retry works. `[runId, retryKey]` deps.
+- `upsertIncident` in Zustand: skips update if incoming incident has no improvement (same/fewer hypotheses_tested, same/lower confidence, same status) over stored entry.
+- `needsReviewCount` uses `requires_human_review && status !== 'complete'` — `IncidentStatus` is `'running' | 'complete' | 'needs_review' | 'escalated'`, no `'resolved'`.
+- `get_run` endpoint returns `rows_scanned: len(rows)` (from `recon_rows` table) as authoritative row count — not `len(incidents)` which can be inflated by duplicates.
+- `get_incident` endpoint returns `resolution` field (from `resolutions` table) if one exists. IncidentDetail shows read-only resolution view with Edit toggle when already resolved.
+- Cache hit % in LiveAnalysis capped at `Math.min(100, ...)` — cacheHits accumulates across SSE reconnects but total is deduplicated.
+- SSE `_stream_existing` only fires when `len(existing_incidents) >= len(rows)` — partial runs (some rows unprocessed) fall through to full analysis.
+- `updateRunInHistory(runId, { status: 'complete' })` called in SSE `onDone` — keeps localStorage run history in sync without page reload.
 
 ---
 
@@ -121,3 +137,6 @@ Hypothesis decides *what* to check. Evidence *executes* the check. Never merge t
 | 2026-05-06 | 8 | Analytics dashboard — 6 backend endpoints, analytics_seed.py, 6 frontend components, /analytics route. 0 TS errors. | `.in_()` on 2000 IDs hits PostgREST URL limit — use date-range queries for analytics. CSS vars fail in Recharts tooltips — use hex. |
 | 2026-05-06 | polish | RootCauseDonut tooltip fixed (contentStyle hex colors, removed custom DonutTooltip). Skeleton loading states in Analytics (shimmer-pulse keyframe). 5-min in-memory cache on all 6 analytics endpoints. | — |
 | 2026-05-06 | landing | Landing page at `/` (hero, problem, how-it-works, arch, built-by). Upload moved to `/upload`. vercel.json SPA rewrite added. 0 TS errors. | — |
+| 2026-05-06 | tracking | Page view tracking (trackPageView + RouteTracker). Access gate on /upload with demo-request form + code bypass. POST /track/pageview + /track/demo-request endpoints. | demo_requests table columns must match exactly: name/email/company/requested_at |
+| 2026-05-06 | infra | Sentry init (SENTRY_DSN gated). Synthesis graceful degradation on API errors. HealthBanner polls /health every 60s. SSE error banner + Retry button. resend>=2.0 for demo request notifications. | RESEND_API_KEY + NOTIFY_EMAIL needed in Render |
+| 2026-05-06 | bugfix | SSE guard (sseOpenedRef), upsertIncident dedup, needsReviewCount fix, rows_scanned source of truth, resolution dedup in IncidentDetail, activity log "Resolution recorded", cache hit % capped at 100%, partial-run SSE fix, run status sync to localStorage. 0 TS errors. | IncidentStatus has no 'resolved' — use 'complete' |

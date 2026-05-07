@@ -152,7 +152,6 @@ export default function LiveAnalysis() {
         if (runId) {
           try {
             const { incidents: fresh } = await getRunIncidents(runId)
-            console.log('[DONE] first incident from API:', JSON.stringify(fresh[0]).slice(0, 300))
             // Enrich store entries with hypothesis data from DB (not in SSE)
             for (const inc of fresh) {
               if (!inc.recon_row_id) continue

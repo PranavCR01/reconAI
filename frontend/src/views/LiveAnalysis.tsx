@@ -24,6 +24,7 @@ const SEV_COLOR: Record<string, string> = {
 }
 
 function sseToIncident(e: SSEIncidentEvent): RCAIncident {
+  const done = !!e.root_cause_summary
   return {
     id: e.incident_id,
     recon_row_id: e.row_id,
@@ -38,7 +39,7 @@ function sseToIncident(e: SSEIncidentEvent): RCAIncident {
     postmortem_draft: null,
     jira_summary: e.jira_summary,
     requires_human_review: e.requires_human_review,
-    status: e.root_cause_summary ? 'complete' : 'running',
+    status: done ? (e.requires_human_review ? 'needs_review' : 'complete') : 'running',
     llm_model: e.llm_model,
     total_tool_calls: 0,
     total_tokens_used: 0,
@@ -139,17 +140,19 @@ export default function LiveAnalysis() {
         setTotalRows(e.total_rows)
         sseCleanupRef.current = null
         if (runId) updateRunInHistory(runId, { status: 'complete' })
-        // Enrich store incidents with real token/tool-call data from the API
+        // Patch in stats (tokens, tool calls, latency) that SSE never sends.
+        // Use recon_row_id as the key so we overwrite the existing Map entry,
+        // not create a new one with incident.id as the key.
         if (runId) {
           try {
             const { incidents: fresh } = await getRunIncidents(runId)
-            const storeSnap = store.incidents
             for (const inc of fresh) {
-              const existing = storeSnap.get(inc.id ?? '')
+              if (!inc.recon_row_id) continue
               store.upsertIncident({
                 ...inc,
-                sf_object: existing?.sf_object ?? null,
-                sf_field: existing?.sf_field ?? null,
+                // Keep sf_object / sf_field from whatever SSE already wrote
+                sf_object: inc.sf_object,
+                sf_field: inc.sf_field,
               })
             }
           } catch {
@@ -177,7 +180,7 @@ export default function LiveAnalysis() {
   const p2Count = allIncidents.filter(i => i.severity === 'P2').length
   const p3Count = allIncidents.filter(i => i.severity === 'P3').length
   const resolvedCount = allIncidents.filter(i => i.status === 'complete').length
-  const needsReviewCount = allIncidents.filter(i => i.requires_human_review && i.status !== 'complete').length
+  const needsReviewCount = allIncidents.filter(i => i.requires_human_review === true).length
   const analyzingCount = allIncidents.filter(i => i.status === 'running').length
   const avgLatencyMs = total > 0 ? allIncidents.reduce((s, i) => s + i.latency_ms, 0) / total : 0
   const totalTokens = allIncidents.reduce((s, i) => s + i.total_tokens_used, 0)

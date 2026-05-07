@@ -49,20 +49,24 @@ export const useReconStore = create<ReconStore>((set, get) => ({
 
   upsertIncident: (incident) =>
     set((state) => {
-      const key = incident.id ?? incident.recon_row_id ?? String(Date.now())
+      const key = incident.recon_row_id
+      if (!key) return state
       const existing = state.incidents.get(key)
-      if (existing) {
-        const newHyps = incident.hypotheses_tested?.length ?? 0
-        const oldHyps = existing.hypotheses_tested?.length ?? 0
-        const newConf = incident.confidence ?? 0
-        const oldConf = existing.confidence ?? 0
-        // Skip update if incoming data has no improvements over stored data
-        if (newHyps <= oldHyps && newConf <= oldConf && incident.status === existing.status) {
-          return state
-        }
-      }
       const next = new Map(state.incidents)
-      next.set(key, incident)
+      if (existing) {
+        // Merge: only overwrite fields that are non-null in the incoming incident
+        // so a running-state SSE event never blanks out data from a completed one
+        const merged: RCAIncident = { ...existing }
+        for (const k of Object.keys(incident) as (keyof RCAIncident)[]) {
+          const v = incident[k]
+          if (v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0)) {
+            (merged as unknown as Record<string, unknown>)[k] = v
+          }
+        }
+        next.set(key, merged)
+      } else {
+        next.set(key, incident)
+      }
       return { incidents: next }
     }),
 

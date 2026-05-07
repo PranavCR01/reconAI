@@ -40,9 +40,13 @@ export async function createRun(
   return apiFetch<CreateRunResponse>('/recon/runs', { method: 'POST', body: form })
 }
 
-export function getStreamUrl(runId: string, llmConfig?: LlmConfig): string {
+export function getStreamUrl(runId: string, llmConfig?: LlmConfig, bypassCache?: boolean): string {
   const base = `${API_URL}/recon/runs/${runId}/stream`
-  return llmConfig ? `${base}?llm_config=${llmConfig}` : base
+  const params = new URLSearchParams()
+  if (llmConfig) params.set('llm_config', llmConfig)
+  if (bypassCache) params.set('bypass_cache', 'true')
+  const qs = params.toString()
+  return qs ? `${base}?${qs}` : base
 }
 
 export async function getRun(runId: string): Promise<RunDetailResponse> {

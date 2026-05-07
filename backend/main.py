@@ -401,6 +401,7 @@ async def stream_run_analysis(
     run_id: str,
     storage: StorageDep,
     llm_config: str = Query(default=""),
+    bypass_cache: bool = Query(default=False),
     last_event_id: Optional[str] = Header(default=None, alias="last-event-id"),
 ):
     rows = await storage.get_recon_rows_for_run(run_id)
@@ -427,7 +428,7 @@ async def stream_run_analysis(
     # Partial completion (len < len(rows)) means a prior run was interrupted —
     # fall through to re-analyze so the missing rows get processed.
     existing_incidents = await storage.get_incidents_for_run(run_id)
-    if existing_incidents and len(existing_incidents) >= len(rows):
+    if not bypass_cache and existing_incidents and len(existing_incidents) >= len(rows):
         row_map = {str(r.id): r for r in rows}
 
         async def _stream_existing():
@@ -470,7 +471,7 @@ async def stream_run_analysis(
     async def _generate():
         for i, row in enumerate(rows):
             try:
-                result = await _analyze_row(row, config, graph, storage)
+                result = await _analyze_row(row, config, graph, storage, bypass_cache=bypass_cache)
                 if result["error"]:
                     payload = {"row_index": i, "row_id": str(row.id), "error": result["error"]}
                     yield f"event: error\ndata: {json.dumps(payload)}\n\n"

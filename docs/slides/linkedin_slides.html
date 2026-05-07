@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1200">
+<title>ReconAI — LinkedIn Slides</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #080a10;
+    font-family: 'Inter', -apple-system, sans-serif;
+    padding: 48px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Slide chrome ── */
+  .slide {
+    width: 1200px;
+    height: 675px;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: #0f1117;
+    color: #f0f2f8;
+  }
+
+  .slide-divider {
+    width: 1200px;
+    height: 56px;
+    background: #080a10;
+    border-top: 1px solid #141720;
+    border-bottom: 1px solid #141720;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+  .slide-divider-line {
+    flex: 1;
+    height: 1px;
+    background: #141720;
+    max-width: 160px;
+  }
+  .slide-divider-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #2a2f45;
+  }
+
+  /* ── Common atoms ── */
+  .s-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #525870;
+  }
+  .s-label::before {
+    content: '';
+    display: block;
+    width: 3px;
+    height: 13px;
+    border-radius: 2px;
+    background: #3b82f6;
+    flex-shrink: 0;
+  }
+
+  .badge { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; }
+  .badge-p1    { background: #ef444422; border: 1px solid #ef444445; color: #ef4444; }
+  .badge-p2    { background: #f59e0b22; border: 1px solid #f59e0b45; color: #f59e0b; }
+  .badge-ok    { background: #22c55e1a; border: 1px solid #22c55e35; color: #22c55e; }
+  .badge-amber { background: #f59e0b1a; border: 1px solid #f59e0b35; color: #f59e0b; font-weight: 600; }
+
+  .hyp { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; background: #3b82f61a; border: 1px solid #3b82f632; color: #3b82f6; margin-right: 4px; }
+  .ev  { display: inline-flex; align-items: center; height: 18px; padding: 0 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500; background: #141720; border: 1px solid #252a3d; color: #8892b0; margin-right: 4px; }
+
+  .conf-green { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: #22c55e; }
+  .conf-amber { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: #f59e0b; }
+
+  .inc-card {
+    background: #141720;
+    border: 1px solid #252a3d;
+    border-radius: 10px;
+    padding: 14px 18px;
+  }
+  .inc-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #525870;
+    margin-bottom: 5px;
+  }
+
+  .agent-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #141720;
+    border: 1px solid #252a3d;
+    border-radius: 8px;
+    padding: 10px 20px;
+    text-align: center;
+    min-width: 148px;
+  }
+  .agent-num { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #525870; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
+  .agent-name { font-size: 15px; font-weight: 700; color: #f0f2f8; }
+  .agent-model { font-family: 'JetBrains Mono', monospace; font-size: 10px; margin-top: 4px; }
+
+  .h-branch {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 5px;
+    background: #141720;
+    border: 1px solid #252a3d;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #8892b0;
+  }
+  .h-id { font-weight: 700; color: #3b82f6; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════
+     SLIDE 1 — TITLE
+═══════════════════════════════════ -->
+<div class="slide" style="
+  background-color: #0f1117;
+  background-image:
+    radial-gradient(circle, #1c2035 1px, transparent 1px),
+    radial-gradient(ellipse at 12% -8%, rgba(59,130,246,0.09) 0%, transparent 42%),
+    radial-gradient(ellipse at 92% 108%, rgba(168,85,247,0.07) 0%, transparent 42%);
+  background-size: 24px 24px, 100% 100%, 100% 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  gap: 0;
+">
+
+  <!-- Brand mark + wordmark -->
+  <div style="display:flex;align-items:center;gap:13px;margin-bottom:30px;">
+    <div style="
+      width:44px;height:44px;border-radius:10px;flex-shrink:0;
+      background:linear-gradient(135deg,#3b82f6 0%,#6d28d9 100%);
+      box-shadow:inset 0 0 0 1px rgba(148,200,255,0.18);
+      display:grid;place-items:center;position:relative;
+    ">
+      <div style="
+        position:absolute;inset:10px;
+        border-radius:2px;
+        border:2px solid #fff;
+        border-right:2px solid transparent;
+        border-bottom:2px solid transparent;
+        transform:rotate(45deg);
+      "></div>
+    </div>
+    <span style="font-size:26px;font-weight:800;letter-spacing:-0.025em;color:#f0f2f8;">reconAI</span>
+  </div>
+
+  <!-- Main headline -->
+  <h1 style="
+    font-size:64px;font-weight:800;
+    letter-spacing:-0.04em;line-height:1;
+    color:#f0f2f8;text-align:center;
+    margin-bottom:16px;
+  ">ReconAI</h1>
+
+  <!-- Subheadline -->
+  <p style="
+    font-size:19px;font-weight:400;
+    color:#8892b0;text-align:center;
+    letter-spacing:-0.01em;line-height:1.45;
+    margin-bottom:44px;max-width:560px;
+  ">AI-Powered Salesforce FSC Integration Observability</p>
+
+  <!-- Stat pills -->
+  <div style="display:flex;gap:10px;margin-bottom:48px;">
+    <div style="display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 16px;border-radius:8px;background:#141720;border:1px solid #252a3d;font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:500;color:#c8cfe0;">
+      <span style="width:6px;height:6px;border-radius:50%;background:#3b82f6;flex-shrink:0;"></span>
+      50 incidents benchmarked
+    </div>
+    <div style="display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 16px;border-radius:8px;background:#141720;border:1px solid #252a3d;font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:500;color:#c8cfe0;">
+      <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>
+      80% avg confidence
+    </div>
+    <div style="display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 16px;border-radius:8px;background:#141720;border:1px solid #252a3d;font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:500;color:#c8cfe0;">
+      <span style="width:6px;height:6px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></span>
+      12.5s avg analysis time
+    </div>
+  </div>
+
+  <!-- Tech stack -->
+  <div style="
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;font-weight:400;color:#2e3450;
+    letter-spacing:0.08em;text-transform:uppercase;
+  ">Built with LangGraph · Claude API · pgvector · Supabase</div>
+
+</div>
+
+<!-- DIVIDER -->
+<div class="slide-divider">
+  <div class="slide-divider-line"></div>
+  <span class="slide-divider-label">Slide 2 / 5</span>
+  <div class="slide-divider-line"></div>
+</div>
+
+<!-- ═══════════════════════════════════
+     SLIDE 2 — THE PROBLEM
+═══════════════════════════════════ -->
+<div class="slide" style="
+  background:#0f1117;
+  padding:52px 60px;
+  display:flex;
+  flex-direction:column;
+">
+
+  <div class="s-label" style="margin-bottom:18px;">The Problem</div>
+
+  <h2 style="
+    font-size:34px;font-weight:800;
+    letter-spacing:-0.025em;color:#f0f2f8;
+    margin-bottom:32px;line-height:1.15;
+    max-width:680px;
+  ">3 hours every morning.<br>Same failures, zero institutional memory.</h2>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;flex:1;">
+
+    <!-- Before -->
+    <div style="
+      background:#110d0d;
+      border:1px solid #271616;
+      border-top:3px solid #ef4444;
+      border-radius:10px;
+      padding:24px 28px;
+      display:flex;flex-direction:column;
+    ">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#ef4444;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:20px;">Before ReconAI</div>
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div style="display:flex;gap:11px;align-items:flex-start;">
+          <span style="color:#ef4444;font-size:15px;flex-shrink:0;line-height:1.45;font-weight:700;">✕</span>
+          <span style="font-size:15px;color:#c8cfe0;line-height:1.45;">3 hours manual Splunk correlation each morning</span>
+        </div>
+        <div style="display:flex;gap:11px;align-items:flex-start;">
+          <span style="color:#ef4444;font-size:15px;flex-shrink:0;line-height:1.45;font-weight:700;">✕</span>
+          <span style="font-size:15px;color:#c8cfe0;line-height:1.45;">Excel decision tree with tribal knowledge</span>
+        </div>
+        <div style="display:flex;gap:11px;align-items:flex-start;">
+          <span style="color:#ef4444;font-size:15px;flex-shrink:0;line-height:1.45;font-weight:700;">✕</span>
+          <span style="font-size:15px;color:#c8cfe0;line-height:1.45;">No postmortem, no audit trail</span>
+        </div>
+        <div style="display:flex;gap:11px;align-items:flex-start;">
+          <span style="color:#ef4444;font-size:15px;flex-shrink:0;line-height:1.45;font-weight:700;">✕</span>
+          <span style="font-size:15px;color:#c8cfe0;line-height:1.45;">Same failures repeat weekly</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- After -->
+    <div style="
+      background:#0b1210;
+      border:1px solid #152619;
+      border-top:3px solid #22c55e;
+      border-radius:10px;
+      padding:24px 28px;
+      display:flex;flex-direction:column;
+    ">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#22c55e;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:20px;">After ReconAI</div>
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div style="display:flex;gap:11px;align-items:flex-start;">
+          <span style="color:#22c55e;font-size:15px;flex-shrink:0;line-height:1.45;font-weight:700;">✓</span>
+          <span style="font-size:15px;color:#c8cfe0;line-height:1.45;">12.5 seconds per incident, end to end</span>
+        </div>
+        <div style="display:flex;gap:11px;align-items:flex-start;">
+          <span style="color:#22c55e;font-size:15px;flex-shrink:0;line-height:1.45;font-weight:700;">✓</span>
+          <span style="font-size:15px;color:#c8cfe0;line-height:1.45;">Cited evidence, not guesswork</span>
+        </div>
+        <div style="display:flex;gap:11px;align-items:flex-start;">
+          <span style="color:#22c55e;font-size:15px;flex-shrink:0;line-height:1.45;font-weight:700;">✓</span>
+          <span style="font-size:15px;color:#c8cfe0;line-height:1.45;">Auto-generated postmortem + Jira summary</span>
+        </div>
+        <div style="display:flex;gap:11px;align-items:flex-start;">
+          <span style="color:#22c55e;font-size:15px;flex-shrink:0;line-height:1.45;font-weight:700;">✓</span>
+          <span style="font-size:15px;color:#c8cfe0;line-height:1.45;">Organizational memory accumulates over time</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- DIVIDER -->
+<div class="slide-divider">
+  <div class="slide-divider-line"></div>
+  <span class="slide-divider-label">Slide 3 / 5</span>
+  <div class="slide-divider-line"></div>
+</div>
+
+<!-- ═══════════════════════════════════
+     SLIDE 3 — LIVE ANALYSIS UI MOCKUP
+═══════════════════════════════════ -->
+<div class="slide" style="
+  background:#0f1117;
+  padding:40px 52px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+">
+
+  <div class="s-label">Live Analysis</div>
+
+  <!-- Incident card 1 -->
+  <div class="inc-card" style="flex:1;">
+    <!-- Header row -->
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px;">
+      <span class="badge badge-p1">P1</span>
+      <span class="badge badge-ok" style="font-weight:600;">RESOLVED</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#525870;margin:0 2px;">SF → DB2</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;color:#c8cfe0;">FinancialAccount__c.AccountStatus__c</span>
+      <span style="margin-left:auto;" class="conf-green">91%</span>
+    </div>
+    <!-- Root cause -->
+    <div class="inc-card-label">Root Cause</div>
+    <p style="font-size:13px;color:#8892b0;line-height:1.55;margin-bottom:11px;max-width:960px;">
+      The Apex trigger <span style="font-family:'JetBrains Mono',monospace;color:#c8cfe0;font-size:11.5px;">FinancialAccountIntegrationTrigger</span> contains conditional publish logic
+      that suppresses null value propagation when <span style="font-family:'JetBrains Mono',monospace;color:#c8cfe0;font-size:11.5px;">AccountStatus__c</span> was previously populated.
+    </p>
+    <!-- Hypotheses + evidence -->
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div style="display:flex;align-items:center;gap:4px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#525870;text-transform:uppercase;letter-spacing:0.08em;margin-right:5px;">Hypotheses</span>
+        <span class="hyp">✓ HVM1</span><span class="hyp">✓ HVM2</span><span class="hyp">✓ HVM3</span>
+      </div>
+      <div style="width:1px;height:14px;background:#252a3d;"></div>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#525870;text-transform:uppercase;letter-spacing:0.08em;margin-right:5px;">Evidence</span>
+        <span class="ev">splunk://</span><span class="ev">sf-fls://</span><span class="ev">db2://</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Incident card 2 -->
+  <div class="inc-card" style="flex:1;">
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px;">
+      <span class="badge badge-p2">P2</span>
+      <span class="badge badge-amber">NEEDS REVIEW</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#525870;margin:0 2px;">SF → DB2</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;color:#c8cfe0;">Contact.TaxId__c</span>
+      <span style="margin-left:auto;" class="conf-amber">74%</span>
+    </div>
+    <div class="inc-card-label">Root Cause</div>
+    <p style="font-size:13px;color:#8892b0;line-height:1.55;margin-bottom:11px;max-width:960px;">
+      Two CDC platform events were silently dropped by the <span style="font-family:'JetBrains Mono',monospace;color:#c8cfe0;font-size:11.5px;">cdc-pipeline</span>
+      between last captured event and the DB2 sync window.
+    </p>
+    <div style="display:flex;align-items:center;gap:4px;">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#525870;text-transform:uppercase;letter-spacing:0.08em;margin-right:5px;">Hypotheses</span>
+      <span class="hyp">✓ H1</span><span class="hyp">✓ H4</span>
+    </div>
+  </div>
+
+  <!-- Stat strip -->
+  <div style="
+    display:flex;align-items:stretch;
+    background:#0c0e15;border:1px solid #1e2236;
+    border-radius:8px;overflow:hidden;flex-shrink:0;
+  ">
+    <div style="padding:0 20px;height:38px;display:flex;align-items:center;gap:7px;border-right:1px solid #1e2236;">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#c8cfe0;">10</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#525870;">discrepancies</span>
+    </div>
+    <div style="padding:0 20px;height:38px;display:flex;align-items:center;gap:7px;border-right:1px solid #1e2236;">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#ef4444;">2</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#525870;">P1 critical</span>
+    </div>
+    <div style="padding:0 20px;height:38px;display:flex;align-items:center;gap:7px;border-right:1px solid #1e2236;">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#22c55e;">8</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#525870;">analyzed</span>
+    </div>
+    <div style="padding:0 20px;height:38px;display:flex;align-items:center;gap:7px;border-right:1px solid #1e2236;">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#c8cfe0;">1.8k</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#525870;">tokens/incident</span>
+    </div>
+    <div style="padding:0 20px;height:38px;display:flex;align-items:center;gap:7px;">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#c8cfe0;">$0.02</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#525870;">total</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- DIVIDER -->
+<div class="slide-divider">
+  <div class="slide-divider-line"></div>
+  <span class="slide-divider-label">Slide 4 / 5</span>
+  <div class="slide-divider-line"></div>
+</div>
+
+<!-- ═══════════════════════════════════
+     SLIDE 4 — BENCHMARK RESULTS
+═══════════════════════════════════ -->
+<div class="slide" style="
+  background:#0f1117;
+  padding:46px 60px;
+  display:flex;
+  flex-direction:column;
+">
+
+  <div class="s-label" style="margin-bottom:18px;">LLM Benchmark · 50 FSC Incidents</div>
+
+  <h2 style="font-size:32px;font-weight:800;letter-spacing:-0.025em;color:#f0f2f8;margin-bottom:26px;line-height:1.1;">
+    Model Comparison
+  </h2>
+
+  <!-- Table -->
+  <div style="border:1px solid #252a3d;border-radius:10px;overflow:hidden;margin-bottom:18px;flex-shrink:0;">
+
+    <!-- Header -->
+    <div style="display:grid;grid-template-columns:210px 1fr 1fr 1fr 1fr;background:#141720;border-bottom:1px solid #252a3d;padding:0 20px;">
+      <div style="padding:10px 0;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#525870;letter-spacing:0.1em;text-transform:uppercase;">Config</div>
+      <div style="padding:10px 0;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#525870;letter-spacing:0.1em;text-transform:uppercase;text-align:center;">Accuracy</div>
+      <div style="padding:10px 0;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#525870;letter-spacing:0.1em;text-transform:uppercase;text-align:center;">Latency</div>
+      <div style="padding:10px 0;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#525870;letter-spacing:0.1em;text-transform:uppercase;text-align:center;">Cost</div>
+      <div style="padding:10px 0;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#525870;letter-spacing:0.1em;text-transform:uppercase;text-align:center;">Human Review</div>
+    </div>
+
+    <!-- Row 1 — Claude Sonnet -->
+    <div style="display:grid;grid-template-columns:210px 1fr 1fr 1fr 1fr;padding:0 20px;border-bottom:1px solid #252a3d;background:#0f1117;">
+      <div style="padding:15px 0;display:flex;align-items:center;gap:9px;">
+        <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>
+        <span style="font-size:14px;font-weight:600;color:#c8cfe0;">Claude Sonnet</span>
+      </div>
+      <div style="padding:15px 0;font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#22c55e;text-align:center;">70%</div>
+      <div style="padding:15px 0;font-family:'JetBrains Mono',monospace;font-size:16px;color:#8892b0;text-align:center;">12.5s</div>
+      <div style="padding:15px 0;font-family:'JetBrains Mono',monospace;font-size:16px;color:#8892b0;text-align:center;">$0.006</div>
+      <div style="padding:15px 0;font-family:'JetBrains Mono',monospace;font-size:16px;color:#8892b0;text-align:center;">56%</div>
+    </div>
+
+    <!-- Row 2 — Groq -->
+    <div style="display:grid;grid-template-columns:210px 1fr 1fr 1fr 1fr;padding:0 20px;border-bottom:1px solid #252a3d;background:#0f1117;">
+      <div style="padding:15px 0;display:flex;align-items:center;gap:9px;">
+        <span style="width:8px;height:8px;border-radius:50%;background:#a855f7;flex-shrink:0;"></span>
+        <span style="font-size:14px;font-weight:600;color:#c8cfe0;">Groq Llama 3.3 70B</span>
+      </div>
+      <div style="padding:15px 0;font-family:'JetBrains Mono',monospace;font-size:16px;color:#8892b0;text-align:center;">62%</div>
+      <div style="padding:15px 0;font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#22c55e;text-align:center;">1.4s</div>
+      <div style="padding:15px 0;font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#22c55e;text-align:center;">$0.001</div>
+      <div style="padding:15px 0;font-family:'JetBrains Mono',monospace;font-size:16px;color:#8892b0;text-align:center;">50%</div>
+    </div>
+
+    <!-- Row 3 — Hybrid (highlighted/recommended) -->
+    <div style="display:grid;grid-template-columns:210px 1fr 1fr 1fr 1fr;padding:0 20px;background:#10182a;border-top:1px solid #1c2845;">
+      <div style="padding:15px 0;display:flex;align-items:center;gap:9px;">
+        <span style="width:8px;height:8px;border-radius:50%;background:#3b82f6;flex-shrink:0;"></span>
+        <span style="font-size:14px;font-weight:700;color:#f0f2f8;">Hybrid</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;color:#3b82f6;background:#3b82f61a;border:1px solid #3b82f632;border-radius:4px;padding:2px 7px;letter-spacing:0.08em;text-transform:uppercase;">rec</span>
+      </div>
+      <div style="padding:15px 0;font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#3b82f6;text-align:center;">67%</div>
+      <div style="padding:15px 0;font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600;color:#c8cfe0;text-align:center;">~9s</div>
+      <div style="padding:15px 0;font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600;color:#c8cfe0;text-align:center;">$0.004</div>
+      <div style="padding:15px 0;font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#3b82f6;text-align:center;">65%</div>
+    </div>
+  </div>
+
+  <!-- Callout + annotation row -->
+  <div style="display:flex;gap:14px;align-items:stretch;">
+    <div style="
+      flex:1;
+      background:#0d1825;
+      border:1px solid #1c2845;
+      border-left:3px solid #3b82f6;
+      border-radius:8px;
+      padding:16px 20px;
+    ">
+      <div style="font-size:15px;font-weight:700;color:#c8cfe0;line-height:1.5;margin-bottom:5px;">
+        Hybrid config: best human review calibration at 65%
+      </div>
+      <div style="font-size:13px;color:#525870;line-height:1.5;">Near-Claude accuracy at near-Groq cost</div>
+    </div>
+    <div style="
+      display:flex;align-items:center;
+      background:#141720;border:1px solid #252a3d;
+      border-radius:8px;padding:16px 22px;
+      flex-shrink:0;
+    ">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#525870;line-height:1.65;text-align:left;">
+        Groq classification<br>+ Claude Sonnet synthesis
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- DIVIDER -->
+<div class="slide-divider">
+  <div class="slide-divider-line"></div>
+  <span class="slide-divider-label">Slide 5 / 5</span>
+  <div class="slide-divider-line"></div>
+</div>
+
+<!-- ═══════════════════════════════════
+     SLIDE 5 — ARCHITECTURE
+═══════════════════════════════════ -->
+<div class="slide" style="
+  background:#0f1117;
+  padding:40px 52px;
+  display:flex;
+  flex-direction:column;
+  gap:0;
+">
+
+  <div class="s-label" style="margin-bottom:20px;">Hypothesis Graph Architecture</div>
+
+  <!-- Agent pipeline -->
+  <div style="display:flex;align-items:center;margin-bottom:26px;gap:0;">
+
+    <div class="agent-box">
+      <div class="agent-num">Agent 1</div>
+      <div class="agent-name">Ingestion</div>
+      <div class="agent-model" style="color:#3b82f6;">Haiku</div>
+    </div>
+
+    <div style="flex:1;position:relative;height:1px;background:linear-gradient(90deg,#1e2236,#3b82f640,#1e2236);min-width:20px;">
+      <span style="position:absolute;right:-5px;top:-7px;color:#3b82f6;font-size:12px;line-height:1;">›</span>
+    </div>
+
+    <div class="agent-box">
+      <div class="agent-num">Agent 2</div>
+      <div class="agent-name">Hypothesis</div>
+      <div class="agent-model" style="color:#3b82f6;">Sonnet</div>
+    </div>
+
+    <div style="flex:1;position:relative;height:1px;background:linear-gradient(90deg,#1e2236,#3b82f640,#1e2236);min-width:20px;">
+      <span style="position:absolute;right:-5px;top:-7px;color:#3b82f6;font-size:12px;line-height:1;">›</span>
+    </div>
+
+    <div class="agent-box">
+      <div class="agent-num">Agent 3</div>
+      <div class="agent-name">Evidence</div>
+      <div class="agent-model" style="color:#3b82f6;">Sonnet</div>
+    </div>
+
+    <div style="flex:1;position:relative;height:1px;background:linear-gradient(90deg,#1e2236,#3b82f640,#1e2236);min-width:20px;">
+      <span style="position:absolute;right:-5px;top:-7px;color:#3b82f6;font-size:12px;line-height:1;">›</span>
+    </div>
+
+    <div class="agent-box">
+      <div class="agent-num">Agent 4</div>
+      <div class="agent-name">Synthesis</div>
+      <div class="agent-model" style="color:#22c55e;">Sonnet</div>
+    </div>
+
+  </div>
+
+  <!-- Lower section: branches + RAG store -->
+  <div style="display:grid;grid-template-columns:1fr 196px;gap:20px;flex:1;min-height:0;">
+
+    <!-- Hypothesis branches + stats -->
+    <div style="display:flex;flex-direction:column;gap:0;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#525870;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:11px;">
+        Hypothesis Branches
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:auto;">
+        <span class="h-branch"><span class="h-id">H1</span> DB2 History</span>
+        <span class="h-branch"><span class="h-id">H2</span> Splunk Triage</span>
+        <span class="h-branch"><span class="h-id">H3a</span> FLS Check</span>
+        <span class="h-branch"><span class="h-id">H3b</span> CDC Config</span>
+        <span class="h-branch"><span class="h-id">H3c</span> Apex Trigger</span>
+        <span class="h-branch"><span class="h-id">H4</span> Transform Deep Dive</span>
+        <span class="h-branch" style="background:#0e1525;border-color:#1e2847;">
+          <span style="font-weight:700;color:#a855f7;">H5</span> RAG Fallback · pgvector HNSW
+        </span>
+      </div>
+
+      <!-- Bottom stat strip -->
+      <div style="
+        display:flex;margin-top:22px;
+        background:#0c0e15;border:1px solid #1e2236;
+        border-radius:7px;overflow:hidden;flex-shrink:0;
+      ">
+        <div style="flex:1;padding:11px 14px;border-right:1px solid #1e2236;font-size:12.5px;color:#8892b0;line-height:1.4;">
+          <span style="color:#22c55e;font-weight:700;">Early termination</span> on confirmation
+        </div>
+        <div style="flex:1;padding:11px 14px;border-right:1px solid #1e2236;font-size:12.5px;color:#8892b0;line-height:1.4;">
+          Every claim <span style="color:#3b82f6;font-weight:700;">cites a concrete artifact</span>
+        </div>
+        <div style="flex:1;padding:11px 14px;font-size:12.5px;color:#8892b0;line-height:1.4;">
+          <span style="color:#f59e0b;font-weight:700;">Human approval</span> required for write actions
+        </div>
+      </div>
+    </div>
+
+    <!-- RAG store -->
+    <div style="
+      background:#0e1525;
+      border:1px solid #1e2847;
+      border-radius:10px;
+      padding:18px 18px;
+      display:flex;
+      flex-direction:column;
+      gap:11px;
+    ">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:0.12em;">pgvector RAG Store</div>
+      <div style="display:flex;flex-direction:column;gap:9px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#8892b0;line-height:1.5;padding-left:9px;border-left:2px solid #1e2847;">
+          23 FSC seed artifacts
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#8892b0;line-height:1.5;padding-left:9px;border-left:2px solid #1e2847;">
+          text-embedding-3-small
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#8892b0;line-height:1.5;padding-left:9px;border-left:2px solid #1e2847;">
+          HNSW similarity search
+        </div>
+      </div>
+      <div style="
+        font-family:'JetBrains Mono',monospace;
+        font-size:10.5px;color:#3b82f6;
+        background:#3b82f612;border:1px solid #3b82f625;
+        border-radius:5px;padding:5px 9px;
+        text-align:center;margin-top:2px;
+      ">1536 dims · cosine</div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

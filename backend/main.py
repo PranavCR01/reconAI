@@ -43,7 +43,8 @@ if _dsn:
     sentry_sdk.init(dsn=_dsn, traces_sample_rate=0.1)
 
 _storage: SupabaseAdapter | None = None
-_recall_metrics_cache: dict | None = None
+_recall_cache: dict = {"data": None, "ts": 0}
+_RECALL_TTL = 3600  # 1 hour — recall@k is stable between artifact updates
 
 _REQUIRED_CSV_COLUMNS = {"sf_object", "sf_field", "sf_record_id", "db2_table", "db2_column"}
 
@@ -616,14 +617,15 @@ async def resolve_incident(incident_id: str, body: ResolveRequest, storage: Stor
 
 @app.get("/api/v1/recall")
 async def get_recall_metrics(storage: StorageDep):
-    global _recall_metrics_cache
-    if _recall_metrics_cache is not None:
-        return _recall_metrics_cache
+    cached = _recall_cache["data"]
+    if cached and (time.time() - _recall_cache["ts"]) < _RECALL_TTL:
+        return cached
     try:
         metrics = await asyncio.to_thread(compute_recall_at_k, storage)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Recall computation failed: {exc}")
-    _recall_metrics_cache = metrics
+    _recall_cache["data"] = metrics
+    _recall_cache["ts"] = time.time()
     return metrics
 
 

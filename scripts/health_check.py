@@ -58,13 +58,14 @@ class Results:
 results = Results()
 
 
-def _http(method: str, url: str, **kwargs) -> tuple[int | None, str]:
+def _http(method: str, url: str, timeout_override: int | None = None, **kwargs) -> tuple[int | None, str]:
     """Return (status_code, error_string). error_string is '' on success."""
+    t = timeout_override if timeout_override is not None else TIMEOUT
     try:
-        resp = requests.request(method, url, timeout=TIMEOUT, **kwargs)
+        resp = requests.request(method, url, timeout=t, **kwargs)
         return resp.status_code, ""
     except requests.exceptions.Timeout:
-        return None, "timeout"
+        return None, f"timeout (>{t}s)"
     except requests.exceptions.ConnectionError as e:
         return None, f"connection error: {e}"
     except Exception as e:
@@ -86,7 +87,7 @@ MuleSoft CDC,VALUE_MISMATCH,P1
 
 BACKEND_CHECKS: list[tuple[str, str, dict]] = [
     ("GET",  "/api/v1/health",                                          {}),
-    ("GET",  "/api/v1/recall",                                          {}),
+    ("GET",  "/api/v1/recall",                                          {"timeout_override": 30}),
     ("GET",  "/api/v1/analytics/summary?days=30",                       {}),
     ("GET",  "/api/v1/analytics/incidents-over-time?days=30",           {}),
     ("GET",  "/api/v1/analytics/by-object?days=30",                     {}),
@@ -114,7 +115,9 @@ def run_backend_checks():
         url = BASE_URL + path
         expected = EXPECTED_STATUS.get(f"{method} {path}", 200)
         print(f"   {method} {path} ...", end=" ", flush=True)
-        status, err = _http(method, url, **kwargs)
+        kw = dict(kwargs)
+        to = kw.pop("timeout_override", None)
+        status, err = _http(method, url, timeout_override=to, **kw)
         actual = str(status) if status else f"ERR ({err})"
         ok = status == expected
         res = PASS if ok else FAIL

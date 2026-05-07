@@ -1,20 +1,20 @@
 # ReconAI Health Check Report
-Generated: 2026-05-07 07:03:25 UTC
+Generated: 2026-05-07 07:07:42 UTC
 
 ## Backend API
-| Check                                                 | Expected | Actual        | Status | Notes   |
-| ----------------------------------------------------- | -------- | ------------- | ------ | ------- |
-| GET /api/v1/health                                    | 200      | 200           | PASS   |         |
-| GET /api/v1/recall                                    | 200      | ERR (timeout) | FAIL   | timeout |
-| GET /api/v1/analytics/summary?days=30                 | 200      | 200           | PASS   |         |
-| GET /api/v1/analytics/incidents-over-time?days=30     | 200      | 200           | PASS   |         |
-| GET /api/v1/analytics/by-object?days=30               | 200      | 200           | PASS   |         |
-| GET /api/v1/analytics/root-cause-distribution?days=30 | 200      | 200           | PASS   |         |
-| GET /api/v1/analytics/deployment-correlation?days=30  | 200      | 200           | PASS   |         |
-| GET /api/v1/analytics/ai-accuracy?weeks=5             | 200      | 200           | PASS   |         |
-| POST /api/v1/track/pageview                           | 200      | 200           | PASS   |         |
-| POST /api/v1/track/demo-request                       | 200      | 200           | PASS   |         |
-| POST /api/v1/recon/runs                               | 201      | 201           | PASS   |         |
+| Check                                                 | Expected | Actual | Status | Notes |
+| ----------------------------------------------------- | -------- | ------ | ------ | ----- |
+| GET /api/v1/health                                    | 200      | 200    | PASS   |       |
+| GET /api/v1/recall                                    | 200      | 200    | PASS   |       |
+| GET /api/v1/analytics/summary?days=30                 | 200      | 200    | PASS   |       |
+| GET /api/v1/analytics/incidents-over-time?days=30     | 200      | 200    | PASS   |       |
+| GET /api/v1/analytics/by-object?days=30               | 200      | 200    | PASS   |       |
+| GET /api/v1/analytics/root-cause-distribution?days=30 | 200      | 200    | PASS   |       |
+| GET /api/v1/analytics/deployment-correlation?days=30  | 200      | 200    | PASS   |       |
+| GET /api/v1/analytics/ai-accuracy?weeks=5             | 200      | 200    | PASS   |       |
+| POST /api/v1/track/pageview                           | 200      | 200    | PASS   |       |
+| POST /api/v1/track/demo-request                       | 200      | 200    | PASS   |       |
+| POST /api/v1/recon/runs                               | 201      | 201    | PASS   |       |
 
 ## Supabase Tables
 | Check             | Expected | Actual  | Status | Notes                                        |
@@ -63,12 +63,11 @@ Generated: 2026-05-07 07:03:25 UTC
 
 ## Summary
 - **Total checks:** 40
-- **Passed:** 21
-- **Failed:** 4
+- **Passed:** 22
+- **Failed:** 3
 - **Warnings:** 15
 
 ### Failed checks
-- **Backend API / GET /api/v1/recall**: timeout
 - **Environment Variables / SUPABASE_URL**: Supabase project URL
 - **Environment Variables / SUPABASE_SERVICE_KEY**: Supabase service role key
 - **Environment Variables / ANTHROPIC_API_KEY**: Claude LLM

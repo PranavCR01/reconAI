@@ -230,7 +230,7 @@ export default function Benchmark() {
                 { label: 'Incidents', value: String(meta.total_incidents) },
                 { label: 'FSC Objects', value: String(meta.objects_covered) },
                 { label: 'Discrepancy Types', value: String(meta.discrepancy_types) },
-                { label: 'Run Date', value: meta.run_date },
+                { label: 'Ground Truth', value: 'Labeled' },
               ].map(({ label, value }) => (
                 <div key={label} style={{
                   background: C.bg2, border: `1px solid ${C.line}`,
@@ -392,15 +392,12 @@ export default function Benchmark() {
             </h2>
             <div style={{ maxWidth: 720 }}>
               {written.key_findings.map((finding, i) => (
-                <div key={i} className="bmk-finding-item">
+                <div key={i} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 18 }}>
                   <span style={{
-                    flexShrink: 0, marginTop: 3,
-                    width: 20, height: 20, borderRadius: '50%',
-                    background: C.bg2, border: `1px solid ${C.line}`,
-                    display: 'inline-grid', placeItems: 'center',
-                    font: `700 10px var(--mono)`, color: C.info,
+                    flexShrink: 0, width: 24,
+                    font: `700 13px var(--mono)`, color: C.info, lineHeight: 1.7,
                   }}>
-                    {i + 1}
+                    {i + 1}.
                   </span>
                   <p style={{ margin: 0, fontSize: 14.5, color: C.fg2, lineHeight: 1.7 }}>{finding}</p>
                 </div>
@@ -570,7 +567,7 @@ export default function Benchmark() {
           color: C.fg3,
           letterSpacing: '0.03em',
         }}>
-          reconAI · LangGraph · Claude API · Supabase pgvector · UIUC 2025
+          reconAI · LangGraph · Claude API · Supabase pgvector · UIUC 2026
         </footer>
 
       </div>

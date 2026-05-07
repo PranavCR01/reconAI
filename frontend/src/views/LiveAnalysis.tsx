@@ -104,6 +104,8 @@ export default function LiveAnalysis() {
   const [retryKey, setRetryKey] = useState(0)
   const [totalRows, setTotalRows] = useState(0)
   const [cacheHits, setCacheHits] = useState(0)
+  const [analyzedCount, setAnalyzedCount] = useState(0)
+  const [apiStats, setApiStats] = useState<{ avgTokens: number; totalCalls: number; avgLatencyMs: number; count: number } | null>(null)
   const sseCleanupRef = useRef<(() => void) | null>(null)
   const sseOpenedRef = useRef(false)
 
@@ -132,6 +134,7 @@ export default function LiveAnalysis() {
         store.setSseConnected(true)
         store.setRunStatus('streaming')
         if (e.cached) setCacheHits(n => n + 1)
+        if (e.root_cause_summary) setAnalyzedCount(n => n + 1)
       },
       onDone: async (e) => {
         store.setRunStatus('complete')
@@ -140,19 +143,24 @@ export default function LiveAnalysis() {
         setTotalRows(e.total_rows)
         sseCleanupRef.current = null
         if (runId) updateRunInHistory(runId, { status: 'complete' })
-        // Patch in stats (tokens, tool calls, latency) that SSE never sends.
-        // Use recon_row_id as the key so we overwrite the existing Map entry,
-        // not create a new one with incident.id as the key.
         if (runId) {
           try {
             const { incidents: fresh } = await getRunIncidents(runId)
+            console.log('[DONE] first incident from API:', JSON.stringify(fresh[0]).slice(0, 300))
+            // Enrich store entries with hypothesis data from DB (not in SSE)
             for (const inc of fresh) {
               if (!inc.recon_row_id) continue
-              store.upsertIncident({
-                ...inc,
-                // Keep sf_object / sf_field from whatever SSE already wrote
-                sf_object: inc.sf_object,
-                sf_field: inc.sf_field,
+              store.upsertIncident({ ...inc, sf_object: inc.sf_object, sf_field: inc.sf_field })
+            }
+            // Compute run stats directly from API response — do not rely on
+            // the Map merge since SSE events carry zero for tokens/latency.
+            const n = fresh.length
+            if (n > 0) {
+              setApiStats({
+                avgTokens: Math.round(fresh.reduce((s, i) => s + (i.total_tokens_used ?? 0), 0) / n),
+                totalCalls: fresh.reduce((s, i) => s + (i.total_tool_calls ?? 0), 0),
+                avgLatencyMs: fresh.reduce((s, i) => s + (i.latency_ms ?? 0), 0) / n,
+                count: n,
               })
             }
           } catch {
@@ -179,16 +187,22 @@ export default function LiveAnalysis() {
   const p1Count = allIncidents.filter(i => i.severity === 'P1').length
   const p2Count = allIncidents.filter(i => i.severity === 'P2').length
   const p3Count = allIncidents.filter(i => i.severity === 'P3').length
+  // resolvedCount: only 'complete' (not needs_review) — used for Resolved stat cell and tab
   const resolvedCount = allIncidents.filter(i => i.status === 'complete').length
   const needsReviewCount = allIncidents.filter(i => i.requires_human_review === true).length
   const analyzingCount = allIncidents.filter(i => i.status === 'running').length
-  const avgLatencyMs = total > 0 ? allIncidents.reduce((s, i) => s + i.latency_ms, 0) / total : 0
-  const totalTokens = allIncidents.reduce((s, i) => s + i.total_tokens_used, 0)
-  const totalToolCalls = allIncidents.reduce((s, i) => s + i.total_tool_calls, 0)
-  const avgTokensPerIncident = total > 0 ? Math.round(totalTokens / total) : 0
-  const avgToolCalls = total > 0 ? (totalToolCalls / total).toFixed(1) : '—'
   const cacheHitPct = total > 0 ? Math.min(100, Math.round((cacheHits / total) * 100)) : null
-  const approxSpend = totalTokens * 0.000003
+
+  // Stats sourced from API response after done — reliable since SSE carries zero for these
+  const displayAvgTokens = apiStats?.avgTokens ?? 0
+  const displayTotalCalls = apiStats?.totalCalls ?? 0
+  const displayCount = apiStats?.count ?? total
+  const displayAvgLatencyMs = apiStats?.avgLatencyMs ?? 0
+  const displayAvgCalls = displayCount > 0 ? (displayTotalCalls / displayCount).toFixed(1) : '—'
+  const displayApproxSpend = displayAvgTokens > 0 ? displayAvgTokens * displayCount * 0.000003 : 0
+
+  // Progress bar denominator: use SSE done event total when known, else Map size
+  const progressTotal = totalRows || total
 
   const topObjects = useMemo(() => {
     const counts = new Map<string, number>()
@@ -201,9 +215,9 @@ export default function LiveAnalysis() {
       .slice(0, 5)
   }, [allIncidents])
   const elapsedSec = Math.floor(elapsed / 1000)
-  const etaStr = total > 0 && analyzingCount > 0
-    ? `~${Math.max(0, Math.round((analyzingCount * elapsedSec) / Math.max(resolvedCount, 1)))}s`
-    : total > 0 ? 'Done' : '…'
+  const etaStr = progressTotal > 0 && analyzedCount < progressTotal
+    ? `~${Math.max(0, Math.round((progressTotal - analyzedCount) * elapsedSec / Math.max(analyzedCount, 1)))}s`
+    : progressTotal > 0 ? 'Done' : '…'
 
   const tabOptions: SegOption[] = [
     { value: 'all', label: 'All', sub: String(total) },
@@ -239,10 +253,10 @@ export default function LiveAnalysis() {
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px', background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 6 }}>
               <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-2)' }}>
-                {resolvedCount}/{total} analyzed
+                {analyzedCount}/{progressTotal || '?'} analyzed
               </span>
               <div style={{ width: 80, height: 4, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: total > 0 ? `${Math.round((resolvedCount / total) * 100)}%` : '0%', background: 'var(--ok)', borderRadius: 2, transition: 'width 0.4s' }} />
+                <div style={{ height: '100%', width: progressTotal > 0 ? `${Math.round((analyzedCount / progressTotal) * 100)}%` : '0%', background: 'var(--ok)', borderRadius: 2, transition: 'width 0.4s' }} />
               </div>
               <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>ETA {etaStr}</span>
             </div>
@@ -304,7 +318,7 @@ export default function LiveAnalysis() {
         <StatCell label="Resolved" value={resolvedCount} color="var(--ok)" />
         <StatCell label="Needs Review" value={needsReviewCount} color="var(--warn)" />
         <StatCell label="Analyzing" value={analyzingCount} />
-        <StatCell label="Mean Time / Incident" value={avgLatencyMs > 0 ? fmtLatency(avgLatencyMs) : '—'} />
+        <StatCell label="Mean Time / Incident" value={displayAvgLatencyMs > 0 ? fmtLatency(displayAvgLatencyMs) : '—'} />
       </div>
 
       {/* Toolbar */}
@@ -471,10 +485,10 @@ export default function LiveAnalysis() {
           <Panel title="Run Stats">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
-                { label: 'Tokens / incident', value: avgTokensPerIncident > 0 ? fmtTokens(avgTokensPerIncident) : '—' },
-                { label: 'Avg tool calls', value: totalToolCalls > 0 ? avgToolCalls : '—' },
+                { label: 'Tokens / incident', value: displayAvgTokens > 0 ? fmtTokens(displayAvgTokens) : '—' },
+                { label: 'Avg tool calls', value: displayTotalCalls > 0 ? displayAvgCalls : '—' },
                 { label: 'Cache hit %', value: cacheHitPct !== null ? `${cacheHitPct}%` : '—' },
-                { label: 'Approx. spend', value: totalTokens > 0 ? fmtCurrency(approxSpend) : '—' },
+                { label: 'Approx. spend', value: displayApproxSpend > 0 ? fmtCurrency(displayApproxSpend) : '—' },
               ].map(row => (
                 <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>{row.label}</span>

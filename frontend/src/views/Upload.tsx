@@ -314,11 +314,12 @@ function UploadForm() {
   const [model, setModel] = useState<LlmConfig>('claude')
   const [loading, setLoading] = useState(false)
   const [history, setHistory] = useState<RunHistoryEntry[]>([])
+  const [showAll, setShowAll] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [sfdxModalOpen, setSfdxModalOpen] = useState(false)
 
   useEffect(() => {
-    setHistory(getRunHistory().slice(0, 3))
+    setHistory(getRunHistory())
   }, [])
 
   function parseFile(f: File) {
@@ -453,6 +454,7 @@ function UploadForm() {
   ]
 
   const canStart = !!file && !loading
+  const displayedRuns = showAll ? history : history.slice(0, 3)
 
   return (
     <div style={{ maxWidth: 940, margin: '0 auto', padding: '36px 24px 80px' }}>
@@ -924,26 +926,31 @@ function UploadForm() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '36px 0 12px' }}>
         <h2 style={{ fontSize: 13, fontWeight: 600, letterSpacing: '-0.005em', margin: 0 }}>Recent runs</h2>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, color: 'var(--fg-3)' }}>
-          last {history.length || 0} ·{' '}
-          <a
-            href="#"
-            style={{
-              color: 'var(--info)',
-              textDecoration: 'none',
-              fontFamily: 'var(--mono)',
-              fontSize: 11,
-              fontWeight: 500,
-            }}
-          >
-            view all →
-          </a>
+          {showAll ? `all ${history.length}` : `last ${Math.min(history.length, 3)}`} ·{' '}
+          {history.length > 3 && (
+            <button
+              onClick={() => setShowAll(v => !v)}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: 'var(--info)',
+                fontFamily: 'var(--mono)',
+                fontSize: 11,
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              {showAll ? '← show less' : 'view all →'}
+            </button>
+          )}
         </span>
         <div style={{ marginLeft: 'auto' }}>
           <button
             onClick={async () => {
               setRefreshing(true)
               await new Promise(r => setTimeout(r, 400))
-              setHistory(getRunHistory().slice(0, 3))
+              setHistory(getRunHistory())
               setRefreshing(false)
             }}
             disabled={refreshing}
@@ -1013,7 +1020,7 @@ function UploadForm() {
         )}
 
         {/* Rows */}
-        {history.map((run, idx) => {
+        {displayedRuns.map((run, idx) => {
           const heights = sparkHeights(run.runId)
           const statusVariant = STATUS_VARIANT[run.status] ?? 'queued'
           const isProd = run.environment === 'PROD'

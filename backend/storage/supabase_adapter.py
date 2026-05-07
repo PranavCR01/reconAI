@@ -80,7 +80,9 @@ class SupabaseAdapter(StorageAdapter):
 
     async def save_resolution(self, resolution: Resolution) -> str:
         result = await self._run(
-            lambda: self._client.table("resolutions").insert(_dump(resolution)).execute()
+            lambda: self._client.table("resolutions")
+            .upsert(_dump(resolution), on_conflict="incident_id")
+            .execute()
         )
         return result.data[0]["id"]
 

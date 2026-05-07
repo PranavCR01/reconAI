@@ -7,7 +7,7 @@ import { ConfidenceBar } from '@/components/ui/ConfidenceBar'
 import { Panel } from '@/components/ui/Panel'
 import { getIncident, resolveIncident } from '@/lib/api'
 import { fmtDate, fmtLatency, fmtTokens, fmtConfidence } from '@/lib/format'
-import type { RCAIncident, Evidence, FixType, ResolveRequest } from '@/types'
+import type { RCAIncident, Evidence, FixType, ResolveRequest, Resolution } from '@/types'
 
 const FIX_TYPES: FixType[] = [
   'apex_code_change',
@@ -134,8 +134,17 @@ export default function IncidentDetail() {
     getIncident(incidentId)
       .then(data => {
         setIncident(data)
-        setFormRoot(data.root_cause_summary ?? '')
-        if (data.resolution) setResolvedAt(data.resolution.resolved_at)
+        if (data.resolution) {
+          setResolvedAt(data.resolution.resolved_at)
+          setFormRoot(data.resolution.confirmed_root_cause)
+          setFormFix(data.resolution.fix_applied)
+          setFormFixType(data.resolution.fix_type)
+          setFormAiCorrect(data.resolution.ai_was_correct ?? true)
+          setFormResolvedBy(data.resolution.resolved_by)
+          setFormNotes(data.resolution.correction_notes ?? '')
+        } else {
+          setFormRoot(data.root_cause_summary ?? '')
+        }
         setLoading(false)
       })
       .catch(e => {
@@ -158,8 +167,23 @@ export default function IncidentDetail() {
         correction_notes: formNotes || undefined,
       }
       await resolveIncident(incidentId, body)
+      const now = new Date().toISOString()
+      const newResolution: Resolution = {
+        id: null,
+        incident_id: incidentId,
+        confirmed_root_cause: formRoot,
+        fix_applied: formFix,
+        fix_type: formFixType,
+        fix_verified: false,
+        verification_recon_run_id: null,
+        ai_was_correct: formAiCorrect,
+        correction_notes: formNotes || null,
+        resolved_by: formResolvedBy,
+        resolved_at: now,
+      }
+      setIncident(prev => prev ? { ...prev, resolution: newResolution } : null)
       setResolveSuccess(true)
-      setResolvedAt(new Date().toISOString())
+      setResolvedAt(now)
       setEditingResolution(false)
     } catch {
       // ignore
@@ -353,9 +377,14 @@ export default function IncidentDetail() {
                   </div>
                   {inc.resolution && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-2)', background: 'var(--bg-2)', borderRadius: 6, padding: '10px 12px' }}>
+                      <div><span style={{ color: 'var(--fg-3)' }}>confirmed_root_cause: </span>{inc.resolution.confirmed_root_cause}</div>
+                      <div><span style={{ color: 'var(--fg-3)' }}>fix_applied: </span>{inc.resolution.fix_applied}</div>
                       <div><span style={{ color: 'var(--fg-3)' }}>fix_type: </span>{inc.resolution.fix_type}</div>
                       <div><span style={{ color: 'var(--fg-3)' }}>resolved_by: </span>{inc.resolution.resolved_by}</div>
                       <div><span style={{ color: 'var(--fg-3)' }}>ai_correct: </span>{String(inc.resolution.ai_was_correct ?? '—')}</div>
+                      {inc.resolution.correction_notes && (
+                        <div><span style={{ color: 'var(--fg-3)' }}>correction_notes: </span>{inc.resolution.correction_notes}</div>
+                      )}
                     </div>
                   )}
                   <button onClick={() => setEditingResolution(true)} style={{ marginTop: 10, padding: '5px 14px', borderRadius: 5, border: '1px solid var(--line)', background: 'var(--bg-2)', color: 'var(--fg-2)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}>
@@ -438,7 +467,7 @@ export default function IncidentDetail() {
                 {[
                   { label: 'Records Affected', value: '1' },
                   { label: 'Tool Calls', value: String(inc.total_tool_calls) },
-                  { label: 'Time to RCA', value: fmtLatency(inc.latency_ms) },
+                  { label: 'Time to RCA', value: inc.latency_ms > 0 ? fmtLatency(inc.latency_ms) : '—' },
                   { label: 'Tokens', value: fmtTokens(inc.total_tokens_used) },
                 ].map(stat => (
                   <div key={stat.label} style={{ background: 'var(--bg-2)', padding: '10px 12px' }}>

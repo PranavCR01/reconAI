@@ -492,7 +492,7 @@ export default function Landing() {
           color: C.fg3,
           letterSpacing: '0.03em',
         }}>
-          reconAI · LangGraph · Claude API · Supabase pgvector · UIUC 2025
+          reconAI · LangGraph · Claude API · Supabase pgvector · UIUC 2026
         </footer>
 
       </div>

@@ -116,6 +116,8 @@ export default function IncidentDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [resolveSuccess, setResolveSuccess] = useState(false)
+  const [resolvedAt, setResolvedAt] = useState<string | null>(null)
+  const [editingResolution, setEditingResolution] = useState(false)
 
   // Resolution form state
   const [formRoot, setFormRoot] = useState('')
@@ -133,6 +135,7 @@ export default function IncidentDetail() {
       .then(data => {
         setIncident(data)
         setFormRoot(data.root_cause_summary ?? '')
+        if (data.resolution) setResolvedAt(data.resolution.resolved_at)
         setLoading(false)
       })
       .catch(e => {
@@ -156,6 +159,8 @@ export default function IncidentDetail() {
       }
       await resolveIncident(incidentId, body)
       setResolveSuccess(true)
+      setResolvedAt(new Date().toISOString())
+      setEditingResolution(false)
     } catch {
       // ignore
     } finally {
@@ -341,9 +346,21 @@ export default function IncidentDetail() {
 
             {/* Resolution form */}
             <Panel title="Resolve Incident">
-              {resolveSuccess ? (
-                <div style={{ textAlign: 'center', padding: '24px 0', fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--ok)' }}>
-                  ✓ Resolution recorded successfully
+              {(resolveSuccess || (inc.resolution && !editingResolution)) ? (
+                <div style={{ padding: '16px 0' }}>
+                  <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--ok)', marginBottom: 12 }}>
+                    ✓ Resolution already recorded
+                  </div>
+                  {inc.resolution && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-2)', background: 'var(--bg-2)', borderRadius: 6, padding: '10px 12px' }}>
+                      <div><span style={{ color: 'var(--fg-3)' }}>fix_type: </span>{inc.resolution.fix_type}</div>
+                      <div><span style={{ color: 'var(--fg-3)' }}>resolved_by: </span>{inc.resolution.resolved_by}</div>
+                      <div><span style={{ color: 'var(--fg-3)' }}>ai_correct: </span>{String(inc.resolution.ai_was_correct ?? '—')}</div>
+                    </div>
+                  )}
+                  <button onClick={() => setEditingResolution(true)} style={{ marginTop: 10, padding: '5px 14px', borderRadius: 5, border: '1px solid var(--line)', background: 'var(--bg-2)', color: 'var(--fg-2)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}>
+                    Edit resolution
+                  </button>
                 </div>
               ) : (
                 <form onSubmit={handleResolve} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -439,6 +456,7 @@ export default function IncidentDetail() {
                   { label: 'AI opened incident', time: fmtDate(inc.created_at), color: 'var(--info)' },
                   { label: 'AI confirmed hypothesis', time: fmtDate(inc.created_at), color: 'var(--ok)' },
                   { label: 'You opened detail view', time: 'just now', color: 'var(--fg-3)' },
+                  ...(resolvedAt ? [{ label: 'Resolution recorded', time: fmtDate(resolvedAt), color: 'var(--ok)' }] : []),
                 ].map((item, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: item.color, marginTop: 4, flexShrink: 0 }} />

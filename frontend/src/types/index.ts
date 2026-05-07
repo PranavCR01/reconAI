@@ -100,6 +100,8 @@ export interface RCAIncident {
   sf_field?: string | null
   // Joined evidence (from GET /incidents/:id)
   evidence?: Evidence[]
+  // Existing resolution if already recorded
+  resolution?: Resolution | null
 }
 
 export interface Resolution {
@@ -147,6 +149,7 @@ export interface RunDetailResponse {
   run: ReconRun
   incidents: (RCAIncident & { severity: Severity | null })[]
   total_incidents: number
+  rows_scanned: number
   needs_review: number
 }
 

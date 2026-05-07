@@ -104,6 +104,7 @@ export default function LiveAnalysis() {
   const [totalRows, setTotalRows] = useState(0)
   const [cacheHits, setCacheHits] = useState(0)
   const sseCleanupRef = useRef<(() => void) | null>(null)
+  const sseOpenedRef = useRef(false)
 
   const handleStop = useCallback(() => {
     if (sseCleanupRef.current) {
@@ -121,6 +122,8 @@ export default function LiveAnalysis() {
 
   useEffect(() => {
     if (!runId) return
+    if (sseOpenedRef.current) return
+    sseOpenedRef.current = true
     store.setRunId(runId)
     const cleanup = connectToRun(runId, {
       onIncident: (e) => {
@@ -163,6 +166,7 @@ export default function LiveAnalysis() {
     return () => {
       cleanup()
       sseCleanupRef.current = null
+      sseOpenedRef.current = false
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runId, retryKey])
@@ -173,7 +177,7 @@ export default function LiveAnalysis() {
   const p2Count = allIncidents.filter(i => i.severity === 'P2').length
   const p3Count = allIncidents.filter(i => i.severity === 'P3').length
   const resolvedCount = allIncidents.filter(i => i.status === 'complete').length
-  const needsReviewCount = allIncidents.filter(i => i.status === 'needs_review').length
+  const needsReviewCount = allIncidents.filter(i => i.requires_human_review && i.status !== 'resolved').length
   const analyzingCount = allIncidents.filter(i => i.status === 'running').length
   const avgLatencyMs = total > 0 ? allIncidents.reduce((s, i) => s + i.latency_ms, 0) / total : 0
   const totalTokens = allIncidents.reduce((s, i) => s + i.total_tokens_used, 0)

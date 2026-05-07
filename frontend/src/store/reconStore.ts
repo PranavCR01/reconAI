@@ -50,6 +50,17 @@ export const useReconStore = create<ReconStore>((set, get) => ({
   upsertIncident: (incident) =>
     set((state) => {
       const key = incident.id ?? incident.recon_row_id ?? String(Date.now())
+      const existing = state.incidents.get(key)
+      if (existing) {
+        const newHyps = incident.hypotheses_tested?.length ?? 0
+        const oldHyps = existing.hypotheses_tested?.length ?? 0
+        const newConf = incident.confidence ?? 0
+        const oldConf = existing.confidence ?? 0
+        // Skip update if incoming data has no improvements over stored data
+        if (newHyps <= oldHyps && newConf <= oldConf && incident.status === existing.status) {
+          return state
+        }
+      }
       const next = new Map(state.incidents)
       next.set(key, incident)
       return { incidents: next }

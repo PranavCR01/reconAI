@@ -201,7 +201,7 @@ export default function RunSummary() {
 
         {/* Stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', borderRadius: 8, border: '1px solid var(--line)', overflow: 'hidden', background: 'var(--bg-1)', marginBottom: 20 }}>
-          <StatCell label="Rows Scanned" value={run.total_rows_checked} />
+          <StatCell label="Rows Scanned" value={data.rows_scanned ?? run.total_rows_checked ?? 0} />
           <StatCell label="Resolved" value={resolvedCount} color="var(--ok)" />
           <StatCell label="Needs Review" value={needsReview} color="var(--warn)" />
           <StatCell label="P1 Critical" value={p1Count} color="var(--p1)" />

@@ -295,6 +295,18 @@ class SupabaseAdapter(StorageAdapter):
     # Tracking methods
     # -----------------------------------------------------------------------
 
+    async def get_resolution_for_incident(self, incident_id: str) -> Resolution | None:
+        result = await self._run(
+            lambda: self._client.table("resolutions")
+            .select("*")
+            .eq("incident_id", incident_id)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return Resolution.model_validate(result.data[0])
+
     async def insert_page_view(self, data: dict) -> None:
         await self._run(
             lambda: self._client.table("page_views").insert(data).execute()

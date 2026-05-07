@@ -502,6 +502,7 @@ async def get_run(run_id: str, storage: StorageDep):
         "run": run.model_dump(mode="json"),
         "incidents": incidents_out,
         "total_incidents": len(incidents),
+        "rows_scanned": len(rows),
         "needs_review": sum(1 for i in incidents if i.requires_human_review),
     }
 
@@ -535,10 +536,12 @@ async def get_incident(incident_id: str, storage: StorageDep):
         raise HTTPException(status_code=404, detail="Incident not found")
 
     evidence = await storage.get_evidence_for_incident(incident_id)
+    resolution = await storage.get_resolution_for_incident(incident_id)
 
     return {
         **incident.model_dump(mode="json"),
         "evidence": [e.model_dump(mode="json") for e in evidence],
+        "resolution": resolution.model_dump(mode="json") if resolution else None,
     }
 
 

@@ -160,11 +160,11 @@ export default function IncidentDetail() {
     try {
       const body: ResolveRequest = {
         confirmed_root_cause: formRoot,
-        fix_applied: formFix,
         fix_type: formFixType,
+        fix_applied: formFix || "",
         ai_was_correct: formAiCorrect,
         resolved_by: formResolvedBy,
-        correction_notes: formNotes || undefined,
+        correction_notes: formNotes || "",
       }
       await resolveIncident(incidentId, body)
       const now = new Date().toISOString()

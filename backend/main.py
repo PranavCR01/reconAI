@@ -547,7 +547,7 @@ async def get_incident(incident_id: str, storage: StorageDep):
 
 class ResolveRequest(BaseModel):
     confirmed_root_cause: str
-    fix_applied: str
+    fix_applied: str = ""
     fix_type: FixType
     fix_verified: bool = False
     resolved_by: str

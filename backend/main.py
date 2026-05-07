@@ -406,10 +406,11 @@ async def stream_run_analysis(
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
-    # If incidents already exist for this run, stream them without re-analyzing.
-    # This prevents re-triggering the full analysis pipeline on every SSE reconnect.
+    # If ALL rows already have incidents, stream them without re-analyzing.
+    # Partial completion (len < len(rows)) means a prior run was interrupted —
+    # fall through to re-analyze so the missing rows get processed.
     existing_incidents = await storage.get_incidents_for_run(run_id)
-    if existing_incidents:
+    if existing_incidents and len(existing_incidents) >= len(rows):
         row_map = {str(r.id): r for r in rows}
 
         async def _stream_existing():

@@ -11,7 +11,7 @@ import { EvidenceChip } from '@/components/ui/EvidenceChip'
 import { Panel } from '@/components/ui/Panel'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import type { SegOption } from '@/components/ui/SegmentedControl'
-import { useReconStore } from '@/store/reconStore'
+import { useReconStore, updateRunInHistory } from '@/store/reconStore'
 import { connectToRun } from '@/lib/sse'
 import { getRunIncidents } from '@/lib/api'
 import { fmtLatency, fmtTokens, fmtCurrency } from '@/lib/format'
@@ -135,6 +135,7 @@ export default function LiveAnalysis() {
         setIsDone(true)
         setTotalRows(e.total_rows)
         sseCleanupRef.current = null
+        if (runId) updateRunInHistory(runId, { status: 'complete' })
         // Enrich store incidents with real token/tool-call data from the API
         if (runId) {
           try {
@@ -179,7 +180,7 @@ export default function LiveAnalysis() {
   const totalToolCalls = allIncidents.reduce((s, i) => s + i.total_tool_calls, 0)
   const avgTokensPerIncident = total > 0 ? Math.round(totalTokens / total) : 0
   const avgToolCalls = total > 0 ? (totalToolCalls / total).toFixed(1) : '—'
-  const cacheHitPct = total > 0 ? Math.round((cacheHits / total) * 100) : null
+  const cacheHitPct = total > 0 ? Math.min(100, Math.round((cacheHits / total) * 100)) : null
   const approxSpend = totalTokens * 0.000003
 
   const topObjects = useMemo(() => {

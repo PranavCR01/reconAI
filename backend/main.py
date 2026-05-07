@@ -1050,15 +1050,48 @@ async def track_page_view(body: PageViewRequest, storage: StorageDep):
 
 @app.post("/api/v1/track/demo-request", status_code=200)
 async def track_demo_request(body: DemoRequestPayload, storage: StorageDep):
+    name = body.full_name
+    email = body.work_email
+    company = body.company or None
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Supabase insert — columns: id, name, email, company, requested_at, code_sent, notes
     try:
-        await storage.insert_demo_request({
-            "full_name": body.full_name,
-            "work_email": body.work_email,
-            "company": body.company or None,
-            "session_id": body.session_id,
-            "referrer": body.referrer or None,
-            "submitted_at": datetime.now(timezone.utc).isoformat(),
+        result = await storage.insert_demo_request({
+            "name": name,
+            "email": email,
+            "company": company,
+            "requested_at": now,
         })
+        print(f"Demo request insert OK: {result}", flush=True)
     except Exception as exc:
+        print(f"Demo request insert FAILED: {exc}", flush=True)
         sentry_sdk.capture_exception(exc)
+
+    # Email notification via Resend
+    try:
+        import resend as _resend
+        _resend.api_key = os.getenv("RESEND_API_KEY", "")
+        notify_to = os.getenv("NOTIFY_EMAIL", "")
+        if _resend.api_key and notify_to:
+            await asyncio.to_thread(
+                _resend.Emails.send,
+                {
+                    "from": "ReconAI <reconai@resend.dev>",
+                    "to": [notify_to],
+                    "subject": f"ReconAI demo request: {name}",
+                    "html": (
+                        f"<h2>New demo request</h2>"
+                        f"<p><b>Name:</b> {name}</p>"
+                        f"<p><b>Email:</b> {email}</p>"
+                        f"<p><b>Company:</b> {company or 'Not provided'}</p>"
+                        f"<p><b>Time:</b> {now}</p>"
+                    ),
+                },
+            )
+            print(f"Resend notification sent to {notify_to}", flush=True)
+    except Exception as exc:
+        print(f"Resend notification FAILED: {exc}", flush=True)
+        sentry_sdk.capture_exception(exc)
+
     return {"ok": True}

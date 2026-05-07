@@ -96,15 +96,12 @@ export default function LiveAnalysis() {
   const store = useReconStore()
   const [tab, setTab] = useState('all')
   const [sevFilter, setSevFilter] = useState<Severity | 'all'>('all')
-  const [startTime] = useState(() => Date.now())
-  const [elapsed, setElapsed] = useState(0)
   const [isDone, setIsDone] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [sseError, setSseError] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
   const [totalRows, setTotalRows] = useState(0)
   const [cacheHits, setCacheHits] = useState(0)
-  const [analyzedCount, setAnalyzedCount] = useState(0)
   const [expectedRows, setExpectedRows] = useState(0)
   const [apiStats, setApiStats] = useState<{ avgTokens: number; totalCalls: number; avgLatencyMs: number; count: number } | null>(null)
   const sseCleanupRef = useRef<(() => void) | null>(null)
@@ -118,11 +115,6 @@ export default function LiveAnalysis() {
     store.setSseConnected(false)
     setIsPaused(true)
   }, [store])
-
-  useEffect(() => {
-    const id = setInterval(() => setElapsed(Date.now() - startTime), 1000)
-    return () => clearInterval(id)
-  }, [startTime])
 
   useEffect(() => {
     if (!runId) return
@@ -140,7 +132,6 @@ export default function LiveAnalysis() {
         store.setSseConnected(true)
         store.setRunStatus('streaming')
         if (e.cached) setCacheHits(n => n + 1)
-        if (e.root_cause_summary) setAnalyzedCount(n => n + 1)
       },
       onDone: async (e) => {
         store.setRunStatus('complete')
@@ -195,7 +186,8 @@ export default function LiveAnalysis() {
   // resolvedCount: only 'complete' (not needs_review) — used for Resolved stat cell and tab
   const resolvedCount = allIncidents.filter(i => i.status === 'complete').length
   const needsReviewCount = allIncidents.filter(i => i.requires_human_review === true).length
-  const analyzingCount = Math.max(0, (expectedRows || totalRows) - analyzedCount)
+  const completedCount = allIncidents.filter(i => i.status !== 'running').length
+  const analyzingCount = Math.max(0, (expectedRows || totalRows) - completedCount)
   const cacheHitPct = total > 0 ? Math.min(100, Math.round((cacheHits / total) * 100)) : null
 
   // Stats sourced from API response after done — reliable since SSE carries zero for these
@@ -205,9 +197,6 @@ export default function LiveAnalysis() {
   const displayAvgLatencyMs = apiStats?.avgLatencyMs ?? 0
   const displayAvgCalls = displayCount > 0 ? (displayTotalCalls / displayCount).toFixed(1) : '—'
   const displayApproxSpend = displayAvgTokens > 0 ? displayAvgTokens * displayCount * 0.000003 : 0
-
-  // Progress bar denominator: use SSE done event total when known, else Map size
-  const progressTotal = totalRows || total
 
   const topObjects = useMemo(() => {
     const counts = new Map<string, number>()
@@ -219,11 +208,6 @@ export default function LiveAnalysis() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
   }, [allIncidents])
-  const elapsedSec = Math.floor(elapsed / 1000)
-  const etaStr = progressTotal > 0 && analyzedCount < progressTotal
-    ? `~${Math.max(0, Math.round((progressTotal - analyzedCount) * elapsedSec / Math.max(analyzedCount, 1)))}s`
-    : progressTotal > 0 ? 'Done' : '…'
-
   const tabOptions: SegOption[] = [
     { value: 'all', label: 'All', sub: String(total) },
     { value: 'review', label: 'Needs Review', sub: String(needsReviewCount) },
@@ -250,21 +234,18 @@ export default function LiveAnalysis() {
         }
         right={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {store.sseConnected && !isPaused && (
+            {!isDone && store.sseConnected && !isPaused && (
               <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ok)' }}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--ok)', animation: 'blink-dot 1.2s ease-in-out infinite' }} />
                 LIVE
               </span>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px', background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 6 }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-2)' }}>
-                {analyzedCount}/{progressTotal || '?'} analyzed
+            {isDone && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ok)' }}>
+                ✓ {totalRows} rows analyzed
+                <span style={{ color: 'var(--fg-3)' }}>· ETA Done</span>
               </span>
-              <div style={{ width: 80, height: 4, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: progressTotal > 0 ? `${Math.round((analyzedCount / progressTotal) * 100)}%` : '0%', background: 'var(--ok)', borderRadius: 2, transition: 'width 0.4s' }} />
-              </div>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>ETA {etaStr}</span>
-            </div>
+            )}
             {store.sseConnected && !isPaused && (
               <button
                 onClick={handleStop}

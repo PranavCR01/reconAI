@@ -12,13 +12,6 @@ import type { SegOption } from '@/components/ui/SegmentedControl'
 
 // ---- access gate ------------------------------------------------------------
 
-const PERSONAL_DOMAINS = new Set(['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'live.com', 'me.com'])
-
-function isPersonalEmail(email: string): boolean {
-  const domain = email.split('@')[1]?.toLowerCase() ?? ''
-  return PERSONAL_DOMAINS.has(domain)
-}
-
 function LockIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
@@ -55,7 +48,6 @@ function AccessGate({ onAccess }: { onAccess: () => void }) {
     if (!fullName.trim()) { setFormError('Full name is required'); return }
     if (!workEmail.trim()) { setFormError('Work email is required'); return }
     if (!workEmail.includes('@')) { setFormError('Enter a valid email address'); return }
-    if (isPersonalEmail(workEmail)) { setFormError('Please use a work email address'); return }
     setSubmitting(true)
     try {
       await trackDemoRequest({ full_name: fullName.trim(), work_email: workEmail.trim(), company: company.trim() || undefined })
@@ -151,12 +143,12 @@ function AccessGate({ onAccess }: { onAccess: () => void }) {
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--fg-2)', marginBottom: 6 }}>
-                  Work email <span style={{ color: 'var(--p1)' }}>*</span>
+                  Email <span style={{ color: 'var(--p1)' }}>*</span>
                 </label>
                 <input
                   style={inputStyle}
                   type="email"
-                  placeholder="j.smith@company.com"
+                  placeholder="Your email"
                   value={workEmail}
                   onChange={e => setWorkEmail(e.target.value)}
                   autoComplete="email"

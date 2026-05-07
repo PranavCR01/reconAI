@@ -14,7 +14,7 @@ import os
 
 import sentry_sdk
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -394,6 +394,7 @@ async def stream_run_analysis(
     run_id: str,
     storage: StorageDep,
     llm_config: str = Query(default=""),
+    last_event_id: Optional[str] = Header(default=None, alias="last-event-id"),
 ):
     rows = await storage.get_recon_rows_for_run(run_id)
 
@@ -406,6 +407,15 @@ async def stream_run_analysis(
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
+    # Resolve cutoff timestamp from Last-Event-ID so reconnects skip already-sent incidents.
+    cutoff_dt = None
+    if last_event_id:
+        try:
+            last_inc = await storage.get_incident_by_id(last_event_id)
+            cutoff_dt = last_inc.created_at
+        except Exception:
+            pass  # unknown id — stream everything
+
     # If ALL rows already have incidents, stream them without re-analyzing.
     # Partial completion (len < len(rows)) means a prior run was interrupted —
     # fall through to re-analyze so the missing rows get processed.
@@ -415,6 +425,8 @@ async def stream_run_analysis(
 
         async def _stream_existing():
             for i, incident in enumerate(existing_incidents):
+                if cutoff_dt and incident.created_at and incident.created_at <= cutoff_dt:
+                    continue
                 row = row_map.get(str(incident.recon_row_id))
                 payload = {
                     "row_index": i,
@@ -430,6 +442,7 @@ async def stream_run_analysis(
                     "jira_summary": incident.jira_summary,
                     "llm_model": incident.llm_model,
                 }
+                yield f"id: {incident.id}\n"
                 yield f"event: incident\ndata: {json.dumps(payload)}\n\n"
             yield f"event: done\ndata: {json.dumps({'total_rows': len(existing_incidents)})}\n\n"
 
@@ -451,6 +464,8 @@ async def stream_run_analysis(
                     yield f"event: error\ndata: {json.dumps(payload)}\n\n"
                     continue
                 incident: RCAIncident = result["incident"]
+                if cutoff_dt and incident.created_at and incident.created_at <= cutoff_dt:
+                    continue
                 payload = {
                     "row_index": i,
                     "row_id": str(row.id),
@@ -465,6 +480,7 @@ async def stream_run_analysis(
                     "jira_summary": incident.jira_summary,
                     "llm_model": incident.llm_model,
                 }
+                yield f"id: {result['incident_id']}\n"
                 yield f"event: incident\ndata: {json.dumps(payload)}\n\n"
             except Exception as exc:
                 payload = {"row_index": i, "row_id": str(row.id), "error": str(exc)}

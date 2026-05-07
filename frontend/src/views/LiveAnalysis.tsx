@@ -99,13 +99,11 @@ export default function LiveAnalysis() {
   const [isDone, setIsDone] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [sseError, setSseError] = useState(false)
-  const [retryKey, setRetryKey] = useState(0)
   const [totalRows, setTotalRows] = useState(0)
   const [cacheHits, setCacheHits] = useState(0)
   const [expectedRows, setExpectedRows] = useState(0)
   const [apiStats, setApiStats] = useState<{ avgTokens: number; totalCalls: number; avgLatencyMs: number; count: number } | null>(null)
   const sseCleanupRef = useRef<(() => void) | null>(null)
-  const sseOpenedRef = useRef(false)
 
   const handleStop = useCallback(() => {
     if (sseCleanupRef.current) {
@@ -123,8 +121,6 @@ export default function LiveAnalysis() {
 
   useEffect(() => {
     if (!runId) return
-    if (sseOpenedRef.current) return
-    sseOpenedRef.current = true
     store.setRunId(runId)
     const cleanup = connectToRun(runId, {
       onIncident: (e) => {
@@ -173,10 +169,9 @@ export default function LiveAnalysis() {
     return () => {
       cleanup()
       sseCleanupRef.current = null
-      sseOpenedRef.current = false
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runId, retryKey])
+  }, [runId])
 
   const allIncidents = store.getIncidentsSorted()
   const total = allIncidents.length
@@ -281,7 +276,7 @@ export default function LiveAnalysis() {
           </svg>
           Analysis interrupted — the service may be temporarily unavailable. Your partial results are shown above.
           <button
-            onClick={() => { setSseError(false); setRetryKey(k => k + 1) }}
+            onClick={() => setSseError(false)}
             style={{
               marginLeft: 'auto',
               height: 26, padding: '0 12px', borderRadius: 5,

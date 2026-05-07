@@ -51,10 +51,11 @@ function AccessGate({ onAccess }: { onAccess: () => void }) {
     setSubmitting(true)
     try {
       await trackDemoRequest({ full_name: fullName.trim(), work_email: workEmail.trim(), company: company.trim() || undefined })
-      setSubmitted(true)
     } catch {
-      setFormError('Failed to submit. Please try again.')
+      // tracking failure — fail open, user request is still acknowledged
     } finally {
+      localStorage.setItem('recon_request_submitted', 'true')
+      setSubmitted(true)
       setSubmitting(false)
     }
   }
@@ -124,8 +125,8 @@ function AccessGate({ onAccess }: { onAccess: () => void }) {
               padding: '16px 18px',
               textAlign: 'center',
             }}>
-              <div style={{ fontSize: 13, color: 'var(--ok)', fontWeight: 600, marginBottom: 4 }}>Request submitted</div>
-              <div style={{ fontSize: 12, color: 'var(--fg-2)' }}>We'll reach out to {workEmail} shortly.</div>
+              <div style={{ fontSize: 13, color: 'var(--ok)', fontWeight: 600, marginBottom: 4 }}>Request received!</div>
+              <div style={{ fontSize: 12, color: 'var(--fg-2)' }}>We'll be in touch with your access code within 24 hours.</div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

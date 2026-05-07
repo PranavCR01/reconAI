@@ -1033,26 +1033,32 @@ class DemoRequestPayload(BaseModel):
     referrer: str = ""
 
 
-@app.post("/api/v1/track/pageview", status_code=201)
+@app.post("/api/v1/track/pageview", status_code=200)
 async def track_page_view(body: PageViewRequest, storage: StorageDep):
-    await storage.insert_page_view({
-        "page": body.page,
-        "session_id": body.session_id,
-        "referrer": body.referrer or None,
-        "user_agent": body.user_agent or None,
-        "recorded_at": datetime.now(timezone.utc).isoformat(),
-    })
+    try:
+        await storage.insert_page_view({
+            "page": body.page,
+            "session_id": body.session_id,
+            "referrer": body.referrer or None,
+            "user_agent": body.user_agent or None,
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as exc:
+        sentry_sdk.capture_exception(exc)
     return {"ok": True}
 
 
-@app.post("/api/v1/track/demo-request", status_code=201)
+@app.post("/api/v1/track/demo-request", status_code=200)
 async def track_demo_request(body: DemoRequestPayload, storage: StorageDep):
-    await storage.insert_demo_request({
-        "full_name": body.full_name,
-        "work_email": body.work_email,
-        "company": body.company or None,
-        "session_id": body.session_id,
-        "referrer": body.referrer or None,
-        "submitted_at": datetime.now(timezone.utc).isoformat(),
-    })
+    try:
+        await storage.insert_demo_request({
+            "full_name": body.full_name,
+            "work_email": body.work_email,
+            "company": body.company or None,
+            "session_id": body.session_id,
+            "referrer": body.referrer or None,
+            "submitted_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as exc:
+        sentry_sdk.capture_exception(exc)
     return {"ok": True}

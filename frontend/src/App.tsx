@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom'
-import { Suspense, lazy, useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { Shell } from '@/components/layout/Shell'
 import { trackPageView } from '@/lib/api'
 
@@ -16,24 +16,28 @@ const _API = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api/v1'
 function HealthBanner() {
   const [down, setDown] = useState(false)
   const [dismissed, setDismissed] = useState(false)
+  const consecutiveFailures = useRef(0)
 
   useEffect(() => {
     async function check() {
       try {
-        const res = await fetch(`${_API}/health`, { signal: AbortSignal.timeout(5000) })
+        const res = await fetch(`${_API}/health`, { signal: AbortSignal.timeout(20000) })
         if (res.ok) {
+          consecutiveFailures.current = 0
           setDown(false)
           setDismissed(false)
         } else {
-          setDown(true)
+          consecutiveFailures.current += 1
+          if (consecutiveFailures.current >= 2) setDown(true)
         }
       } catch {
-        setDown(true)
+        consecutiveFailures.current += 1
+        if (consecutiveFailures.current >= 2) setDown(true)
       }
     }
-    check()
-    const id = setInterval(check, 60_000)
-    return () => clearInterval(id)
+    const initialTimer = setTimeout(check, 10_000)
+    const id = setInterval(check, 90_000)
+    return () => { clearTimeout(initialTimer); clearInterval(id) }
   }, [])
 
   if (!down || dismissed) return null

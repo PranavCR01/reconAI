@@ -76,17 +76,25 @@ export default function Analytics() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  function fetchWithRetry<T>(fn: () => Promise<T>, retries = 2, delay = 3000): Promise<T> {
+    return fn().catch((e) =>
+      retries > 0
+        ? new Promise(r => setTimeout(r, delay)).then(() => fetchWithRetry(fn, retries - 1, delay))
+        : Promise.reject(e)
+    )
+  }
+
   useEffect(() => {
     setLoading(true)
     setError(null)
     const weeks = Math.ceil(days / 7)
     Promise.all([
-      getAnalyticsSummary(days),
-      getIncidentsOverTime(days),
-      getByObject(days),
-      getRootCauseDistribution(days),
-      getDeploymentCorrelation(days),
-      getAIAccuracy(weeks),
+      fetchWithRetry(() => getAnalyticsSummary(days)),
+      fetchWithRetry(() => getIncidentsOverTime(days)),
+      fetchWithRetry(() => getByObject(days)),
+      fetchWithRetry(() => getRootCauseDistribution(days)),
+      fetchWithRetry(() => getDeploymentCorrelation(days)),
+      fetchWithRetry(() => getAIAccuracy(weeks)),
     ])
       .then(([s, ot, bo, rc, dc, ai]) => {
         setSummary(s)

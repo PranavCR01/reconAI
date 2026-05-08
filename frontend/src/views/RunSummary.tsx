@@ -88,10 +88,18 @@ export default function RunSummary() {
   const [benchmark] = useState<BenchmarkResponse | null>(null)
   const [jiraModalOpen, setJiraModalOpen] = useState(false)
 
+  function fetchWithRetry<T>(fn: () => Promise<T>, retries = 2, delay = 3000): Promise<T> {
+    return fn().catch((e) =>
+      retries > 0
+        ? new Promise(r => setTimeout(r, delay)).then(() => fetchWithRetry(fn, retries - 1, delay))
+        : Promise.reject(e)
+    )
+  }
+
   useEffect(() => {
     if (!runId) return
     setLoading(true)
-    getRun(runId)
+    fetchWithRetry(() => getRun(runId))
       .then(d => { setData(d); setLoading(false) })
       .catch(e => { setError(String(e)); setLoading(false) })
     getRecallMetrics()
@@ -130,7 +138,15 @@ export default function RunSummary() {
       <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
         <TopBar center={<Breadcrumbs crumbs={[{ label: 'Runs' }, { label: 'Error' }]} />} />
         <div style={{ maxWidth: 1320, margin: '0 auto', padding: '40px 24px', textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--p1)' }}>
-          {error ?? 'Run not found'}
+          <div>
+            <div style={{ marginBottom: 12 }}>Unable to load run data. The server may be warming up.</div>
+            <button
+              onClick={() => { setError(null); setLoading(true); fetchWithRetry(() => getRun(runId!)).then(d => { setData(d); setLoading(false) }).catch(e => { setError(String(e)); setLoading(false) }) }}
+              style={{ fontFamily: 'var(--mono)', fontSize: 12, background: 'var(--bg-2)', border: '1px solid var(--line)', color: 'var(--fg-1)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer' }}
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </div>
     )

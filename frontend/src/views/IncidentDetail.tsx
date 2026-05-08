@@ -128,10 +128,18 @@ export default function IncidentDetail() {
   const [formNotes, setFormNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  function fetchWithRetry<T>(fn: () => Promise<T>, retries = 2, delay = 3000): Promise<T> {
+    return fn().catch((e) =>
+      retries > 0
+        ? new Promise(r => setTimeout(r, delay)).then(() => fetchWithRetry(fn, retries - 1, delay))
+        : Promise.reject(e)
+    )
+  }
+
   useEffect(() => {
     if (!incidentId) return
     setLoading(true)
-    getIncident(incidentId)
+    fetchWithRetry(() => getIncident(incidentId))
       .then(data => {
         setIncident(data)
         if (data.resolution) {
@@ -221,7 +229,15 @@ export default function IncidentDetail() {
       <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
         <TopBar center={<Breadcrumbs crumbs={[{ label: 'Live Analysis', to: runId ? `/runs/${runId}` : '/' }, { label: 'Error' }]} />} />
         <div style={{ maxWidth: 1320, margin: '0 auto', padding: '40px 24px', textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--p1)' }}>
-          {error ?? 'Incident not found'}
+          <div>
+            <div style={{ marginBottom: 12 }}>Unable to load incident data. The server may be warming up.</div>
+            <button
+              onClick={() => { setError(null); setLoading(true); fetchWithRetry(() => getIncident(incidentId!)).then(data => { setIncident(data); if (data.resolution) { setResolvedAt(data.resolution.resolved_at) } else { setFormRoot(data.root_cause_summary ?? '') } setLoading(false) }).catch(e => { setError(String(e)); setLoading(false) }) }}
+              style={{ fontFamily: 'var(--mono)', fontSize: 12, background: 'var(--bg-2)', border: '1px solid var(--line)', color: 'var(--fg-1)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer' }}
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </div>
     )

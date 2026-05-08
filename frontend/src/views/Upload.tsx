@@ -36,6 +36,7 @@ function AccessGate({ onAccess }: { onAccess: () => void }) {
     const expected = (import.meta.env.VITE_DEMO_CODE as string | undefined) ?? 'reconai2025'
     if (code.trim() === expected) {
       localStorage.setItem('recon_access', 'granted')
+      localStorage.setItem('recon_session_id', crypto.randomUUID())
       onAccess()
     } else {
       setCodeError('Invalid access code')

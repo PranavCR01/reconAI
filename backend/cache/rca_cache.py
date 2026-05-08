@@ -8,8 +8,9 @@ from backend.models.entities import ReconRow
 _TTL_DAYS = 30
 
 
-def make_cache_key(row: ReconRow) -> str:
+def make_cache_key(row: ReconRow, session_id: str = "") -> str:
     parts = "|".join([
+        session_id,
         str(row.discrepancy_type.value) if row.discrepancy_type else "",
         row.sf_object or "",
         row.sf_field or "",

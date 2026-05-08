@@ -134,9 +134,9 @@ def _severity_sort_key(incident: RCAIncident, row_map: dict[str, ReconRow]) -> i
     return _SEVERITY_ORDER.get(row.severity, 3)
 
 
-async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool = False) -> dict:
+async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool = False, session_id: str = "") -> dict:
     """Full analysis pipeline for one row. Returns a result dict; never raises."""
-    cache_key = make_cache_key(row)
+    cache_key = make_cache_key(row, session_id)
     cached = None if bypass_cache else await check_cache(storage, cache_key)
 
     if cached:
@@ -401,6 +401,7 @@ async def stream_run_analysis(
     run_id: str,
     storage: StorageDep,
     llm_config: str = Query(default=""),
+    session_id: str = Query(default=""),
     bypass_cache: bool = Query(default=False),
     last_event_id: Optional[str] = Header(default=None, alias="last-event-id"),
 ):
@@ -471,7 +472,7 @@ async def stream_run_analysis(
     async def _generate():
         for i, row in enumerate(rows):
             try:
-                result = await _analyze_row(row, config, graph, storage, bypass_cache=bypass_cache)
+                result = await _analyze_row(row, config, graph, storage, bypass_cache=bypass_cache, session_id=session_id)
                 if result["error"]:
                     payload = {"row_index": i, "row_id": str(row.id), "error": result["error"]}
                     yield f"event: error\ndata: {json.dumps(payload)}\n\n"

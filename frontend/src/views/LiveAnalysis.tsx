@@ -120,6 +120,8 @@ export default function LiveAnalysis() {
     getRun(runId).then(data => setExpectedRows(data.rows_scanned)).catch(() => {})
   }, [runId])
 
+  const sessionId = localStorage.getItem('recon_session_id') ?? ''
+
   useEffect(() => {
     if (!runId) return
     store.setRunId(runId)
@@ -166,7 +168,7 @@ export default function LiveAnalysis() {
         store.setSseConnected(false)
         if (!isDone) setSseError(true)
       },
-    }, store.llmConfig)
+    }, store.llmConfig, sessionId)
     sseCleanupRef.current = cleanup
     return () => {
       cleanup()

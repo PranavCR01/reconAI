@@ -7,8 +7,8 @@ export interface SSEHandlers {
   onError: (event: SSEErrorEvent | Event) => void
 }
 
-export function connectToRun(runId: string, handlers: SSEHandlers, llmConfig?: LlmConfig, bypassCache?: boolean): () => void {
-  const url = getStreamUrl(runId, llmConfig, bypassCache)
+export function connectToRun(runId: string, handlers: SSEHandlers, llmConfig?: LlmConfig, sessionId?: string, bypassCache?: boolean): () => void {
+  const url = getStreamUrl(runId, llmConfig, bypassCache, sessionId)
   const es = new EventSource(url)
 
   es.addEventListener('incident', (e: MessageEvent) => {

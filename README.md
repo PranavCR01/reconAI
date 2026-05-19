@@ -26,7 +26,7 @@ AI-powered Salesforce FSC integration reconciliation and root cause analysis, re
 
 | | |
 |---|---|
-| Live Demo | https://recon-ai-iota.vercel.app |
+| App | https://recon-ai-iota.vercel.app |
 | Demo Video | https://youtu.be/cEzxQ1xfltU |
 | Research Notes | https://www.notion.so/ReconAI-Research-Architecture-Notes-358a47a2b4cf8000944fefad0ddf1349 |
 | Dev Journal | https://www.notion.so/ReconAI-Project-Arc-358a47a2b4cf8004a38bee6d50283911?source=copy_link |

@@ -112,11 +112,14 @@ class SupabaseAdapter(StorageAdapter):
             .execute()
         )
         # Python-level guard ensures cross-run incidents never leak through
-        return [
-            RCAIncident.model_validate(r)
-            for r in result.data
-            if r.get("recon_row_id") in row_ids
-        ]
+        seen = {}
+        for r in result.data:
+            if r.get("recon_row_id") not in row_ids:
+                continue
+            row_id = r["recon_row_id"]
+            if row_id not in seen or (r.get("created_at") or "") > (seen[row_id].get("created_at") or ""):
+                seen[row_id] = r
+        return [RCAIncident.model_validate(r) for r in seen.values()]
 
     async def get_incident_by_id(self, incident_id: str) -> RCAIncident:
         result = await self._run(

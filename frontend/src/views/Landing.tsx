@@ -451,6 +451,7 @@ export default function Landing() {
                 { label: '→ GitHub', href: 'https://github.com/PranavCR01' },
                 { label: '→ Research Notes', href: 'https://www.notion.so/ReconAI-Research-Architecture-Notes-358a47a2b4cf8000944fefad0ddf1349?source=copy_link' },
                 { label: '→ Dev Journal', href: 'https://www.notion.so/ReconAI-Project-Arc-358a47a2b4cf8004a38bee6d50283911?source=copy_link' },
+                { label: '→ Demo', href: 'https://www.youtube.com/watch?v=cEzxQ1xfltU' },
               ].map(({ label, href }) => (
                 <a
                   key={label}

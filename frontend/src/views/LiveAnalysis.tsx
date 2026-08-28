@@ -100,6 +100,7 @@ export default function LiveAnalysis() {
   const [isDone, setIsDone] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [sseError, setSseError] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
   const [totalRows, setTotalRows] = useState(0)
   const [cacheHits, setCacheHits] = useState(0)
   const [expectedRows, setExpectedRows] = useState(0)
@@ -125,57 +126,62 @@ export default function LiveAnalysis() {
   useEffect(() => {
     if (!runId) return
     store.setRunId(runId)
-    const cleanup = connectToRun(runId, {
-      onIncident: (e) => {
-        store.upsertIncident(sseToIncident(e))
-        store.setSseConnected(true)
-        store.setRunStatus('streaming')
-        if (e.cached) setCacheHits(n => n + 1)
-      },
-      onDone: async (e) => {
-        store.setRunStatus('complete')
-        store.setSseConnected(false)
-        setIsDone(true)
-        setTotalRows(e.total_rows)
-        sseCleanupRef.current = null
-        const p1Count = store.getIncidentsSorted().filter(i => i.severity === 'P1').length
-        if (runId) updateRunInHistory(runId, { status: 'complete', p1Count })
-        if (runId) {
-          try {
-            const { incidents: fresh } = await getRunIncidents(runId)
-            // Enrich store entries with hypothesis data from DB (not in SSE)
-            for (const inc of fresh) {
-              if (!inc.recon_row_id) continue
-              store.upsertIncident({ ...inc, sf_object: inc.sf_object, sf_field: inc.sf_field })
+    const timer = setTimeout(() => {
+      const cleanup = connectToRun(runId, {
+        onIncident: (e) => {
+          store.upsertIncident(sseToIncident(e))
+          store.setSseConnected(true)
+          store.setRunStatus('streaming')
+          if (e.cached) setCacheHits(n => n + 1)
+        },
+        onDone: async (e) => {
+          store.setRunStatus('complete')
+          store.setSseConnected(false)
+          setIsDone(true)
+          setTotalRows(e.total_rows)
+          sseCleanupRef.current = null
+          const p1Count = store.getIncidentsSorted().filter(i => i.severity === 'P1').length
+          if (runId) updateRunInHistory(runId, { status: 'complete', p1Count })
+          if (runId) {
+            try {
+              const { incidents: fresh } = await getRunIncidents(runId)
+              // Enrich store entries with hypothesis data from DB (not in SSE)
+              for (const inc of fresh) {
+                if (!inc.recon_row_id) continue
+                store.upsertIncident({ ...inc, sf_object: inc.sf_object, sf_field: inc.sf_field })
+              }
+              // Compute run stats directly from API response — do not rely on
+              // the Map merge since SSE events carry zero for tokens/latency.
+              const n = fresh.length
+              if (n > 0) {
+                setApiStats({
+                  avgTokens: Math.round(fresh.reduce((s, i) => s + (i.total_tokens_used ?? 0), 0) / n),
+                  totalCalls: fresh.reduce((s, i) => s + (i.total_tool_calls ?? 0), 0),
+                  avgLatencyMs: fresh.reduce((s, i) => s + (i.latency_ms ?? 0), 0) / n,
+                  count: n,
+                })
+              }
+            } catch {
+              // non-fatal; stats stay at 0 rather than crashing
             }
-            // Compute run stats directly from API response — do not rely on
-            // the Map merge since SSE events carry zero for tokens/latency.
-            const n = fresh.length
-            if (n > 0) {
-              setApiStats({
-                avgTokens: Math.round(fresh.reduce((s, i) => s + (i.total_tokens_used ?? 0), 0) / n),
-                totalCalls: fresh.reduce((s, i) => s + (i.total_tool_calls ?? 0), 0),
-                avgLatencyMs: fresh.reduce((s, i) => s + (i.latency_ms ?? 0), 0) / n,
-                count: n,
-              })
-            }
-          } catch {
-            // non-fatal; stats stay at 0 rather than crashing
           }
-        }
-      },
-      onError: () => {
-        store.setSseConnected(false)
-        if (!isDone) setSseError(true)
-      },
-    }, store.llmConfig, sessionId)
-    sseCleanupRef.current = cleanup
+        },
+        onError: () => {
+          store.setSseConnected(false)
+          if (!isDone) setSseError(true)
+        },
+      }, store.llmConfig, sessionId)
+      sseCleanupRef.current = cleanup
+    }, 5000)
     return () => {
-      cleanup()
-      sseCleanupRef.current = null
+      clearTimeout(timer)
+      if (sseCleanupRef.current) {
+        sseCleanupRef.current()
+        sseCleanupRef.current = null
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runId])
+  }, [runId, retryKey])
 
   const allIncidents = store.getIncidentsSorted()
   const total = allIncidents.length
@@ -280,7 +286,7 @@ export default function LiveAnalysis() {
           </svg>
           Analysis interrupted — the service may be temporarily unavailable. Your partial results are shown above.
           <button
-            onClick={() => setSseError(false)}
+            onClick={() => { setSseError(false); setRetryKey(k => k + 1) }}
             style={{
               marginLeft: 'auto',
               height: 26, padding: '0 12px', borderRadius: 5,

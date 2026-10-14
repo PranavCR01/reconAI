@@ -63,10 +63,10 @@ Upload CSV
 Ingestion Agent  ──── classifies discrepancy type and severity (Claude Haiku)
     │
     ▼
-Hypothesis Agent ──── walks graph, decides next hypothesis (Claude Sonnet)
+Hypothesis Agent ──── walks graph, decides next hypothesis (deterministic, no LLM)
     │
     ▼
-Evidence Agent   ──── executes tool calls, returns cited EvidenceResult (Claude Sonnet)
+Evidence Agent   ──── executes tool calls, returns cited EvidenceResult (deterministic, no LLM)
     │
     ▼
 Synthesis Agent  ──── assembles RCA from complete state (Claude Sonnet)
@@ -104,7 +104,7 @@ Early termination applies throughout: a NULL_DOWNSTREAM incident with a confirme
 
 Embeddings are generated with OpenAI `text-embedding-3-small` at 1536 dimensions. The `recon_artifacts` table in Supabase holds 23 FSC seed artifacts covering the known failure pattern library, indexed with a pgvector HNSW index for approximate nearest-neighbor retrieval.
 
-Retrieval uses a hybrid approach: a Postgres pre-filter narrows candidates by `discrepancy_type`, an ANN search over the HNSW index ranks by cosine similarity, and Claude Sonnet reranks the top results before synthesis. Artifacts ingested within the last six hours are treated as ground truth and weighted accordingly.
+Retrieval uses a hybrid approach: a Postgres pre-filter narrows candidates by `discrepancy_type`, an ANN search over the HNSW index ranks by cosine similarity, and Claude Haiku reranks the top results before synthesis. Artifacts ingested within the last six hours are treated as ground truth and weighted accordingly.
 
 When a human analyst confirms a resolution, that incident and its fix are embedded and written back to the artifact store, closing the memory loop.
 
@@ -250,8 +250,8 @@ reconAI/
 ├── backend/
 │   ├── agents/
 │   │   ├── ingestion.py          # discrepancy classification, Claude Haiku, no tool calls
-│   │   ├── hypothesis.py         # graph traversal and routing, Claude Sonnet
-│   │   ├── evidence.py           # all tool call execution, Claude Sonnet
+│   │   ├── hypothesis.py         # graph traversal and routing, deterministic (no LLM)
+│   │   ├── evidence.py           # all tool call execution, deterministic (no LLM)
 │   │   └── synthesis.py          # RCA assembly from complete state, Claude Sonnet
 │   ├── tools/
 │   │   ├── salesforce_sim.py     # FieldPermissions, CDC config, Apex trigger metadata

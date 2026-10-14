@@ -8,6 +8,7 @@ load_dotenv()
 
 class AgentConfig(BaseModel):
     ingestion_llm: str = "claude-haiku-4-5-20251001"
+    # hypothesis_llm / evidence_llm are reserved: both agents are deterministic and make no LLM calls.
     hypothesis_llm: str = "claude-sonnet-4-6"
     evidence_llm: str = "claude-sonnet-4-6"
     reranker_llm: str = "claude-haiku-4-5-20251001"

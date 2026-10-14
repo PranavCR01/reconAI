@@ -188,7 +188,7 @@ export interface RunHistoryEntry {
   environment: 'PROD' | 'UAT'
   sfOrgId: string
   rowCount: number
-  status: 'pending' | 'running' | 'complete' | 'error'
+  status: 'pending' | 'running' | 'complete' | 'error' | 'interrupted'
   integrationName?: string
   p1Count?: number
 }

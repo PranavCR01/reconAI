@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { RCAIncident, LlmConfig, Environment, RunStatus, RunHistoryEntry } from '@/types'
+import { getRun } from '@/lib/api'
 
 interface RunStats {
   total: number
@@ -131,4 +132,28 @@ export function saveRunToHistory(entry: RunHistoryEntry): void {
 export function updateRunInHistory(runId: string, patch: Partial<RunHistoryEntry>): void {
   const history = getRunHistory().map((r) => (r.runId === runId ? { ...r, ...patch } : r))
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
+}
+
+// Analysis runs inside the SSE stream, so leaving LiveAnalysis before `done` stops it
+// and the local entry stays 'running' forever. Check unfinished entries against the
+// backend: every row has an incident → complete, otherwise → interrupted (reopen resumes).
+export async function reconcileRunHistory(): Promise<RunHistoryEntry[]> {
+  const unfinished = getRunHistory().filter((r) => r.status !== 'complete' && r.status !== 'error')
+  await Promise.all(
+    unfinished.map(async (r) => {
+      try {
+        const res = await getRun(r.runId)
+        const done = res.rows_scanned > 0 && res.total_incidents >= res.rows_scanned
+        updateRunInHistory(
+          r.runId,
+          done
+            ? { status: 'complete', p1Count: res.incidents.filter((i) => i.severity === 'P1').length }
+            : { status: 'interrupted' },
+        )
+      } catch {
+        // Backend unreachable or run deleted — leave the entry as is.
+      }
+    }),
+  )
+  return getRunHistory()
 }

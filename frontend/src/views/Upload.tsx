@@ -3,7 +3,7 @@ import type { DragEvent, ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Papa from 'papaparse'
 import { createRun } from '@/lib/api'
-import { useReconStore, getRunHistory, saveRunToHistory } from '@/store/reconStore'
+import { useReconStore, getRunHistory, saveRunToHistory, reconcileRunHistory } from '@/store/reconStore'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { fmtDate } from '@/lib/format'
@@ -38,6 +38,7 @@ const STATUS_VARIANT: Record<RunHistoryEntry['status'], 'queued' | 'analyzing' |
   running: 'analyzing',
   complete: 'ok',
   error: 'fail',
+  interrupted: 'queued',
 }
 
 // ---- shared inline-button style ---------------------------------------------
@@ -83,6 +84,7 @@ function UploadForm() {
   useEffect(() => {
     localStorage.setItem('recon_session_id', crypto.randomUUID())
     setHistory(getRunHistory())
+    reconcileRunHistory().then(setHistory)
   }, [])
 
   function parseFile(f: File) {
@@ -712,8 +714,7 @@ function UploadForm() {
           <button
             onClick={async () => {
               setRefreshing(true)
-              await new Promise(r => setTimeout(r, 400))
-              setHistory(getRunHistory())
+              setHistory(await reconcileRunHistory())
               setRefreshing(false)
             }}
             disabled={refreshing}
@@ -745,7 +746,7 @@ function UploadForm() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '2.4fr 1.2fr 0.8fr 1fr 0.8fr 1fr 0.6fr',
+            gridTemplateColumns: 'minmax(0,2.4fr) minmax(0,1.2fr) minmax(0,0.8fr) minmax(0,1fr) minmax(0,0.8fr) minmax(0,1.2fr) minmax(0,0.6fr)',
             alignItems: 'center',
             padding: '10px 18px',
             gap: 14,
@@ -794,7 +795,7 @@ function UploadForm() {
               onClick={() => navigate(`/runs/${run.runId}`)}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '2.4fr 1.2fr 0.8fr 1fr 0.8fr 1fr 0.6fr',
+                gridTemplateColumns: 'minmax(0,2.4fr) minmax(0,1.2fr) minmax(0,0.8fr) minmax(0,1fr) minmax(0,0.8fr) minmax(0,1.2fr) minmax(0,0.6fr)',
                 alignItems: 'center',
                 padding: '12px 18px',
                 gap: 14,
@@ -931,7 +932,10 @@ function UploadForm() {
 
               {/* Status */}
               <div>
-                <StatusPill variant={statusVariant} />
+                <StatusPill
+                  variant={statusVariant}
+                  label={run.status === 'interrupted' ? 'interrupted' : undefined}
+                />
               </div>
 
               {/* Action */}

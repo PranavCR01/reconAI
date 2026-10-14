@@ -1,4 +1,4 @@
-"""RAG tools: embedding, artifact retrieval, Haiku-based reranking, and recall@k evaluation.
+"""RAG tools: embedding, artifact retrieval, LLM reranking (Haiku by default), and recall@k evaluation.
 
 match_artifacts RPC — run once in Supabase SQL editor before testing:
 
@@ -58,6 +58,7 @@ import time
 
 import anthropic
 import openai
+import sentry_sdk
 
 from backend.config import AgentConfig
 
@@ -96,10 +97,14 @@ def rerank_candidates(
     candidates: list[dict],
     state: dict,
     config: AgentConfig,
-) -> list[dict]:
-    """Use Haiku to rerank RAG candidates by relevance to the current incident."""
+) -> tuple[list[dict], dict | None]:
+    """Use the reranker LLM to rerank RAG candidates by relevance to the current incident.
+
+    Returns (reranked, llm_call). llm_call is None when no LLM call was made.
+    On LLM failure, falls back to the original top-5 order and records the error.
+    """
     if not candidates:
-        return []
+        return [], None
 
     row = state.get("recon_row", {})
     context = (
@@ -120,6 +125,8 @@ def rerank_candidates(
     model = config.reranker_llm
     start = time.monotonic()
     raw = ""
+    input_tokens = output_tokens = 0
+    llm_call: dict = {"agent": "reranker", "model": model}
     try:
         if model.startswith("claude"):
             client = anthropic.Anthropic()
@@ -129,6 +136,8 @@ def rerank_candidates(
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = msg.content[0].text.strip()
+            input_tokens = msg.usage.input_tokens
+            output_tokens = msg.usage.output_tokens
         else:
             import groq as groq_sdk
             gclient = groq_sdk.Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
@@ -138,8 +147,26 @@ def rerank_candidates(
                 max_tokens=64,
             )
             raw = resp.choices[0].message.content.strip()
-    except Exception:
-        return candidates[:5]
+            if resp.usage:
+                input_tokens = resp.usage.prompt_tokens
+                output_tokens = resp.usage.completion_tokens
+    except Exception as exc:
+        # Fall back to retrieval order, but never silently: record + report the failure.
+        sentry_sdk.capture_exception(exc)
+        llm_call.update({
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "latency_ms": int((time.monotonic() - start) * 1000),
+            "error": f"{type(exc).__name__}: {exc}"[:300],
+            "fallback": "retrieval_order",
+        })
+        return candidates[:5], llm_call
+
+    llm_call.update({
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "latency_ms": int((time.monotonic() - start) * 1000),
+    })
 
     try:
         m = re.search(r"\[[\d,\s]+\]", raw)
@@ -157,7 +184,7 @@ def rerank_candidates(
         if i not in seen:
             reranked.append(c)
 
-    return reranked[:5]
+    return reranked[:5], llm_call
 
 
 # (query_text, expected_discrepancy_type)

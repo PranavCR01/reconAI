@@ -29,11 +29,16 @@ def build_graph(config: AgentConfig, storage):
 
     def _rag_retrieval(state: ReconState) -> dict:
         candidates = retrieve_similar_artifacts(state, storage)
-        reranked = rerank_candidates(candidates, state, config) if candidates else []
-        return {
+        reranked, llm_call = rerank_candidates(candidates, state, config)
+        out: dict = {
             "rag_candidates": candidates,
             "reranked_candidates": reranked,
         }
+        if llm_call:
+            # Non-negotiable #4: every LLM call is logged in state like the other agents.
+            out["llm_calls"] = (state.get("llm_calls") or []) + [llm_call]
+            out["total_latency_ms"] = (state.get("total_latency_ms") or 0) + llm_call["latency_ms"]
+        return out
 
     def _synthesis(state: ReconState) -> dict:
         # Non-negotiable #1: every tested hypothesis must have ≥1 evidence entry.

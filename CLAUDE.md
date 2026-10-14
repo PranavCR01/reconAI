@@ -54,11 +54,12 @@ reconai/
 
 ## Four Agents — Boundaries Are Hard
 - **Ingestion:** classify discrepancy type + severity. Haiku only. No tool calls.
-- **Hypothesis:** walk graph, decide next step. Sonnet. Routes to Evidence Agent.
-- **Evidence:** execute ALL tool calls. Sonnet. Returns cited EvidenceResult.
+- **Hypothesis:** walk graph, decide next step. Deterministic Python — no LLM call. Routes to Evidence Agent.
+- **Evidence:** execute ALL tool calls. Deterministic Python — no LLM call. Returns cited EvidenceResult.
 - **Synthesis:** assemble RCA from complete state. Sonnet. No tool calls.
 
 Hypothesis decides *what* to check. Evidence *executes* the check. Never merge these.
+LLM calls happen only in Ingestion (ambiguous classification), the RAG reranker, and Synthesis. Each appends a `{agent, model, input_tokens, output_tokens, latency_ms}` entry to `state.llm_calls`.
 
 ---
 

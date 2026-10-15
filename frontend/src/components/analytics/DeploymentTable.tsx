@@ -77,7 +77,7 @@ export function DeploymentTable({ data }: Props) {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['Deployment', 'Date', 'Incidents +24h', 'Most affected', 'Suspected root cause', 'Status'].map((h, i) => (
+              {['Deployment', 'Date', 'Incidents +24h', 'Most affected', 'Top discrepancy', 'Status'].map((h, i) => (
                 <th key={h} style={{
                   font: '600 10.5px var(--mono)', textTransform: 'uppercase', letterSpacing: '0.08em',
                   color: 'var(--fg-3)', textAlign: i === 2 ? 'right' : 'left',

@@ -371,7 +371,7 @@ export default function LiveAnalysis() {
                 </span>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>·</span>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-2)' }}>
-                  {resolvedCount} of {total || '…'} incidents streamed
+                  {total} of {expectedRows || '…'} incidents streamed
                 </span>
                 <button
                   onClick={() => navigate(`/runs/${runId}/summary`)}

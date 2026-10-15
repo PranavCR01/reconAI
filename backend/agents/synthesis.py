@@ -206,7 +206,9 @@ def run_synthesis(state: ReconState, config: AgentConfig) -> dict:
     suggested_fix = data.get("suggested_fix") or "Manual investigation required by on-call engineer."
     postmortem_draft = data.get("postmortem_draft") or ""
     jira_summary = data.get("jira_summary") or f"RCA: {root_cause[:80]}"
-    requires_human_review = confidence < 0.75 or api_unavailable
+    # Keep the hypothesis graph's review flag (exhausted paths, low graph confidence);
+    # the LLM's self-reported confidence can add review but never clear it.
+    requires_human_review = confidence < 0.75 or api_unavailable or bool(state.get("requires_human_review"))
 
     rca_output = RCAOutput(
         root_cause=root_cause,

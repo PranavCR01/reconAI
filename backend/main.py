@@ -134,6 +134,12 @@ def _severity_sort_key(incident: RCAIncident, row_map: dict[str, ReconRow]) -> i
     return _SEVERITY_ORDER.get(row.severity, 3)
 
 
+def _no_confirmed_hypothesis(tested: list[str] | None, ruled_out: list[str] | None) -> bool:
+    """True when the graph confirmed nothing: no hypotheses tested, or all of them ruled out."""
+    tested = tested or []
+    return not tested or set(tested) <= set(ruled_out or [])
+
+
 async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool = False, session_id: str = "") -> dict:
     """Full analysis pipeline for one row. Returns a result dict; never raises."""
     cache_key = make_cache_key(row, session_id)
@@ -142,7 +148,13 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
     if cached:
         rca = cached.get("rca_output") or {}
         confidence = float(rca.get("confidence", 0.5))
-        human_review = confidence < 0.75 or bool(rca.get("requires_human_review"))
+        # Cache entries written before the synthesis fix may carry a cleared flag for
+        # exhausted paths, so re-derive it from the stored hypotheses too.
+        human_review = (
+            confidence < 0.75
+            or bool(rca.get("requires_human_review"))
+            or _no_confirmed_hypothesis(rca.get("_hypotheses_tested"), rca.get("_hypotheses_ruled_out"))
+        )
         status = IncidentStatus.needs_review if human_review else IncidentStatus.complete
         incident = RCAIncident(
             recon_row_id=row.id,

@@ -107,6 +107,7 @@ LLM calls happen only in Ingestion (ambiguous classification), the RAG reranker,
 - SSE `_stream_existing` fires when `not bypass_cache and len(existing_incidents) >= len(rows)` — partial runs fall through to full re-analysis. Pass `?bypass_cache=true` to force fresh LangGraph run.
 - `updateRunInHistory(runId, { status: 'complete' })` called in SSE `onDone` — keeps localStorage run history in sync without page reload.
 - SSE async generators (`_generate`, `_stream_existing`): `await`/`yield` must be inside the generator body — a `yield` in the outer endpoint scope turns it into a generator, making `return StreamingResponse(...)` a SyntaxError.
+- Cost guards in `main.py` (public app, every row costs LLM calls): max 200 rows / 256 KB per upload (413); uploads 20/hour per IP, 300/day total; 5,000 analyzed rows/day total (uploads + `bypass_cache` re-runs + benchmarks); `bypass_cache` 5/hour per IP (SSE error event); benchmark 3/hour per IP (429). In-memory — resets on restart/deploy. Upload.tsx mirrors the 200-row cap and shows server errors inline.
 - `/recall` uses `_recall_cache` dict with 1hr TTL (not the old bare `_recall_metrics_cache`). Cold start takes 20s+; always serve from cache on subsequent requests.
 
 ---

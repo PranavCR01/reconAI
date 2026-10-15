@@ -5,6 +5,7 @@ import csv
 import io
 import json
 import time
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 import statistics
 from datetime import date, datetime, timedelta, timezone
@@ -14,7 +15,7 @@ import os
 
 import sentry_sdk
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -49,6 +50,56 @@ _RECALL_TTL = 3600  # 1 hour — recall@k is stable between artifact updates
 _REQUIRED_CSV_COLUMNS = {"sf_object", "sf_field", "sf_record_id", "db2_table", "db2_column"}
 
 _SEVERITY_ORDER = {Severity.P1: 0, Severity.P2: 1, Severity.P3: 2}
+
+# ---------------------------------------------------------------------------
+# Cost guards — the app is public and every analyzed row costs LLM/embedding calls.
+# In-memory: limits reset when the process restarts (fine for a single Render instance).
+# ---------------------------------------------------------------------------
+MAX_UPLOAD_ROWS = 200
+MAX_UPLOAD_BYTES = 256 * 1024
+UPLOADS_PER_IP_PER_HOUR = 20
+UPLOADS_PER_DAY = 300            # all clients combined
+ROWS_PER_DAY = 5000              # all clients combined — the real spend cap
+BYPASS_CACHE_PER_IP_PER_HOUR = 5
+BENCHMARKS_PER_IP_PER_HOUR = 3
+_HOUR, _DAY = 3600, 86400
+
+_rate_events: dict[str, deque] = defaultdict(deque)  # key -> deque[(timestamp, amount)]
+
+
+def _client_ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _retry_after(key: str, limit: int, window_s: int, amount: int = 1) -> int:
+    """Seconds until `amount` more fits under `limit` in the rolling window (0 = allowed now)."""
+    now = time.time()
+    q = _rate_events[key]
+    while q and q[0][0] <= now - window_s:
+        q.popleft()
+    used = sum(a for _, a in q)
+    if used + amount <= limit:
+        return 0
+    if amount > limit:
+        return window_s
+    for ts, a in q:  # oldest first: wait until enough expires
+        used -= a
+        if used + amount <= limit:
+            return max(1, int(ts + window_s - now) + 1)
+    return window_s
+
+
+def _record(key: str, amount: int = 1) -> None:
+    _rate_events[key].append((time.time(), amount))
+
+
+def _wait_text(seconds: int) -> str:
+    if seconds >= _HOUR:
+        return f"{round(seconds / _HOUR)} h"
+    return f"{max(1, round(seconds / 60))} min"
 
 
 @asynccontextmanager
@@ -300,6 +351,7 @@ async def health():
 
 @app.post("/api/v1/recon/runs", status_code=201)
 async def create_recon_run(
+    request: Request,
     storage: StorageDep,
     file: UploadFile = File(...),
     sf_org_id: str = Form(default="sf-demo-org"),
@@ -310,7 +362,17 @@ async def create_recon_run(
     if db2_environment not in ("PROD", "UAT"):
         raise HTTPException(status_code=400, detail="db2_environment must be PROD or UAT")
 
-    content = await file.read()
+    ip = _client_ip(request)
+    wait = _retry_after(f"upload:ip:{ip}", UPLOADS_PER_IP_PER_HOUR, _HOUR)
+    if wait:
+        raise HTTPException(status_code=429, detail=f"Upload limit reached ({UPLOADS_PER_IP_PER_HOUR}/hour). Try again in {_wait_text(wait)}.")
+    wait = _retry_after("upload:all", UPLOADS_PER_DAY, _DAY)
+    if wait:
+        raise HTTPException(status_code=429, detail=f"Daily upload limit reached for the demo. Try again in {_wait_text(wait)}.")
+
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"File too large (max {MAX_UPLOAD_BYTES // 1024} KB).")
     try:
         reader = csv.DictReader(io.StringIO(content.decode("utf-8")))
         raw_rows = list(reader)
@@ -320,9 +382,19 @@ async def create_recon_run(
     if not raw_rows:
         raise HTTPException(status_code=422, detail="CSV file is empty")
 
+    if len(raw_rows) > MAX_UPLOAD_ROWS:
+        raise HTTPException(status_code=413, detail=f"Too many rows: {len(raw_rows)} (max {MAX_UPLOAD_ROWS} per upload).")
+
     missing_cols = _REQUIRED_CSV_COLUMNS - set(reader.fieldnames or [])
     if missing_cols:
         raise HTTPException(status_code=422, detail=f"Missing CSV columns: {sorted(missing_cols)}")
+
+    wait = _retry_after("rows:all", ROWS_PER_DAY, _DAY, amount=len(raw_rows))
+    if wait:
+        raise HTTPException(status_code=429, detail=f"Daily analysis budget for the demo is used up. Try again in {_wait_text(wait)}.")
+    _record(f"upload:ip:{ip}")
+    _record("upload:all")
+    _record("rows:all", len(raw_rows))
 
     run = ReconRun(
         run_date=date.today(),
@@ -411,6 +483,7 @@ async def analyze_run(run_id: str, storage: StorageDep):
 @app.get("/api/v1/recon/runs/{run_id}/stream")
 async def stream_run_analysis(
     run_id: str,
+    request: Request,
     storage: StorageDep,
     llm_config: str = Query(default=""),
     session_id: str = Query(default=""),
@@ -427,6 +500,23 @@ async def stream_run_analysis(
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    if bypass_cache:
+        # Forced re-analysis re-spends LLM calls for every row — rate-limit it.
+        ip = _client_ip(request)
+        wait = _retry_after(f"bypass:ip:{ip}", BYPASS_CACHE_PER_IP_PER_HOUR, _HOUR) or \
+            _retry_after("rows:all", ROWS_PER_DAY, _DAY, amount=len(rows))
+        if wait:
+            async def _limited():
+                msg = f"Re-analysis limit reached. Try again in {_wait_text(wait)}."
+                yield f"event: error\ndata: {json.dumps({'detail': msg})}\n\n"
+            return StreamingResponse(
+                _limited(),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            )
+        _record(f"bypass:ip:{ip}")
+        _record("rows:all", len(rows))
 
     # Resolve cutoff timestamp from Last-Event-ID so reconnects skip already-sent incidents.
     cutoff_dt = None
@@ -1018,12 +1108,22 @@ async def analytics_ai_accuracy(storage: StorageDep, weeks: int = Query(default=
 @app.post("/api/v1/recon/runs/{run_id}/benchmark")
 async def benchmark_run(
     run_id: str,
+    request: Request,
     storage: StorageDep,
     n_rows: int = Query(default=2, ge=1, le=3),
 ):
     rows = await storage.get_recon_rows_for_run(run_id)
     if not rows:
         raise HTTPException(status_code=404, detail="Run not found or has no rows")
+
+    ip = _client_ip(request)
+    cost = min(n_rows, len(rows)) * 3  # each sampled row runs under 3 LLM configs
+    wait = _retry_after(f"bench:ip:{ip}", BENCHMARKS_PER_IP_PER_HOUR, _HOUR) or \
+        _retry_after("rows:all", ROWS_PER_DAY, _DAY, amount=cost)
+    if wait:
+        raise HTTPException(status_code=429, detail=f"Benchmark limit reached. Try again in {_wait_text(wait)}.")
+    _record(f"bench:ip:{ip}")
+    _record("rows:all", cost)
 
     sample = rows[:n_rows]
     results = []

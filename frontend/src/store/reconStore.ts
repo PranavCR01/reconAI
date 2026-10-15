@@ -137,12 +137,24 @@ export function updateRunInHistory(runId: string, patch: Partial<RunHistoryEntry
 // Analysis runs inside the SSE stream, so leaving LiveAnalysis before `done` stops it
 // and the local entry stays 'running' forever. Check unfinished entries against the
 // backend: every row has an incident → complete, otherwise → interrupted (reopen resumes).
+async function getRunWithRetry(runId: string, retries = 2, delayMs = 3000) {
+  // Render free tier cold-starts: the first request after idle often fails.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await getRun(runId)
+    } catch (e) {
+      if (attempt >= retries) throw e
+      await new Promise((r) => setTimeout(r, delayMs))
+    }
+  }
+}
+
 export async function reconcileRunHistory(): Promise<RunHistoryEntry[]> {
   const unfinished = getRunHistory().filter((r) => r.status !== 'complete' && r.status !== 'error')
   await Promise.all(
     unfinished.map(async (r) => {
       try {
-        const res = await getRun(r.runId)
+        const res = await getRunWithRetry(r.runId)
         const done = res.rows_scanned > 0 && res.total_incidents >= res.rows_scanned
         updateRunInHistory(
           r.runId,

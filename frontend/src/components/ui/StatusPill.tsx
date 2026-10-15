@@ -9,7 +9,7 @@ const VARIANT: Record<PillVariant, { bg: string; color: string; border: string; 
     border: 'oklch(0.40 0.10 155)',
     dotBg: 'var(--ok)',
     dotShadow: '0 0 0 3px oklch(0.74 0.16 155 / 0.18)',
-    label: 'resolved',
+    label: 'completed',
   },
   review: {
     bg: 'oklch(0.32 0.06 75 / 0.5)',

@@ -219,7 +219,7 @@ export default function Analytics() {
               sparkData={SPARK_CONF}
             />
             <StatCard
-              label="Top root cause"
+              label="Top discrepancy type"
               value=""
               footer={summary ? (
                 <>
@@ -252,7 +252,7 @@ export default function Analytics() {
         </Panel>
 
         <Panel
-          title="Root Cause Distribution"
+          title="Discrepancy Types"
           meta={`${days}d · n=${summary?.incidents_triaged.count.toLocaleString() ?? '…'}`}
         >
           {loading || !rootCause ? <ChartSkeleton h={160} /> : <RootCauseDonut data={rootCause} />}

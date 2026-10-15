@@ -29,14 +29,14 @@ interface HypFreq { name: string; count: number }
 function buildHypFreq(incidents: RCAIncident[]): HypFreq[] {
   const freq: Record<string, number> = {}
   for (const inc of incidents) {
-    for (const h of inc.hypotheses_tested) {
+    // Count each hypothesis once per incident, so count = incidents that tested it.
+    for (const h of new Set(inc.hypotheses_tested ?? [])) {
       freq[h] = (freq[h] ?? 0) + 1
     }
   }
   return Object.entries(freq)
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, 8)
 }
 
 interface ObjRow {
@@ -164,7 +164,8 @@ export default function RunSummary() {
     ? incidents.reduce((s, i) => s + i.latency_ms, 0) / incidents.length
     : 0
 
-  const hypFreq = buildHypFreq(incidents)
+  const hypFreqAll = buildHypFreq(incidents)
+  const hypFreq = hypFreqAll.slice(0, 8)
   const maxHypCount = hypFreq.length > 0 ? hypFreq[0].count : 1
   const byObj = buildByObject(incidents)
 
@@ -218,7 +219,7 @@ export default function RunSummary() {
         {/* Stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', borderRadius: 8, border: '1px solid var(--line)', overflow: 'hidden', background: 'var(--bg-1)', marginBottom: 20 }}>
           <StatCell label="Rows Scanned" value={data.rows_scanned ?? run.total_rows_checked ?? 0} />
-          <StatCell label="Resolved" value={resolvedCount} color="var(--ok)" />
+          <StatCell label="No Review Needed" value={resolvedCount} color="var(--ok)" />
           <StatCell label="Needs Review" value={needsReview} color="var(--warn)" />
           <StatCell label="P1 Critical" value={p1Count} color="var(--p1)" />
           <StatCell label="Avg Confidence" value={fmtConfidence(avgConf)} />
@@ -227,8 +228,11 @@ export default function RunSummary() {
 
         {/* 2-col grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-          {/* Root Cause Distribution */}
-          <Panel title="Root Cause Distribution" meta={`${hypFreq.length} hypotheses`}>
+          {/* Hypotheses Tested */}
+          <Panel
+            title="Hypotheses Tested"
+            meta={`incidents per hypothesis${hypFreqAll.length > 8 ? ` · top 8 of ${hypFreqAll.length}` : ''}`}
+          >
             {hypFreq.length === 0 ? (
               <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-3)', textAlign: 'center', padding: '20px 0' }}>No data</div>
             ) : (
@@ -252,7 +256,7 @@ export default function RunSummary() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--mono)', fontSize: 11.5 }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                    {['SF Object', 'Count', 'Severities', 'Resolved', 'Avg Conf'].map(h => (
+                    {['SF Object', 'Count', 'Severities', 'No Review', 'Avg Conf'].map(h => (
                       <th key={h} style={{ padding: '4px 8px', textAlign: 'left', color: 'var(--fg-3)', fontWeight: 500, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                     ))}
                   </tr>

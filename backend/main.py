@@ -555,11 +555,19 @@ async def stream_run_analysis(
                 }
                 yield f"id: {incident.id}\n"
                 yield f"event: incident\ndata: {json.dumps(payload)}\n\n"
-            await storage.update_run_status(
-                run_id,
-                status="complete",
-                completed_at=datetime.now(timezone.utc),
-            )
+            # Replaying a finished run must not move completed_at (it drives "Duration");
+            # only mark runs that finished all rows but were never marked complete.
+            try:
+                run = await storage.get_recon_run(run_id)
+                already_done = run.status == "complete" and run.completed_at is not None
+            except Exception:
+                already_done = False
+            if not already_done:
+                await storage.update_run_status(
+                    run_id,
+                    status="complete",
+                    completed_at=datetime.now(timezone.utc),
+                )
             yield f"event: done\ndata: {json.dumps({'total_rows': len(existing_incidents)})}\n\n"
 
         return StreamingResponse(

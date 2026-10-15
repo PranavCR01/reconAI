@@ -188,7 +188,7 @@ export default function LiveAnalysis() {
   const p1Count = allIncidents.filter(i => i.severity === 'P1').length
   const p2Count = allIncidents.filter(i => i.severity === 'P2').length
   const p3Count = allIncidents.filter(i => i.severity === 'P3').length
-  // resolvedCount: only 'complete' (not needs_review) — used for Resolved stat cell and tab
+  // resolvedCount: only 'complete' (not needs_review) — used for No Review Needed stat cell and tab
   const resolvedCount = allIncidents.filter(i => i.status === 'complete').length
   const needsReviewCount = allIncidents.filter(i => i.requires_human_review === true).length
   const completedCount = allIncidents.filter(i => i.status !== 'running').length
@@ -216,7 +216,7 @@ export default function LiveAnalysis() {
   const tabOptions: SegOption[] = [
     { value: 'all', label: 'All', sub: String(total) },
     { value: 'review', label: 'Needs Review', sub: String(needsReviewCount) },
-    { value: 'complete', label: 'Resolved', sub: String(resolvedCount) },
+    { value: 'complete', label: 'No Review Needed', sub: String(resolvedCount) },
   ]
 
   const filtered = useMemo(() => {
@@ -306,7 +306,7 @@ export default function LiveAnalysis() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', borderBottom: '1px solid var(--line)', background: 'var(--bg-1)' }}>
         <StatCell label="Discrepancies" value={total} />
         <StatCell label="P1 Critical" value={p1Count} color="var(--p1)" />
-        <StatCell label="Resolved" value={resolvedCount} color="var(--ok)" />
+        <StatCell label="No Review Needed" value={resolvedCount} color="var(--ok)" />
         <StatCell label="Needs Review" value={needsReviewCount} color="var(--warn)" />
         <StatCell label="Analyzing" value={analyzingCount} />
         <StatCell label="Mean Time / Incident" value={displayAvgLatencyMs > 0 ? fmtLatency(displayAvgLatencyMs) : '—'} note={isDone && cacheHitPct === 100 && displayAvgLatencyMs === 0 ? 'cache hit' : undefined} />

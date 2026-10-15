@@ -33,6 +33,23 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}d ago`
 }
 
+// Mirrors MAX_UPLOAD_ROWS in backend/main.py (server enforces it too).
+const MAX_UPLOAD_ROWS = 200
+
+// apiFetch throws `API <status>: <body>`; pull FastAPI's `detail` out for display.
+function uploadErrorMessage(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err)
+  const m = msg.match(/^API (\d+): (.*)$/s)
+  if (m) {
+    try {
+      const detail = JSON.parse(m[2]).detail
+      if (typeof detail === 'string') return detail
+    } catch { /* not JSON */ }
+    return `Upload failed (${m[1]}).`
+  }
+  return 'Upload failed — check your connection and try again.'
+}
+
 const STATUS_VARIANT: Record<RunHistoryEntry['status'], 'queued' | 'analyzing' | 'ok' | 'fail'> = {
   pending: 'queued',
   running: 'analyzing',
@@ -76,6 +93,7 @@ function UploadForm() {
   const [env, setEnv] = useState<Environment>('PROD')
   const [model, setModel] = useState<LlmConfig>('claude')
   const [loading, setLoading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [history, setHistory] = useState<RunHistoryEntry[]>([])
   const [showAll, setShowAll] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -88,6 +106,7 @@ function UploadForm() {
   }, [])
 
   function parseFile(f: File) {
+    setUploadError(null)
     Papa.parse(f, {
       header: true,
       skipEmptyLines: true,
@@ -134,6 +153,7 @@ function UploadForm() {
       const f = new File([blob], 'sample_fsc_recon.csv', { type: 'text/csv' })
       setFile(f)
       setRowCount(rows)
+      setUploadError(null)
     } catch (err) {
       console.error('Failed to load sample data:', err)
     }
@@ -142,6 +162,7 @@ function UploadForm() {
   async function handleStartAnalysis() {
     if (!file || loading) return
     setLoading(true)
+    setUploadError(null)
     try {
       const res = await createRun(file, { environment: env })
       const entry: RunHistoryEntry = {
@@ -160,6 +181,7 @@ function UploadForm() {
       navigate(`/runs/${res.run_id}`)
     } catch (err) {
       console.error('Failed to start run:', err)
+      setUploadError(uploadErrorMessage(err))
     } finally {
       setLoading(false)
     }
@@ -218,7 +240,8 @@ function UploadForm() {
     { value: 'hybrid', label: 'Hybrid', sub: 'groq → claude' },
   ]
 
-  const canStart = !!file && !loading
+  const tooManyRows = rowCount !== null && rowCount > MAX_UPLOAD_ROWS
+  const canStart = !!file && !loading && !tooManyRows
   const displayedRuns = showAll ? history : history.slice(0, 3)
 
   return (
@@ -409,6 +432,7 @@ function UploadForm() {
               onClick={() => {
                 setFile(null)
                 setRowCount(null)
+                setUploadError(null)
               }}
               style={{
                 marginLeft: 4,
@@ -655,7 +679,14 @@ function UploadForm() {
             thresholds <b style={{ color: 'var(--fg-1)', fontWeight: 500 }}>default</b>
           </span>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {(tooManyRows || uploadError) && (
+            <span role="alert" style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--p1)', maxWidth: 360 }}>
+              {tooManyRows
+                ? `Max ${MAX_UPLOAD_ROWS} rows per upload (this file has ${rowCount!.toLocaleString()}).`
+                : uploadError}
+            </span>
+          )}
           <button
             onClick={handleStartAnalysis}
             disabled={!canStart}

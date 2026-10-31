@@ -1,0 +1,792 @@
+{
+  "results": {
+    "offline_claude": {
+      "schema_version": 1,
+      "mode": "offline",
+      "config": "claude",
+      "models": [
+        "claude-haiku-4-5-20251001",
+        "claude-sonnet-4-6"
+      ],
+      "runs": 1,
+      "created_at": "2026-10-31T22:14:00+00:00",
+      "git_sha": "85563c2cf0fc800c6f71ba2cf918668c9bd2dfb5",
+      "dataset": {
+        "path": "data/benchmark_ground_truth.json",
+        "sha256": "3f53bba25abd4f48c9cef90e550389b9bcef1133cb02410066bd3f1af7a9f6a5",
+        "scenarios_sha256": "83ba789a789da164dc26a58af73c84742d70631ad8429836dcdaa49479b76b8a",
+        "incidents": 50
+      },
+      "graph_version": "2.0.0",
+      "prompt_versions": {
+        "proposer.md": "04003ff2b144",
+        "critic.md": "7ed1ddfea4e4"
+      },
+      "pricing_per_mtok": {
+        "claude-haiku-4-5-20251001": [
+          1.0,
+          5.0
+        ],
+        "claude-sonnet-4-6": [
+          3.0,
+          15.0
+        ]
+      },
+      "caveats": [
+        "Dataset: 50 synthetic incidents written and labeled by the project author; not production data.",
+        "Tool results come from simulators driven by a declared fault per record (data/scenarios.json), with seeded confounders. Graph accuracy therefore measures whether the diagnosis logic finds the declared fault through noise; it is not an estimate of real-world accuracy.",
+        "All rates carry 95% Wilson intervals; with n=50 an interval is roughly +/-10 points or wider.",
+        "Offline mode uses a scripted LLM: explanation, critic-LLM, consistency, final-confidence, token and cost numbers describe that script, not a model. Only graph metrics, the deterministic critic stage and the ablations are meaningful offline."
+      ],
+      "environment_notes": [
+        "offline: scripted fake LLM and fake embeddings"
+      ],
+      "metrics": {
+        "errors": {
+          "count": 0,
+          "incidents": []
+        },
+        "accuracy": {
+          "overall": {
+            "k": 50,
+            "n": 50,
+            "rate": 1.0,
+            "ci95": [
+              0.9287,
+              1.0
+            ]
+          },
+          "by_discrepancy_type": {
+            "DUPLICATE_DOWNSTREAM": {
+              "k": 3,
+              "n": 3,
+              "rate": 1.0,
+              "ci95": [
+                0.4385,
+                1.0
+              ]
+            },
+            "MISSING_RECORD": {
+              "k": 2,
+              "n": 2,
+              "rate": 1.0,
+              "ci95": [
+                0.3424,
+                1.0
+              ]
+            },
+            "NULL_DOWNSTREAM": {
+              "k": 20,
+              "n": 20,
+              "rate": 1.0,
+              "ci95": [
+                0.8389,
+                1.0
+              ]
+            },
+            "STALE_VALUE": {
+              "k": 4,
+              "n": 4,
+              "rate": 1.0,
+              "ci95": [
+                0.5101,
+                1.0
+              ]
+            },
+            "VALUE_MISMATCH": {
+              "k": 21,
+              "n": 21,
+              "rate": 1.0,
+              "ci95": [
+                0.8454,
+                1.0
+              ]
+            }
+          },
+          "confusion": {
+            "CDC_FIELD_EXCLUDED": {
+              "CDC_FIELD_EXCLUDED": 6
+            },
+            "DATAWAVE_TRANSFORM_ERROR": {
+              "DATAWAVE_TRANSFORM_ERROR": 21
+            },
+            "DELIVERY_GAP": {
+              "DELIVERY_GAP": 6
+            },
+            "DUPLICATE_DOWNSTREAM": {
+              "DUPLICATE_DOWNSTREAM": 3
+            },
+            "FLS_STRIPPED": {
+              "FLS_STRIPPED": 14
+            }
+          }
+        },
+        "efficiency": {
+          "within_min_hypotheses": {
+            "k": 50,
+            "n": 50,
+            "rate": 1.0,
+            "ci95": [
+              0.9287,
+              1.0
+            ]
+          },
+          "deciding_check_matches_label": {
+            "k": 47,
+            "n": 50,
+            "rate": 0.94,
+            "ci95": [
+              0.8378,
+              0.9794
+            ]
+          },
+          "mean_hypotheses_tested": 2.06
+        },
+        "routing": {
+          "unsafe_auto_clear": {
+            "k": 0,
+            "n": 50,
+            "rate": 0.0,
+            "ci95": [
+              0.0,
+              0.0713
+            ]
+          },
+          "review_rate": {
+            "k": 2,
+            "n": 50,
+            "rate": 0.04,
+            "ci95": [
+              0.011,
+              0.1346
+            ]
+          },
+          "review_vs_label": {
+            "tp": 0,
+            "fp": 2,
+            "fn": 22,
+            "tn": 26,
+            "precision": {
+              "k": 0,
+              "n": 2,
+              "rate": 0.0,
+              "ci95": [
+                0.0,
+                0.6576
+              ]
+            },
+            "recall": {
+              "k": 0,
+              "n": 22,
+              "rate": 0.0,
+              "ci95": [
+                0.0,
+                0.1487
+              ]
+            }
+          },
+          "calibration_graph_confidence": {
+            "ece": 0.135,
+            "n": 50,
+            "excluded_no_confidence": 0,
+            "buckets": [
+              {
+                "range": [
+                  0.7,
+                  0.8
+                ],
+                "n": 2,
+                "mean_confidence": 0.7,
+                "accuracy": 1.0
+              },
+              {
+                "range": [
+                  0.8,
+                  0.9
+                ],
+                "n": 34,
+                "mean_confidence": 0.8603,
+                "accuracy": 1.0
+              },
+              {
+                "range": [
+                  0.9,
+                  1.0
+                ],
+                "n": 14,
+                "mean_confidence": 0.9,
+                "accuracy": 1.0
+              }
+            ]
+          },
+          "calibration_final_confidence": {
+            "ece": 0.1,
+            "n": 50,
+            "excluded_no_confidence": 0,
+            "buckets": [
+              {
+                "range": [
+                  0.9,
+                  1.0
+                ],
+                "n": 50,
+                "mean_confidence": 0.9,
+                "accuracy": 1.0
+              }
+            ]
+          }
+        },
+        "explanation": {
+          "judge_decisions": {
+            "accept": 50
+          },
+          "revised": {
+            "k": 0,
+            "n": 50,
+            "rate": 0.0,
+            "ci95": [
+              0.0,
+              0.0713
+            ]
+          },
+          "grounded_when_accepted": {
+            "k": 50,
+            "n": 50,
+            "rate": 1.0,
+            "ci95": [
+              0.9287,
+              1.0
+            ]
+          }
+        },
+        "consistency": null,
+        "retrieval": {
+          "status": "not_measured",
+          "reason": "needs real embeddings (OPENAI_API_KEY) in live mode"
+        },
+        "cost_latency": {
+          "cost_usd_total": 0.7619,
+          "cost_usd_median": 0.01534,
+          "cost_usd_p95": 0.01534,
+          "tokens_median": 3228,
+          "llm_calls_median": 3,
+          "e2e_latency_ms_median": null,
+          "e2e_latency_ms_p95": null,
+          "llm_latency_ms_median": null,
+          "llm_latency_ms_p95": null
+        }
+      },
+      "critic_planted": {
+        "incidents": 50,
+        "draft_set_sha256": "f66c2dcee8443535ceb62e2f72939466fc078d1096806c8d771f2c7e458be3fc",
+        "by_draft": {
+          "clean": {
+            "drafts": 50,
+            "critic_unavailable": 0,
+            "false_rejection": {
+              "k": 0,
+              "n": 50,
+              "rate": 0.0,
+              "ci95": [
+                0.0,
+                0.0713
+              ]
+            },
+            "falsely_rejected_incidents": []
+          },
+          "fabricated_evidence": {
+            "drafts": 50,
+            "critic_unavailable": 0,
+            "expected_stage": "deterministic",
+            "caught": {
+              "k": 50,
+              "n": 50,
+              "rate": 1.0,
+              "ci95": [
+                0.9287,
+                1.0
+              ]
+            },
+            "caught_by_deterministic": {
+              "k": 50,
+              "n": 50,
+              "rate": 1.0,
+              "ci95": [
+                0.9287,
+                1.0
+              ]
+            },
+            "caught_by_llm": {
+              "k": 0,
+              "n": 50,
+              "rate": 0.0,
+              "ci95": [
+                0.0,
+                0.0713
+              ]
+            },
+            "missed_incidents": []
+          },
+          "fabricated_past_incident": {
+            "drafts": 50,
+            "critic_unavailable": 0,
+            "expected_stage": "deterministic",
+            "caught": {
+              "k": 50,
+              "n": 50,
+              "rate": 1.0,
+              "ci95": [
+                0.9287,
+                1.0
+              ]
+            },
+            "caught_by_deterministic": {
+              "k": 50,
+              "n": 50,
+              "rate": 1.0,
+              "ci95": [
+                0.9287,
+                1.0
+              ]
+            },
+            "caught_by_llm": {
+              "k": 0,
+              "n": 50,
+              "rate": 0.0,
+              "ci95": [
+                0.0,
+                0.0713
+              ]
+            },
+            "missed_incidents": []
+          },
+          "wrong_category": {
+            "drafts": 50,
+            "critic_unavailable": 0,
+            "expected_stage": "deterministic",
+            "caught": {
+              "k": 50,
+              "n": 50,
+              "rate": 1.0,
+              "ci95": [
+                0.9287,
+                1.0
+              ]
+            },
+            "caught_by_deterministic": {
+              "k": 50,
+              "n": 50,
+              "rate": 1.0,
+              "ci95": [
+                0.9287,
+                1.0
+              ]
+            },
+            "caught_by_llm": {
+              "k": 0,
+              "n": 50,
+              "rate": 0.0,
+              "ci95": [
+                0.0,
+                0.0713
+              ]
+            },
+            "missed_incidents": []
+          },
+          "contradicts_refuted": {
+            "drafts": 47,
+            "critic_unavailable": 0,
+            "expected_stage": "deterministic",
+            "caught": {
+              "k": 47,
+              "n": 47,
+              "rate": 1.0,
+              "ci95": [
+                0.9244,
+                1.0
+              ]
+            },
+            "caught_by_deterministic": {
+              "k": 47,
+              "n": 47,
+              "rate": 1.0,
+              "ci95": [
+                0.9244,
+                1.0
+              ]
+            },
+            "caught_by_llm": {
+              "k": 0,
+              "n": 47,
+              "rate": 0.0,
+              "ci95": [
+                0.0,
+                0.0756
+              ]
+            },
+            "missed_incidents": []
+          },
+          "placeholder_text": {
+            "drafts": 50,
+            "critic_unavailable": 0,
+            "expected_stage": "deterministic",
+            "caught": {
+              "k": 50,
+              "n": 50,
+              "rate": 1.0,
+              "ci95": [
+                0.9287,
+                1.0
+              ]
+            },
+            "caught_by_deterministic": {
+              "k": 50,
+              "n": 50,
+              "rate": 1.0,
+              "ci95": [
+                0.9287,
+                1.0
+              ]
+            },
+            "caught_by_llm": {
+              "k": 0,
+              "n": 50,
+              "rate": 0.0,
+              "ci95": [
+                0.0,
+                0.0713
+              ]
+            },
+            "missed_incidents": []
+          },
+          "unsupported_mechanism": {
+            "drafts": 50,
+            "critic_unavailable": 0,
+            "expected_stage": "llm",
+            "caught": {
+              "k": 0,
+              "n": 50,
+              "rate": 0.0,
+              "ci95": [
+                0.0,
+                0.0713
+              ]
+            },
+            "caught_by_deterministic": {
+              "k": 0,
+              "n": 50,
+              "rate": 0.0,
+              "ci95": [
+                0.0,
+                0.0713
+              ]
+            },
+            "caught_by_llm": {
+              "k": 0,
+              "n": 50,
+              "rate": 0.0,
+              "ci95": [
+                0.0,
+                0.0713
+              ]
+            },
+            "missed_incidents": [
+              "BM-001",
+              "BM-002",
+              "BM-003",
+              "BM-004",
+              "BM-005",
+              "BM-006",
+              "BM-007",
+              "BM-008",
+              "BM-009",
+              "BM-010",
+              "BM-011",
+              "BM-012",
+              "BM-013",
+              "BM-014",
+              "BM-015",
+              "BM-016",
+              "BM-017",
+              "BM-018",
+              "BM-019",
+              "BM-020",
+              "BM-021",
+              "BM-022",
+              "BM-023",
+              "BM-024",
+              "BM-025",
+              "BM-026",
+              "BM-027",
+              "BM-028",
+              "BM-029",
+              "BM-030",
+              "BM-031",
+              "BM-032",
+              "BM-033",
+              "BM-034",
+              "BM-035",
+              "BM-036",
+              "BM-037",
+              "BM-038",
+              "BM-039",
+              "BM-040",
+              "BM-041",
+              "BM-042",
+              "BM-043",
+              "BM-044",
+              "BM-045",
+              "BM-046",
+              "BM-047",
+              "BM-048",
+              "BM-049",
+              "BM-050"
+            ]
+          }
+        },
+        "cost_usd": 1.5615
+      },
+      "ablations": {
+        "as_built": {
+          "description": "the graph and scenario world as committed",
+          "accuracy": {
+            "k": 50,
+            "n": 50,
+            "rate": 1.0,
+            "ci95": [
+              0.9287,
+              1.0
+            ]
+          },
+          "review_rate": {
+            "k": 2,
+            "n": 50,
+            "rate": 0.04,
+            "ci95": [
+              0.011,
+              0.1346
+            ]
+          },
+          "unsafe_auto_clear": {
+            "k": 0,
+            "n": 50,
+            "rate": 0.0,
+            "ci95": [
+              0.0,
+              0.0713
+            ]
+          },
+          "confusion": {
+            "CDC_FIELD_EXCLUDED": {
+              "CDC_FIELD_EXCLUDED": 6
+            },
+            "DATAWAVE_TRANSFORM_ERROR": {
+              "DATAWAVE_TRANSFORM_ERROR": 21
+            },
+            "DELIVERY_GAP": {
+              "DELIVERY_GAP": 6
+            },
+            "DUPLICATE_DOWNSTREAM": {
+              "DUPLICATE_DOWNSTREAM": 3
+            },
+            "FLS_STRIPPED": {
+              "FLS_STRIPPED": 14
+            }
+          }
+        },
+        "no_confounders": {
+          "description": "every benchmark record has only its declared fault",
+          "accuracy": {
+            "k": 50,
+            "n": 50,
+            "rate": 1.0,
+            "ci95": [
+              0.9287,
+              1.0
+            ]
+          },
+          "review_rate": {
+            "k": 2,
+            "n": 50,
+            "rate": 0.04,
+            "ci95": [
+              0.011,
+              0.1346
+            ]
+          },
+          "unsafe_auto_clear": {
+            "k": 0,
+            "n": 50,
+            "rate": 0.0,
+            "ci95": [
+              0.0,
+              0.0713
+            ]
+          },
+          "confusion": {
+            "CDC_FIELD_EXCLUDED": {
+              "CDC_FIELD_EXCLUDED": 6
+            },
+            "DATAWAVE_TRANSFORM_ERROR": {
+              "DATAWAVE_TRANSFORM_ERROR": 21
+            },
+            "DELIVERY_GAP": {
+              "DELIVERY_GAP": 6
+            },
+            "DUPLICATE_DOWNSTREAM": {
+              "DUPLICATE_DOWNSTREAM": 3
+            },
+            "FLS_STRIPPED": {
+              "FLS_STRIPPED": 14
+            }
+          }
+        },
+        "all_confounders": {
+          "description": "every benchmark record also carries both confounders (where they don't fake its fault)",
+          "accuracy": {
+            "k": 50,
+            "n": 50,
+            "rate": 1.0,
+            "ci95": [
+              0.9287,
+              1.0
+            ]
+          },
+          "review_rate": {
+            "k": 2,
+            "n": 50,
+            "rate": 0.04,
+            "ci95": [
+              0.011,
+              0.1346
+            ]
+          },
+          "unsafe_auto_clear": {
+            "k": 0,
+            "n": 50,
+            "rate": 0.0,
+            "ci95": [
+              0.0,
+              0.0713
+            ]
+          },
+          "confusion": {
+            "CDC_FIELD_EXCLUDED": {
+              "CDC_FIELD_EXCLUDED": 6
+            },
+            "DATAWAVE_TRANSFORM_ERROR": {
+              "DATAWAVE_TRANSFORM_ERROR": 21
+            },
+            "DELIVERY_GAP": {
+              "DELIVERY_GAP": 6
+            },
+            "DUPLICATE_DOWNSTREAM": {
+              "DUPLICATE_DOWNSTREAM": 3
+            },
+            "FLS_STRIPPED": {
+              "FLS_STRIPPED": 14
+            }
+          }
+        },
+        "delivery_first": {
+          "description": "the delivery check moved to the front of every plan (the pre-2.0 ordering)",
+          "accuracy": {
+            "k": 46,
+            "n": 50,
+            "rate": 0.92,
+            "ci95": [
+              0.8116,
+              0.9685
+            ]
+          },
+          "review_rate": {
+            "k": 6,
+            "n": 50,
+            "rate": 0.12,
+            "ci95": [
+              0.0562,
+              0.238
+            ]
+          },
+          "unsafe_auto_clear": {
+            "k": 0,
+            "n": 50,
+            "rate": 0.0,
+            "ci95": [
+              0.0,
+              0.0713
+            ]
+          },
+          "confusion": {
+            "CDC_FIELD_EXCLUDED": {
+              "CDC_FIELD_EXCLUDED": 5,
+              "DELIVERY_GAP": 1
+            },
+            "DATAWAVE_TRANSFORM_ERROR": {
+              "DATAWAVE_TRANSFORM_ERROR": 21
+            },
+            "DELIVERY_GAP": {
+              "DELIVERY_GAP": 6
+            },
+            "DUPLICATE_DOWNSTREAM": {
+              "DUPLICATE_DOWNSTREAM": 3
+            },
+            "FLS_STRIPPED": {
+              "DELIVERY_GAP": 3,
+              "FLS_STRIPPED": 11
+            }
+          }
+        },
+        "delivery_first_all_confounders": {
+          "description": "delivery-first ordering in the all-confounders world",
+          "accuracy": {
+            "k": 30,
+            "n": 50,
+            "rate": 0.6,
+            "ci95": [
+              0.4618,
+              0.7239
+            ]
+          },
+          "review_rate": {
+            "k": 22,
+            "n": 50,
+            "rate": 0.44,
+            "ci95": [
+              0.3116,
+              0.5769
+            ]
+          },
+          "unsafe_auto_clear": {
+            "k": 0,
+            "n": 50,
+            "rate": 0.0,
+            "ci95": [
+              0.0,
+              0.0713
+            ]
+          },
+          "confusion": {
+            "CDC_FIELD_EXCLUDED": {
+              "DELIVERY_GAP": 6
+            },
+            "DATAWAVE_TRANSFORM_ERROR": {
+              "DATAWAVE_TRANSFORM_ERROR": 21
+            },
+            "DELIVERY_GAP": {
+              "DELIVERY_GAP": 6
+            },
+            "DUPLICATE_DOWNSTREAM": {
+              "DUPLICATE_DOWNSTREAM": 3
+            },
+            "FLS_STRIPPED": {
+              "DELIVERY_GAP": 14
+            }
+          }
+        }
+      },
+      "failure_patterns": [],
+      "source_file": "evals/results/offline_claude.json"
+    }
+  }
+}

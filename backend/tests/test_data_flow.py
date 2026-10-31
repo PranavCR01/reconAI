@@ -80,8 +80,7 @@ def test_review_reasons_never_shrink(graph, ground_truth, llm, confidence, outag
             final = state
 
         reasons = review_reasons(final)
-        hypothesis = final.get("current_hypothesis", "")
-        if "exhausted" in hypothesis or hypothesis.startswith("H5"):
+        if final.get("graph_status") == "exhausted":
             assert "no_hypothesis_confirmed" in reasons, "graph flag must survive any LLM confidence"
         if outage:
             assert "llm_unavailable" in reasons and final["synthesis_status"] == "api_unavailable"
@@ -113,9 +112,15 @@ def _analyze(storage, graph, row, session="s"):
     return asyncio.run(_analyze_row(row, CONFIG, graph, storage, session_id=session))
 
 
-def _rows_by_outcome(graph, ground_truth):
+def _rows_by_outcome(graph, ground_truth, scenarios):
+    from backend.models.entities import DiscrepancyType, ReconRow
+
+    # Benchmark rows all have a declared fault; an exhausted path needs a clean-world record.
+    scenarios.add("TEST-NO-FAULT-1", "NO_FAULT_FOUND", confounders=["unrelated_missed_event"])
+    clean = ReconRow(sf_object="Contact", sf_field="Phone", sf_record_id="TEST-NO-FAULT-1", db2_table="T",
+                     db2_column="C", discrepancy_type=DiscrepancyType.VALUE_MISMATCH)
     exhausted = confirmed_high = None
-    for row in _rows(ground_truth):
+    for row in [clean] + _rows(ground_truth):
         final = graph.invoke(initial_state(row.model_dump(mode="json")))
         h = final.get("current_hypothesis", "")
         if exhausted is None and "exhausted" in h:
@@ -129,8 +134,8 @@ def _rows_by_outcome(graph, ground_truth):
 
 @pytest.mark.parametrize("llm_confidence", [0.6, 0.9])
 @pytest.mark.parametrize("outage", [False, True])
-def test_review_matrix(storage, graph, ground_truth, llm, llm_confidence, outage):
-    exhausted, confirmed = _rows_by_outcome(graph, ground_truth)
+def test_review_matrix(storage, graph, ground_truth, llm, scenarios, llm_confidence, outage):
+    exhausted, confirmed = _rows_by_outcome(graph, ground_truth, scenarios)
     llm.synthesis_confidence = llm_confidence
     if outage:
         llm.fail(SYNTHESIS_PROMPT, api_status_error())

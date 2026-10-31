@@ -10,7 +10,7 @@ from backend.config import AgentConfig
 from backend.models.state import ReconState, check_node_output
 from backend.tools.rag_tools import rerank_candidates, retrieve_similar_artifacts
 
-MAX_ITERATIONS = 6
+MAX_ITERATIONS = 10  # one hypothesis per step; the longest plan has 5
 MAX_EVIDENCE_RETRIES = 2
 
 
@@ -44,6 +44,9 @@ def build_graph(config: AgentConfig, storage):
         covered = {e.get("hypothesis_key") for e in state.get("evidence_collected") or []}
         if tested and not tested.issubset(covered):
             result["review_reasons"] = list(result.get("review_reasons") or []) + ["missing_evidence"]
+        # Routed here by the iteration cap with no verdict: never let that pass as a clean result.
+        if state.get("graph_status") not in ("confirmed", "exhausted", "unknown_type"):
+            result["review_reasons"] = list(result.get("review_reasons") or []) + ["iteration_limit"]
         return check_node_output("synthesis", result)
 
     def _route_after_hypothesis(state: ReconState) -> str:

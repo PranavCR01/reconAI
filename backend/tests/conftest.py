@@ -180,3 +180,23 @@ def sample_rows(sample_csv_text) -> list[dict]:
 @pytest.fixture(scope="session")
 def ground_truth() -> list[dict]:
     return json.loads(GROUND_TRUTH.read_text())["incidents"]
+
+
+@pytest.fixture
+def scenarios():
+    """Declare scenarios for test-only records; the registry is restored afterwards.
+
+    Usage: scenarios.add("REC-1", "NO_FAULT_FOUND", confounders=["unrelated_missed_event"])
+    """
+    from backend.tools import world
+
+    original = dict(world.registry())
+
+    class _Scenarios:
+        def add(self, record_id: str, fault: str, confounders=(), source: str = "test"):
+            current = dict(world.registry())
+            current[record_id] = world.Scenario(record_id, fault, frozenset(confounders), source)
+            world.set_registry(current)
+
+    yield _Scenarios()
+    world.set_registry(original)

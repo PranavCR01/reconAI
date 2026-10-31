@@ -14,6 +14,8 @@ class FieldHistoryResult(BaseModel):
     db2_column: str
     time_window_days: int
     records_checked: int
+    # Rows in the target table for this Salesforce ID (>1 means duplicates downstream).
+    duplicate_rows: int = 1
 
 
 _DB2_COLUMN_MAP: dict[str, str] = {
@@ -49,12 +51,37 @@ def _seed(*parts: str) -> int:
     return int(hashlib.md5(key.encode()).hexdigest()[:8], 16)
 
 
+def _from_scenario(scenario, sf_object: str, sf_field: str, sf_record_id: str, db2_col: str,
+                   time_window_days: int) -> FieldHistoryResult:
+    """Signals consistent with the record's declared fault (see backend/tools/world.py)."""
+    rng = random.Random(_seed("scenario", sf_object, sf_field, sf_record_id))
+    duplicates = rng.randint(2, 4) if scenario.fault == "DUPLICATE_DOWNSTREAM" else 1
+    if scenario.fault != "DOWNSTREAM_OVERWRITE":
+        # The value never landed (or isn't the issue): no prior value in the window.
+        return FieldHistoryResult(was_populated=False, db2_column=db2_col, time_window_days=time_window_days,
+                                  records_checked=duplicates if duplicates > 1 else 0, duplicate_rows=duplicates)
+    days_ago = rng.randint(2, time_window_days)
+    pool = _SAMPLE_VALUES.get(sf_field, ["PREV_VAL_A", "PREV_VAL_B", "PREV_VAL_C"])
+    return FieldHistoryResult(
+        was_populated=True, last_value=rng.choice(pool),
+        last_updated_at=(datetime.now(timezone.utc) - timedelta(days=days_ago)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        db2_column=db2_col, time_window_days=time_window_days, records_checked=1, duplicate_rows=1,
+    )
+
+
 def query_db2_field_history(
     sf_object: str,
     sf_field: str,
     sf_record_id: str,
     time_window_days: int = 30,
 ) -> FieldHistoryResult:
+    from backend.tools.world import lookup
+
+    db2_col = _DB2_COLUMN_MAP.get(sf_field, sf_field.upper().replace("__C", "") + "_VAL")
+    scenario = lookup(sf_record_id)
+    if scenario is not None:
+        return _from_scenario(scenario, sf_object, sf_field, sf_record_id, db2_col, time_window_days)
+
     rng = random.Random(_seed(sf_object, sf_field, sf_record_id))
 
     if "Status" in sf_field or "Verification" in sf_field:
@@ -65,9 +92,9 @@ def query_db2_field_history(
         prob = 0.20
 
     was_populated = rng.random() < prob
-    db2_col = _DB2_COLUMN_MAP.get(
-        sf_field, sf_field.upper().replace("__C", "") + "_VAL"
-    )
+    # Signals added later use their own generator so older fields keep their values.
+    extra = random.Random(_seed("extra", sf_object, sf_field, sf_record_id))
+    duplicate_rows = extra.randint(2, 3) if extra.random() < 0.10 else 1
 
     if not was_populated:
         return FieldHistoryResult(
@@ -75,6 +102,7 @@ def query_db2_field_history(
             db2_column=db2_col,
             time_window_days=time_window_days,
             records_checked=0,
+            duplicate_rows=duplicate_rows,
         )
 
     days_ago = rng.randint(2, time_window_days)
@@ -90,4 +118,5 @@ def query_db2_field_history(
         db2_column=db2_col,
         time_window_days=time_window_days,
         records_checked=rng.randint(1, 5),
+        duplicate_rows=duplicate_rows,
     )

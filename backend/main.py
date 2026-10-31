@@ -58,6 +58,10 @@ REQUIRED_COLUMNS: dict[str, list[str]] = {
     "rca_incidents": ["review_reasons", "llm_calls"],
     "rca_evidence": ["hypothesis_key", "tool", "tool_args", "outcome", "raw_result"],
 }
+REQUIRED_COLUMNS["rca_incidents"] += ["hypothesis_verdicts", "graph_status", "root_cause_category",
+                                      "contributing_factors", "graph_version"]
+
+_GRAPH_FIELDS = ("hypothesis_verdicts", "graph_status", "root_cause_category", "contributing_factors", "graph_version")
 
 # ---------------------------------------------------------------------------
 # Cost guards — the app is public and every analyzed row costs LLM/embedding calls.
@@ -273,6 +277,7 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
             recon_row_id=row.id,
             similar_incidents=rca.get("_similar_incidents") or [],
             similarity_scores=rca.get("_similarity_scores") or [],
+            **{f: rca[f"_{f}"] for f in _GRAPH_FIELDS if rca.get(f"_{f}") is not None},
             hypotheses_tested=rca.get("_hypotheses_tested") or [],
             hypotheses_ruled_out=rca.get("_hypotheses_ruled_out") or [],
             final_hypothesis=rca.get("_final_hypothesis"),
@@ -314,6 +319,11 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
         recon_row_id=row.id,
         similar_incidents=similar_ids,
         similarity_scores=similar_scores,
+        hypothesis_verdicts=final.get("hypothesis_verdicts") or [],
+        graph_status=final.get("graph_status"),
+        root_cause_category=final.get("root_cause_category"),
+        contributing_factors=final.get("contributing_factors") or [],
+        graph_version=final.get("graph_version"),
         hypotheses_tested=final.get("hypotheses_tested") or [],
         hypotheses_ruled_out=final.get("hypotheses_ruled_out") or [],
         final_hypothesis=final_hypothesis,
@@ -350,6 +360,7 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
         "_evidence": evidence,
         "_similar_incidents": similar_ids,
         "_similarity_scores": similar_scores,
+        **{f"_{f}": getattr(incident, f) for f in _GRAPH_FIELDS},
     }, config.synthesis_llm)
 
     return {"incident_id": incident_id, "incident": incident, "cached": False, "human_review": bool(reasons), "error": None}

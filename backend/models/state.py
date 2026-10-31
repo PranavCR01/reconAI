@@ -26,6 +26,11 @@ class ReconState(TypedDict, total=False):
     graph_confidence: float | None
     iterations: int
     tool_calls: list[dict]
+    hypothesis_verdicts: list[dict]
+    graph_status: str              # running | confirmed | exhausted | unknown_type
+    root_cause_category: str | None
+    contributing_factors: list[str]
+    graph_version: str
     # evidence
     evidence_collected: Annotated[list[dict], operator.add]
     evidence_retry_count: int
@@ -50,6 +55,7 @@ OWNERS: dict[str, frozenset[str]] = {
     "hypothesis": frozenset({
         "current_hypothesis", "hypotheses_tested", "hypotheses_ruled_out",
         "graph_root_cause", "graph_confidence", "iterations", "tool_calls",
+        "hypothesis_verdicts", "graph_status", "root_cause_category", "contributing_factors", "graph_version",
     }),
     "evidence": frozenset({"evidence_collected", "evidence_retry_count"}),
     "rag_retrieval": frozenset({"rag_candidates", "reranked_candidates"}),
@@ -65,6 +71,7 @@ REVIEW_REASONS = frozenset({
     "low_confidence",          # the LLM's own confidence < 0.75 (non-negotiable #3)
     "llm_unavailable",         # synthesis degraded because the LLM API failed
     "legacy_cache_flag",       # cache entry from before reasons existed carried a review flag
+    "iteration_limit",         # the graph hit MAX_ITERATIONS before reaching a verdict
 })
 
 
@@ -82,6 +89,11 @@ def initial_state(recon_row: dict) -> ReconState:
         "graph_confidence": None,
         "iterations": 0,
         "tool_calls": [],
+        "hypothesis_verdicts": [],
+        "graph_status": "running",
+        "root_cause_category": None,
+        "contributing_factors": [],
+        "graph_version": None,
         "evidence_collected": [],
         "evidence_retry_count": 0,
         "rag_candidates": [],

@@ -50,18 +50,10 @@ def _uncovered(final):
     return set(final["hypotheses_tested"]) - covered
 
 
-def test_coverage_invariant_except_known_h4_gap(graph, ground_truth):
-    """Non-negotiable #1: every tested hypothesis has evidence (H4 is tracked separately below)."""
+def test_coverage_invariant(graph, ground_truth):
+    """Non-negotiable #1: every tested hypothesis has at least one evidence record."""
     for row, final in _final_states(graph, ground_truth):
-        assert _uncovered(final) - {"H4"} == set(), (row.sf_object, row.sf_field, _uncovered(final))
-
-
-@pytest.mark.xfail(strict=True, reason="H4 has no evidence of its own until issue #10 attributes the DB2 lookup to it")
-def test_h4_path_has_its_own_evidence(graph, ground_truth):
-    h4 = [(row, final) for row, final in _final_states(graph, ground_truth) if "H4" in final["hypotheses_tested"]]
-    assert h4, "benchmark must contain an H4 path"
-    for row, final in h4:
-        assert "H4" not in _uncovered(final), row.sf_field
+        assert _uncovered(final) == set(), (row.sf_object, row.sf_field, _uncovered(final))
 
 
 def test_uncovered_hypothesis_always_flags_review(graph, ground_truth):

@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 from pydantic import ValidationError
 
+from backend.graph.hypotheses import BY_ID, OUTCOME, evaluate
 from backend.models.entities import EvidenceSourceType
 from backend.models.outputs import EvidenceResult
 from backend.models.state import ReconState
@@ -51,10 +52,11 @@ def _build_evidence_result(tool: str, h_key: str, result: dict) -> dict:
             "source_type": EvidenceSourceType.sf_field_history,
             "source_reference": f"db2://{col}/window-{window}d",
             "content": (
-                f"DB2 column {col} previously held value {last_val!r} "
-                f"(last updated {last_ts})."
-                if populated else
-                f"DB2 column {col} has no historical values in the {window}-day window."
+                (f"DB2 column {col} previously held value {last_val!r} (last updated {last_ts})."
+                 if populated else
+                 f"DB2 column {col} has no historical values in the {window}-day window.")
+                + (f" {result.get('duplicate_rows')} rows exist for this Salesforce ID."
+                   if (result.get("duplicate_rows") or 1) > 1 else "")
             ),
             "relevance_explanation": (
                 "A prior value confirms the field was once synced correctly, "
@@ -120,7 +122,9 @@ def _build_evidence_result(tool: str, h_key: str, result: dict) -> dict:
             "source_type": EvidenceSourceType.apex_job_log,
             "source_reference": f"sf-apex://{trigger}/{sf_obj}",
             "content": (
-                f"Apex trigger '{trigger}' on {sf_obj} has conditional publish logic: {logic}."
+                f"Apex trigger '{trigger}' on {sf_obj} has conditional publish logic: {logic}. "
+                + ("It skipped the publish for this record." if result.get("suppressed_for_record")
+                   else "It did not fire for this record.")
                 if conditional else
                 f"Apex trigger '{trigger}' on {sf_obj} has no conditional publish gates."
             ),
@@ -147,11 +151,11 @@ def _build_evidence_result(tool: str, h_key: str, result: dict) -> dict:
             "source_type": EvidenceSourceType.splunk_log,
             "source_reference": source_ref,
             "content": (
-                f"{count} missed CDC/platform event(s) for record {record_id} "
-                f"field '{sf_field}'. Last event: {last_ts}."
-                if missed else
-                f"No missed events for record {record_id} field '{sf_field}'. "
-                f"Last event: {last_ts}."
+                (f"{count} missed CDC/platform event(s)" if missed else "No missed events")
+                + f" for record {record_id} field '{sf_field}' ({result.get('events_found', 0)} event(s) found"
+                + (f", {result.get('transform_errors')} DataWeave transform error(s)" if result.get("transform_errors") else "")
+                + (f", {result.get('retry_count')} delivery retries" if result.get("retry_count") else "")
+                + f"). Last event: {last_ts}."
             ),
             "relevance_explanation": (
                 "Missed platform events indicate CDC pipeline gaps preventing "
@@ -275,7 +279,7 @@ _TOOL_SOURCE = {
 OUTCOMES = ("supports", "refutes", "neutral", "error", "skipped")
 
 
-def _finalize(entry: dict, args: dict) -> dict:
+def _finalize(entry: dict, args: dict, row: dict | None = None) -> dict:
     """Give every evidence record a stable ID, its outcome, and persistable fields.
 
     Records without an EvidenceResult (tool error, unregistered tool, skipped call)
@@ -288,7 +292,18 @@ def _finalize(entry: dict, args: dict) -> dict:
     record = {**entry, "evidence_id": str(uuid.uuid4()), "tool_args": args, "raw_result": raw}
 
     if er:
-        outcome = "supports" if er.get("confirms") else ("refutes" if er.get("rules_out") else "neutral")
+        hypothesis = BY_ID.get(h_key)
+        if hypothesis is not None and tool == hypothesis.tool:
+            # Same rule the graph uses, so an evidence outcome can't disagree with the verdict.
+            verdict, reason, _, _ = evaluate(hypothesis, raw, row or {})
+            outcome = OUTCOME[verdict]
+            er = {**er,
+                  "confirms": f"{h_key}: {hypothesis.label}" if verdict == "confirmed" else None,
+                  "rules_out": [h_key] if verdict == "refuted" else []}
+            record["evidence_result"] = er
+            record["verdict_reason"] = reason
+        else:
+            outcome = "supports" if er.get("confirms") else ("refutes" if er.get("rules_out") else "neutral")
         record.update({
             "outcome": outcome,
             "source_type": er["source_type"],
@@ -335,7 +350,7 @@ def run_evidence(state: ReconState) -> dict:
     for calls in by_hypothesis.values():
         args_by_tool = {c.get("tool", ""): c.get("args", {}) for c in calls}
         for entry in _execute_hypothesis_calls(calls):
-            new_evidence.append(_finalize(entry, args_by_tool.get(entry.get("tool", ""), {})))
+            new_evidence.append(_finalize(entry, args_by_tool.get(entry.get("tool", ""), {}), state.get("recon_row")))
 
     # evidence_collected is an append-only reducer: return only the new records.
     # tool_calls is owned by the hypothesis node, which re-queues on its next turn.

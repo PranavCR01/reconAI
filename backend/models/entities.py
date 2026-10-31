@@ -107,6 +107,12 @@ class RCAIncident(BaseModel):
     review_reasons: list[str] = Field(default_factory=list)
     # Every LLM call made to produce this analysis (non-negotiable #4).
     llm_calls: list[dict] = Field(default_factory=list)
+    # Hypothesis graph outcome (issue #10).
+    hypothesis_verdicts: list[dict] = Field(default_factory=list)
+    graph_status: Optional[str] = None          # confirmed | exhausted | unknown_type
+    root_cause_category: Optional[str] = None   # set when graph_status == confirmed
+    contributing_factors: list[str] = Field(default_factory=list)
+    graph_version: Optional[str] = None
     created_at: Optional[datetime] = None
 
 

@@ -1,8 +1,28 @@
+"""Hypothesis Agent: walks the declarative catalogue (backend/graph/hypotheses.py).
+
+Deterministic Python, no LLM. Each run re-derives every verdict from the evidence
+collected so far, queues the next untested check, and stops at the first confirmed
+hypothesis. Verdicts are explicit per hypothesis: confirmed / refuted / inconclusive
+(a check that couldn't run is inconclusive, never refuted).
+"""
 from __future__ import annotations
 
 from backend.config import AgentConfig
-from backend.models.outputs import HypothesisDecision
+from backend.graph.hypotheses import CATALOGUE, GRAPH_VERSION, Hypothesis, evaluate
 from backend.models.state import ReconState
+
+
+def _verdict_record(h: Hypothesis, verdict: str, reason: str, evidence: list[dict], confidence: float | None) -> dict:
+    return {
+        "hypothesis_id": h.id,
+        "label": h.label,
+        "kind": h.kind,
+        "category": h.category,
+        "verdict": verdict,
+        "reason": reason,
+        "confidence": confidence if verdict == "confirmed" else None,
+        "evidence_ids": [e["evidence_id"] for e in evidence if e.get("evidence_id")],
+    }
 
 
 class HypothesisAgent:
@@ -10,534 +30,70 @@ class HypothesisAgent:
         self._config = config
 
     def run(self, state: ReconState) -> dict:
-        return self._to_state_update(self._decide(state))
-
-    @staticmethod
-    def _to_state_update(result: dict) -> dict:
-        """Map a branch decision onto the keys this node owns.
-
-        The graph's root cause and confidence go to graph_* keys (Synthesis owns the
-        final ones); a review flag becomes a named, append-only review reason.
-        """
-        out = dict(result)
-        if "root_cause" in out:
-            out["graph_root_cause"] = out.pop("root_cause")
-        if "confidence" in out:
-            out["graph_confidence"] = out.pop("confidence")
-        flag = out.pop("requires_human_review", None)
-        if flag:
-            hypothesis = out.get("current_hypothesis", "")
-            if hypothesis.startswith("UNKNOWN"):
-                reason = "unknown_type"
-            elif "exhausted" in hypothesis or hypothesis.startswith("H5"):
-                reason = "no_hypothesis_confirmed"
-            else:
-                reason = "graph_low_confidence"
-            out["review_reasons"] = [reason]
-        return out
-
-    def _decide(self, state: ReconState) -> dict:
         row = state["recon_row"]
-        dt = row.get("discrepancy_type")
-        iterations = state["iterations"] + 1
-        deploy_note = (
-            " [⚠️ Deployment correlation within 24h — consider as contributing factor]"
-            if row.get("deployment_correlated") else ""
-        )
+        discrepancy_type = row.get("discrepancy_type")
+        iterations = state.get("iterations", 0) + 1
+        factors = ["deployment_within_24h"] if row.get("deployment_correlated") else []
+        base = {"iterations": iterations, "contributing_factors": factors, "graph_version": GRAPH_VERSION}
 
-        if dt == "NULL_DOWNSTREAM":
-            return self._null_downstream(state, iterations, deploy_note)
-        if dt == "VALUE_MISMATCH":
-            return self._value_mismatch(state, iterations, deploy_note)
-        if dt == "STALE_VALUE":
-            return self._stale_value(state, iterations, deploy_note)
-        if dt == "MISSING_RECORD":
-            return self._missing_record(state, iterations, deploy_note)
-        if dt == "DUPLICATE_DOWNSTREAM":
-            return self._duplicate_downstream(state, iterations, deploy_note)
-
-        # Unknown discrepancy type — route to human review without tool calls
-        return {
-            "current_hypothesis": f"UNKNOWN: {dt} — no graph path defined",
-            "tool_calls": [],
-            "requires_human_review": True,
-            "iterations": iterations,
-        }
-
-    def _null_downstream(self, state: ReconState, iterations: int, note: str) -> dict:
-        tested = state["hypotheses_tested"]
-        evidence = state["evidence_collected"]
-        row = state["recon_row"]
-
-        # ── H1: DB2 field history ──────────────────────────────────────────────
-        if "H1" not in tested:
-            HypothesisDecision(
-                next_hypothesis="H1: Verify if field was ever populated in DB2",
-                tools_to_call=["query_db2_field_history"],
-                reasoning=f"Field is null downstream. Check if DB2 ever held a value.{note}",
-                terminate=False,
-            )
+        plan = CATALOGUE.get(discrepancy_type)
+        if not plan:
             return {
-                "current_hypothesis": "H1: Verify if field was ever populated in DB2",
-                "hypotheses_tested": tested + ["H1"],
-                "tool_calls": [{
-                    "tool": "query_db2_field_history",
-                    "args": {
-                        "sf_object": row["sf_object"],
-                        "sf_field": row["sf_field"],
-                        "sf_record_id": row["sf_record_id"],
-                    },
-                    "hypothesis_key": "H1",
-                }],
-                "iterations": iterations,
-            }
-
-        # Evaluate H1
-        h1 = next((e for e in evidence if e.get("hypothesis_key") == "H1"), None)
-        if h1 and h1.get("result", {}).get("was_populated"):
-            r = h1["result"]
-            root = (
-                f"Field '{row['sf_field']}' previously held value '{r.get('last_value')}' "
-                f"in DB2 (as of {r.get('last_updated_at')}). A subsequent overwrite or "
-                f"null-propagation event cleared it downstream."
-            )
-            d = HypothesisDecision(
-                next_hypothesis="H4: Overwrite/clear event confirmed",
-                tools_to_call=[],
-                reasoning=root + note,
-                terminate=True,
-                root_cause=root,
-                confidence=0.82,
-            )
-            return {
-                "current_hypothesis": d.next_hypothesis,
-                "hypotheses_tested": tested if "H4" in tested else tested + ["H4"],
-                "root_cause": d.root_cause,
-                "confidence": d.confidence,
-                "requires_human_review": False,
+                **base,
+                "current_hypothesis": f"UNKNOWN: {discrepancy_type} — no graph path defined",
+                "graph_status": "unknown_type",
+                "root_cause_category": None,
+                "hypothesis_verdicts": [],
                 "tool_calls": [],
-                "iterations": iterations,
+                "review_reasons": ["unknown_type"],
             }
 
-        # ── H2: Splunk triage for missed CDC/platform events ─────────────────
-        if "H2" not in tested:
-            HypothesisDecision(
-                next_hypothesis="H2: Splunk triage for missed CDC/platform events",
-                tools_to_call=["splunk_stub"],
-                reasoning=f"H1 inconclusive. Checking Splunk for missed events.{note}",
-                terminate=False,
-            )
-            return {
-                "current_hypothesis": "H2: Splunk triage for missed CDC/platform events",
-                "hypotheses_tested": tested + ["H2"],
-                "tool_calls": [{
-                    "tool": "splunk_stub",
-                    "args": {
-                        "sf_record_id": row["sf_record_id"],
-                        "sf_field": row["sf_field"],
-                        "sf_object": row["sf_object"],
-                    },
-                    "hypothesis_key": "H2",
-                }],
-                "iterations": iterations,
-            }
+        tested = state.get("hypotheses_tested") or []
+        evidence = state.get("evidence_collected") or []
+        verdicts: list[dict] = []
 
-        # ── Evaluate H2 Splunk ───────────────────────────────────────────────
-        h2 = next((e for e in evidence if e.get("hypothesis_key") == "H2"), None)
-        if h2:
-            h2_result = h2.get("result", {})
-            if h2_result.get("missed_events"):
-                missed_count = h2_result.get("missed_count", 0)
-                last_ts = h2_result.get("last_event_ts", "unknown")
-                root = (
-                    f"Splunk detected {missed_count} missed CDC/platform event(s) for "
-                    f"'{row['sf_field']}' on record {row['sf_record_id']}. "
-                    f"Last observed event: {last_ts}. "
-                    f"Field change was not propagated to DB2 downstream."
-                )
-                d = HypothesisDecision(
-                    next_hypothesis="H2: Splunk confirms missed CDC events",
-                    tools_to_call=[],
-                    reasoning=root + note,
-                    terminate=True,
-                    root_cause=root,
-                    confidence=0.84,
-                )
+        for h in plan:
+            if h.id not in tested:
                 return {
-                    "current_hypothesis": d.next_hypothesis,
-                    "hypotheses_tested": tested,
-                    "root_cause": d.root_cause,
-                    "confidence": d.confidence,
-                    "requires_human_review": (d.confidence or 1.0) < 0.75,
-                    "tool_calls": [],
-                    "iterations": iterations,
+                    **base,
+                    "current_hypothesis": f"{h.id}: {h.label}",
+                    "hypotheses_tested": tested + [h.id],
+                    "hypothesis_verdicts": verdicts,
+                    "graph_status": "running",
+                    "tool_calls": [{"tool": h.tool, "args": h.args(row), "hypothesis_key": h.id}],
                 }
 
-        # ── H3: FLS + CDC + Apex fan-out ─────────────────────────────────────
-        if "H3" not in tested:
-            integration_user = row.get("sf_modified_by") or "sf-integration@org.com"
-            HypothesisDecision(
-                next_hypothesis="H3: FLS + CDC + Apex fan-out",
-                tools_to_call=["get_field_permissions", "get_cdc_field_config", "get_apex_trigger_config"],
-                reasoning=f"H2 inconclusive. Running FLS/CDC/Apex checks.{note}",
-                terminate=False,
-            )
-            return {
-                "current_hypothesis": "H3: FLS + CDC + Apex fan-out",
-                "hypotheses_tested": tested + ["H3"],
-                "tool_calls": [
-                    {
-                        "tool": "get_field_permissions",
-                        "args": {
-                            "integration_user": integration_user,
-                            "sf_object": row["sf_object"],
-                            "sf_field": row["sf_field"],
-                        },
-                        "hypothesis_key": "H3",
-                    },
-                    {
-                        "tool": "get_cdc_field_config",
-                        "args": {
-                            "sf_object": row["sf_object"],
-                            "sf_field": row["sf_field"],
-                        },
-                        "hypothesis_key": "H3",
-                    },
-                    {
-                        "tool": "get_apex_trigger_config",
-                        "args": {"sf_object": row["sf_object"]},
-                        "hypothesis_key": "H3",
-                    },
-                ],
-                "iterations": iterations,
-            }
+            records = [e for e in evidence if e.get("hypothesis_key") == h.id]
+            usable = next((e for e in records if e.get("tool") == h.tool and e.get("outcome") not in ("error", "skipped")), None)
+            verdict, reason, root_cause, override = evaluate(h, usable.get("result") if usable else None, row)
+            # A rule may lower confidence for weak evidence; otherwise the hypothesis default applies.
+            confidence = override if override is not None else h.confidence
+            verdicts.append(_verdict_record(h, verdict, reason, records, confidence))
 
-        # Evaluate H3
-        h3 = [e for e in evidence if e.get("hypothesis_key") == "H3"]
-        root_cause, confidence = self._analyze_h3(h3, row)
-        if root_cause:
-            d = HypothesisDecision(
-                next_hypothesis="H3: Root cause confirmed",
-                tools_to_call=[],
-                reasoning=root_cause + note,
-                terminate=True,
-                root_cause=root_cause,
-                confidence=confidence,
-            )
-            return {
-                "current_hypothesis": d.next_hypothesis,
-                "root_cause": root_cause,
-                "confidence": confidence,
-                "requires_human_review": (confidence or 1.0) < 0.75,
-                "tool_calls": [],
-                "iterations": iterations,
-            }
+            if verdict == "confirmed":
+                return {
+                    **base,
+                    "current_hypothesis": f"{h.id}: {h.label} — confirmed",
+                    "hypotheses_ruled_out": [v["hypothesis_id"] for v in verdicts if v["verdict"] == "refuted"],
+                    "hypothesis_verdicts": verdicts,
+                    "graph_status": "confirmed",
+                    "root_cause_category": h.category,
+                    "graph_root_cause": root_cause,
+                    "graph_confidence": confidence,
+                    "tool_calls": [],
+                    **({"review_reasons": ["graph_low_confidence"]} if confidence < 0.75 else {}),
+                }
 
-        # H1–H3 exhausted → H5 RAG stub (Slice 4)
-        HypothesisDecision(
-            next_hypothesis="H5: RAG lookup required",
-            tools_to_call=[],
-            reasoning=f"H1/H2/H3 inconclusive. RAG context search needed (Slice 4).{note}",
-            terminate=True,
-        )
+        prefix = plan[0].id.rstrip("0123456789abc") or "H"
         return {
-            "current_hypothesis": "H5: RAG lookup required (stub — Slice 4)",
-            "hypotheses_ruled_out": state["hypotheses_ruled_out"] + ["H1", "H2", "H3"],
-            "requires_human_review": True,
-            "root_cause": None,
-            "confidence": None,
+            **base,
+            "current_hypothesis": f"{prefix} exhausted — no hypothesis confirmed",
+            "hypotheses_ruled_out": [v["hypothesis_id"] for v in verdicts if v["verdict"] == "refuted"],
+            "hypothesis_verdicts": verdicts,
+            "graph_status": "exhausted",
+            "root_cause_category": None,
+            "graph_root_cause": None,
+            "graph_confidence": None,
             "tool_calls": [],
-            "iterations": iterations,
+            "review_reasons": ["no_hypothesis_confirmed"],
         }
-
-    def _value_mismatch(self, state: ReconState, iterations: int, note: str) -> dict:
-        tested = state["hypotheses_tested"]
-        evidence = state["evidence_collected"]
-        row = state["recon_row"]
-        integration_user = row.get("sf_modified_by") or "sf-integration@org.com"
-
-        # HVM1: Splunk — DataWeave transform errors
-        if "HVM1" not in tested:
-            return {
-                "current_hypothesis": "HVM1: DataWeave transform error in middleware",
-                "hypotheses_tested": tested + ["HVM1"],
-                "tool_calls": [{"tool": "splunk_stub", "args": {
-                    "sf_record_id": row["sf_record_id"],
-                    "sf_field": row["sf_field"],
-                    "sf_object": row["sf_object"],
-                }, "hypothesis_key": "HVM1"}],
-                "iterations": iterations,
-            }
-
-        # HVM2: FLS permissions causing wrong value reads
-        if "HVM2" not in tested:
-            return {
-                "current_hypothesis": "HVM2: FLS permission restricting field read",
-                "hypotheses_tested": tested + ["HVM2"],
-                "tool_calls": [{"tool": "get_field_permissions", "args": {
-                    "integration_user": integration_user,
-                    "sf_object": row["sf_object"],
-                    "sf_field": row["sf_field"],
-                }, "hypothesis_key": "HVM2"}],
-                "iterations": iterations,
-            }
-
-        # HVM3: CDC channel config — field transformation or exclusion
-        if "HVM3" not in tested:
-            return {
-                "current_hypothesis": "HVM3: CDC channel config or Apex conditional publish",
-                "hypotheses_tested": tested + ["HVM3"],
-                "tool_calls": [
-                    {"tool": "get_cdc_field_config", "args": {
-                        "sf_object": row["sf_object"], "sf_field": row["sf_field"],
-                    }, "hypothesis_key": "HVM3"},
-                    {"tool": "get_apex_trigger_config", "args": {
-                        "sf_object": row["sf_object"],
-                    }, "hypothesis_key": "HVM3"},
-                ],
-                "iterations": iterations,
-            }
-
-        # Evaluate HVM2 FLS
-        hvm2 = next((e for e in evidence if e.get("hypothesis_key") == "HVM2"), None)
-        if hvm2 and not hvm2.get("result", {}).get("has_read_access"):
-            r = hvm2["result"]
-            psets = ", ".join(r.get("permission_sets") or []) or "none assigned"
-            root = (
-                f"Integration user '{r.get('integration_user')}' lacks FLS read access to "
-                f"{row['sf_object']}.{row['sf_field']}. Permission sets: {psets}. "
-                f"Partial or default value being written to DB2."
-            )
-            return {
-                "current_hypothesis": "HVM2: FLS gap confirmed",
-                "root_cause": root, "confidence": 0.85,
-                "requires_human_review": False,
-                "tool_calls": [], "iterations": iterations,
-            }
-
-        # Evaluate HVM3 CDC/Apex
-        hvm3 = [e for e in evidence if e.get("hypothesis_key") == "HVM3"]
-        root_cause, confidence = self._analyze_h3(hvm3, row)
-        if root_cause:
-            return {
-                "current_hypothesis": "HVM3: CDC/Apex root cause confirmed",
-                "root_cause": root_cause, "confidence": confidence,
-                "requires_human_review": (confidence or 1.0) < 0.75,
-                "tool_calls": [], "iterations": iterations,
-            }
-
-        # HVM1–3 inconclusive — route to RAG
-        return {
-            "current_hypothesis": "HVM exhausted — RAG lookup needed",
-            "hypotheses_ruled_out": tested,
-            "requires_human_review": True,
-            "root_cause": None, "confidence": None,
-            "tool_calls": [], "iterations": iterations,
-        }
-
-    def _stale_value(self, state: ReconState, iterations: int, note: str) -> dict:
-        tested = state["hypotheses_tested"]
-        evidence = state["evidence_collected"]
-        row = state["recon_row"]
-
-        # HSV1: Check DB2 field history for stale timestamp
-        if "HSV1" not in tested:
-            return {
-                "current_hypothesis": "HSV1: DB2 field history — stale timestamp check",
-                "hypotheses_tested": tested + ["HSV1"],
-                "tool_calls": [{"tool": "query_db2_field_history", "args": {
-                    "sf_object": row["sf_object"],
-                    "sf_field": row["sf_field"],
-                    "sf_record_id": row["sf_record_id"],
-                }, "hypothesis_key": "HSV1"}],
-                "iterations": iterations,
-            }
-
-        # HSV2: CDC config — field excluded or TTL cache issue
-        if "HSV2" not in tested:
-            return {
-                "current_hypothesis": "HSV2: CDC channel config or middleware cache TTL",
-                "hypotheses_tested": tested + ["HSV2"],
-                "tool_calls": [{"tool": "get_cdc_field_config", "args": {
-                    "sf_object": row["sf_object"], "sf_field": row["sf_field"],
-                }, "hypothesis_key": "HSV2"}],
-                "iterations": iterations,
-            }
-
-        # Evaluate HSV2
-        hsv2 = next((e for e in evidence if e.get("hypothesis_key") == "HSV2"), None)
-        if hsv2 and not hsv2.get("result", {}).get("is_tracked"):
-            r = hsv2["result"]
-            root = (
-                f"Field '{row['sf_field']}' is excluded from CDC tracking "
-                f"(channel: {r.get('cdc_channel') or 'unknown'}). "
-                f"DB2 retains the last synced value and does not receive updates."
-            )
-            return {
-                "current_hypothesis": "HSV2: CDC exclusion confirmed",
-                "root_cause": root, "confidence": 0.87,
-                "requires_human_review": False,
-                "tool_calls": [], "iterations": iterations,
-            }
-
-        return {
-            "current_hypothesis": "HSV exhausted — RAG lookup needed",
-            "hypotheses_ruled_out": tested,
-            "requires_human_review": True,
-            "root_cause": None, "confidence": None,
-            "tool_calls": [], "iterations": iterations,
-        }
-
-    def _missing_record(self, state: ReconState, iterations: int, note: str) -> dict:
-        tested = state["hypotheses_tested"]
-        evidence = state["evidence_collected"]
-        row = state["recon_row"]
-        integration_user = row.get("sf_modified_by") or "sf-integration@org.com"
-
-        # HMR1: DB2 field history — was record ever written?
-        if "HMR1" not in tested:
-            return {
-                "current_hypothesis": "HMR1: DB2 history — record ever written?",
-                "hypotheses_tested": tested + ["HMR1"],
-                "tool_calls": [{"tool": "query_db2_field_history", "args": {
-                    "sf_object": row["sf_object"],
-                    "sf_field": row["sf_field"],
-                    "sf_record_id": row["sf_record_id"],
-                }, "hypothesis_key": "HMR1"}],
-                "iterations": iterations,
-            }
-
-        # HMR2: Apex routing — record silently dropped by trigger
-        if "HMR2" not in tested:
-            return {
-                "current_hypothesis": "HMR2: Apex routing — record silently dropped",
-                "hypotheses_tested": tested + ["HMR2"],
-                "tool_calls": [
-                    {"tool": "get_apex_trigger_config", "args": {
-                        "sf_object": row["sf_object"],
-                    }, "hypothesis_key": "HMR2"},
-                    {"tool": "get_field_permissions", "args": {
-                        "integration_user": integration_user,
-                        "sf_object": row["sf_object"],
-                        "sf_field": row["sf_field"],
-                    }, "hypothesis_key": "HMR2"},
-                ],
-                "iterations": iterations,
-            }
-
-        # Evaluate HMR1 — never written → routing/FLS issue
-        hmr1 = next((e for e in evidence if e.get("hypothesis_key") == "HMR1"), None)
-        if hmr1 and not hmr1.get("result", {}).get("was_populated"):
-            root = (
-                f"No historical value found in DB2 for {row['sf_object']}.{row['sf_field']} "
-                f"(record {row['sf_record_id']}). Record was likely silently dropped by a "
-                f"middleware routing rule or Apex trigger before reaching the DB2 write operation."
-            )
-            return {
-                "current_hypothesis": "HMR1: Record never written — routing failure",
-                "root_cause": root, "confidence": 0.80,
-                "requires_human_review": False,
-                "tool_calls": [], "iterations": iterations,
-            }
-
-        return {
-            "current_hypothesis": "HMR exhausted — RAG lookup needed",
-            "hypotheses_ruled_out": tested,
-            "requires_human_review": True,
-            "root_cause": None, "confidence": None,
-            "tool_calls": [], "iterations": iterations,
-        }
-
-    def _duplicate_downstream(self, state: ReconState, iterations: int, note: str) -> dict:
-        tested = state["hypotheses_tested"]
-        evidence = state["evidence_collected"]
-        row = state["recon_row"]
-
-        # HDD1: Splunk — retry storm producing duplicate inserts
-        if "HDD1" not in tested:
-            return {
-                "current_hypothesis": "HDD1: Splunk — retry storm / duplicate insert events",
-                "hypotheses_tested": tested + ["HDD1"],
-                "tool_calls": [{"tool": "splunk_stub", "args": {
-                    "sf_record_id": row["sf_record_id"],
-                    "sf_field": row["sf_field"],
-                    "sf_object": row["sf_object"],
-                }, "hypothesis_key": "HDD1"}],
-                "iterations": iterations,
-            }
-
-        # HDD2: DB2 history — idempotency key check
-        if "HDD2" not in tested:
-            return {
-                "current_hypothesis": "HDD2: DB2 upsert idempotency — missing MERGE key",
-                "hypotheses_tested": tested + ["HDD2"],
-                "tool_calls": [{"tool": "query_db2_field_history", "args": {
-                    "sf_object": row["sf_object"],
-                    "sf_field": row["sf_field"],
-                    "sf_record_id": row["sf_record_id"],
-                }, "hypothesis_key": "HDD2"}],
-                "iterations": iterations,
-            }
-
-        # Evaluate HDD1
-        hdd1 = next((e for e in evidence if e.get("hypothesis_key") == "HDD1"), None)
-        if hdd1 and hdd1.get("result", {}).get("missed_events"):
-            r = hdd1["result"]
-            root = (
-                f"Splunk detected {r.get('missed_count', 0)} retry events for "
-                f"record {row['sf_record_id']}. Missing idempotency key (MERGE on SalesforceId) "
-                f"in the {row.get('integration_name') or 'integration'} DB2 upsert logic "
-                f"caused INSERT instead of MERGE on retry, producing duplicates."
-            )
-            return {
-                "current_hypothesis": "HDD1: Retry-induced duplicate confirmed",
-                "root_cause": root, "confidence": 0.83,
-                "requires_human_review": False,
-                "tool_calls": [], "iterations": iterations,
-            }
-
-        return {
-            "current_hypothesis": "HDD exhausted — RAG lookup needed",
-            "hypotheses_ruled_out": tested,
-            "requires_human_review": True,
-            "root_cause": None, "confidence": None,
-            "tool_calls": [], "iterations": iterations,
-        }
-
-    def _analyze_h3(
-        self, h3_ev: list[dict], row: dict
-    ) -> tuple[str | None, float | None]:
-        fls = next((e for e in h3_ev if e.get("tool") == "get_field_permissions"), None)
-        cdc = next((e for e in h3_ev if e.get("tool") == "get_cdc_field_config"), None)
-        apex = next((e for e in h3_ev if e.get("tool") == "get_apex_trigger_config"), None)
-
-        if fls and not fls.get("result", {}).get("has_read_access"):
-            r = fls["result"]
-            psets = ", ".join(r.get("permission_sets") or []) or "none assigned"
-            return (
-                f"Integration user '{r.get('integration_user')}' lacks FLS read access to "
-                f"{row['sf_object']}.{row['sf_field']} ({r.get('api_name')}). "
-                f"Permission sets: {psets}.",
-                0.88,
-            )
-
-        if cdc and not cdc.get("result", {}).get("is_tracked"):
-            r = cdc["result"]
-            return (
-                f"Field '{row['sf_field']}' is excluded from CDC tracking "
-                f"(channel: {r.get('cdc_channel') or 'unknown'}, "
-                f"reason: {r.get('reason_excluded') or 'unknown'}). "
-                f"Changes will not propagate downstream.",
-                0.85,
-            )
-
-        if apex and apex.get("result", {}).get("has_conditional_publish"):
-            r = apex["result"]
-            return (
-                f"Apex trigger '{r.get('trigger_name')}' on {row['sf_object']} has "
-                f"conditional publish logic that may suppress null values: "
-                f"{r.get('conditional_logic_description') or 'undocumented condition'}.",
-                0.72,  # intentionally < 0.75 → requires_human_review
-            )
-
-        return None, None

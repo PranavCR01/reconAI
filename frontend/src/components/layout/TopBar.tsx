@@ -31,8 +31,8 @@ export function TopBar({ center, right }: TopBarProps) {
         <BrandMark />
         <span style={{ fontSize: 14 }}>
           <b style={{ color: 'var(--fg)' }}>reconAI</b>
-          <span style={{ color: 'var(--fg-3)', margin: '0 4px' }}>/</span>
-          <span style={{ color: 'var(--fg-2)', fontWeight: 500 }}>Reconciliation</span>
+          <span className="hide-sm" style={{ color: 'var(--fg-3)', margin: '0 4px' }}>/</span>
+          <span className="hide-sm" style={{ color: 'var(--fg-2)', fontWeight: 500 }}>Reconciliation</span>
         </span>
       </Link>
 

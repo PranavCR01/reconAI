@@ -133,6 +133,7 @@ function AppRight() {
   return (
     <>
       <span
+        className="hide-sm"
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -158,9 +159,10 @@ function AppRight() {
           }}
         />
         <span style={{ color: 'var(--fg-3)', fontWeight: 400 }}>org</span>
-        td-bank-na
+        demo-org
       </span>
       <button
+        className="hide-sm"
         style={{
           width: 30,
           height: 30,
@@ -180,6 +182,7 @@ function AppRight() {
         </svg>
       </button>
       <span
+        className="hide-sm"
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -209,9 +212,9 @@ function AppRight() {
             flexShrink: 0,
           }}
         >
-          JK
+          DU
         </span>
-        j.kowalski
+        demo.user
       </span>
     </>
   )

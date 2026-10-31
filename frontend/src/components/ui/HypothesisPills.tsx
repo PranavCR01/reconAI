@@ -1,4 +1,4 @@
-export type HypState = 'done' | 'fail' | 'active' | 'pending'
+export type HypState = 'done' | 'fail' | 'active' | 'pending' | 'inconclusive'
 
 export interface HypothesisItem {
   name: string
@@ -10,6 +10,7 @@ const HYP_STYLE: Record<HypState, { color: string; bg: string; border: string }>
   fail:    { color: 'var(--p1)',   bg: 'oklch(0.26 0.06 25 / 0.4)',  border: 'oklch(0.45 0.12 25)'  },
   active:  { color: 'var(--warn)', bg: 'oklch(0.28 0.06 75 / 0.5)',  border: 'oklch(0.50 0.10 75)'  },
   pending: { color: 'var(--fg-3)', bg: 'var(--bg-2)',                 border: 'var(--line-soft)'     },
+  inconclusive: { color: 'var(--warn)', bg: 'var(--bg-2)',            border: 'var(--line-soft)'     },
 }
 
 const CHECK: Record<HypState, string> = {
@@ -17,6 +18,7 @@ const CHECK: Record<HypState, string> = {
   fail: '✕',
   active: '◐',
   pending: '·',
+  inconclusive: '?',
 }
 
 interface HypothesisPillsProps {

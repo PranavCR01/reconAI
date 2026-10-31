@@ -112,6 +112,19 @@ def test_cache_replay_gets_fresh_evidence_ids(storage, graph, ground_truth, fake
     assert by_incident(first["incident_id"]) == by_incident(second["incident_id"])
 
 
+def test_cache_replay_citations_point_at_the_replayed_evidence(storage, graph, ground_truth, fake_db, llm):
+    row = ground_truth_row(ground_truth[3])
+    _analyze(storage, graph, row, session="cite")
+    second = _analyze(storage, graph, row, session="cite")
+    assert second["cached"]
+    inc = second["incident"]
+    own = {r["id"] for r in fake_db.rows("rca_evidence") if r["incident_id"] == second["incident_id"]}
+    cited_by_verdicts = {e for v in inc.hypothesis_verdicts for e in v["evidence_ids"]}
+    cited_by_claims = {e for c in inc.claims for e in c["evidence_ids"]}
+    assert cited_by_verdicts and cited_by_claims
+    assert cited_by_verdicts <= own and cited_by_claims <= own, "citations must resolve to this incident's evidence"
+
+
 # ---------------------------------------------------------------------------
 # Similar past incidents
 # ---------------------------------------------------------------------------
@@ -157,3 +170,11 @@ def test_incident_api_groups_evidence_and_lists_similar(client, sample_csv_text)
         assert [s["id"] for s in body["similar_incidents_detail"]] == [str(i) for i in body["similar_incidents"]]
         checked += bool(body["similar_incidents_detail"])
     assert checked, "at least one sample incident should cite similar past incidents"
+
+
+def test_run_endpoints_join_row_fields(client, sample_csv_text):
+    run_id, _ = run_sample(client, sample_csv_text)
+    for path in (f"/api/v1/recon/runs/{run_id}", f"/api/v1/recon/runs/{run_id}/incidents"):
+        incidents = client.get(path).json()["incidents"]
+        assert incidents and all(i["sf_object"] and i["sf_field"] and i["discrepancy_type"] for i in incidents)
+        assert any(i["sf_object"] == "Contact" and i["sf_field"] == "Phone" for i in incidents)

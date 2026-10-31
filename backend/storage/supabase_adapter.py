@@ -142,6 +142,12 @@ class SupabaseAdapter(StorageAdapter):
         )
         return RCAIncident.model_validate(result.data)
 
+    async def get_recon_row(self, row_id: str) -> ReconRow:
+        result = await self._run(
+            lambda: self._client.table("recon_rows").select("*").eq("id", row_id).single().execute()
+        )
+        return ReconRow.model_validate(result.data)
+
     async def get_evidence_for_incident(self, incident_id: str) -> list[Evidence]:
         result = await self._run(
             lambda: self._client.table("rca_evidence")

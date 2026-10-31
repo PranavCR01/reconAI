@@ -36,3 +36,7 @@ jobs:
         run: npm run lint
       - name: Typecheck and build
         run: npm run build
+      - name: Unit tests
+        run: npm test
+      - name: No real-looking names in the bundle
+        run: "! grep -rlE 'td-bank|kowalski' dist src"

@@ -149,3 +149,8 @@ textarea {
 .topbar-header {
   background: linear-gradient(180deg, var(--bg-1), var(--bg));
 }
+
+/* Small screens: drop decorative header items so nothing scrolls sideways. */
+@media (max-width: 640px) {
+  .hide-sm { display: none !important; }
+}

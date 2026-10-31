@@ -6,6 +6,7 @@ import { SeverityBadge } from '@/components/ui/Badge'
 import { Panel } from '@/components/ui/Panel'
 import { getRun, getRecallMetrics } from '@/lib/api'
 import { fmtDate, fmtLatency, fmtConfidence, fmtTokens } from '@/lib/format'
+import { jiraLines } from '@/lib/incident'
 import type { RunDetailResponse, RCAIncident, Severity, BenchmarkResponse, RecallMetrics, LlmConfig } from '@/types'
 
 function StatCell({ label, value, color }: { label: string; value: string | number; color?: string }) {
@@ -86,7 +87,7 @@ export default function RunSummary() {
   const [error, setError] = useState<string | null>(null)
   const [recall, setRecall] = useState<RecallMetrics | null>(null)
   const [benchmark] = useState<BenchmarkResponse | null>(null)
-  const [jiraModalOpen, setJiraModalOpen] = useState(false)
+  const [jiraCopied, setJiraCopied] = useState<'idle' | 'copied' | 'failed'>('idle')
 
   function fetchWithRetry<T>(fn: () => Promise<T>, retries = 2, delay = 3000): Promise<T> {
     return fn().catch((e) =>
@@ -160,7 +161,7 @@ export default function RunSummary() {
     ? incidents.reduce((s, i) => s + (i.confidence ?? 0), 0) / incidents.length
     : 0
   const avgLatency = incidents.length > 0
-    ? incidents.reduce((s, i) => s + i.latency_ms, 0) / incidents.length
+    ? incidents.reduce((s, i) => s + (i.e2e_latency_ms || i.latency_ms), 0) / incidents.length
     : 0
 
   const hypFreqAll = buildHypFreq(incidents)
@@ -201,8 +202,15 @@ export default function RunSummary() {
               <button onClick={handleDownloadJson} style={{ padding: '5px 14px', borderRadius: 5, border: '1px solid var(--line)', background: 'var(--bg-2)', color: 'var(--fg-1)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}>
                 Download JSON
               </button>
-              <button onClick={() => setJiraModalOpen(true)} style={{ padding: '5px 14px', borderRadius: 5, border: '1px solid var(--info)', background: 'var(--info-bg)', color: 'var(--info)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}>
-                Export to Jira
+              <button
+                onClick={() => {
+                  const ordered = [...incidents].sort((a, b) => (a.severity ?? 'P9').localeCompare(b.severity ?? 'P9'))
+                  navigator.clipboard.writeText(jiraLines(ordered))
+                    .then(() => setJiraCopied('copied'), () => setJiraCopied('failed'))
+                }}
+                style={{ padding: '5px 14px', borderRadius: 5, border: '1px solid var(--info)', background: 'var(--info-bg)', color: 'var(--info)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}
+              >
+                {jiraCopied === 'copied' ? 'Copied ✓' : jiraCopied === 'failed' ? 'Copy failed' : 'Copy Jira summaries'}
               </button>
             </div>
           </div>
@@ -222,7 +230,7 @@ export default function RunSummary() {
           <StatCell label="Needs Review" value={needsReview} color="var(--warn)" />
           <StatCell label="P1 Critical" value={p1Count} color="var(--p1)" />
           <StatCell label="Avg Confidence" value={fmtConfidence(avgConf)} />
-          <StatCell label="Avg Latency" value={avgLatency > 0 ? fmtLatency(avgLatency) : '—'} />
+          <StatCell label="Avg end-to-end / incident" value={avgLatency > 0 ? fmtLatency(avgLatency) : '—'} />
         </div>
 
         {/* 2-col grid */}
@@ -315,7 +323,7 @@ export default function RunSummary() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--mono)', fontSize: 12 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                  {['Model', 'Config', 'Avg Confidence', 'Avg Latency', 'Avg Tokens'].map(h => (
+                  {['Model', 'Config', 'Avg Confidence', 'Avg LLM Time', 'Avg Tokens'].map(h => (
                     <th key={h} style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--fg-3)', fontWeight: 500, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                   ))}
                 </tr>
@@ -347,29 +355,6 @@ export default function RunSummary() {
           </div>
         </Panel>
 
-        {/* Jira modal */}
-        {jiraModalOpen && (
-          <div
-            onClick={() => setJiraModalOpen(false)}
-            style={{ position: 'fixed', inset: 0, background: 'oklch(0 0 0 / 0.6)', zIndex: 50, display: 'grid', placeItems: 'center' }}
-          >
-            <div
-              onClick={e => e.stopPropagation()}
-              style={{ background: 'var(--bg-1)', border: '1px solid var(--line)', borderRadius: 12, padding: '28px 32px', maxWidth: 440, width: '90%', display: 'flex', flexDirection: 'column', gap: 16 }}
-            >
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: 'var(--fg)' }}>Jira Integration — Coming Soon</div>
-              <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--fg-2)', lineHeight: 1.6 }}>
-                Direct Jira export will be available in a future release. Copy Jira summaries from individual incident detail pages.
-              </div>
-              <button
-                onClick={() => setJiraModalOpen(false)}
-                style={{ alignSelf: 'flex-end', padding: '6px 18px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-2)', color: 'var(--fg-1)', fontFamily: 'var(--mono)', fontSize: 12, cursor: 'pointer' }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

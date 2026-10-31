@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { TopBar, Breadcrumbs } from '@/components/layout/TopBar'
 import { StatusPill } from '@/components/ui/StatusPill'
@@ -6,6 +6,8 @@ import { SeverityBadge } from '@/components/ui/Badge'
 import { ConfidenceBar } from '@/components/ui/ConfidenceBar'
 import { Panel } from '@/components/ui/Panel'
 import { getIncident, resolveIncident } from '@/lib/api'
+import { CriticPanel, HypothesisTimeline, ReviewReasons, SimilarIncidents, TracePanel, UnconfirmedBanner } from '@/components/incident/IncidentPanels'
+import { fmtUsd, isUnconfirmed } from '@/lib/incident'
 import { fmtDate, fmtLatency, fmtTokens, fmtConfidence } from '@/lib/format'
 import type { RCAIncident, Evidence, FixType, ResolveRequest, Resolution } from '@/types'
 
@@ -39,61 +41,6 @@ function statusVariant(status: string): 'ok' | 'review' | 'analyzing' | 'queued'
   return 'default'
 }
 
-function HypStep({ name, pass, index }: { name: string; pass: boolean; index: number }) {
-  return (
-    <div style={{ display: 'flex', gap: 12, paddingBottom: 16, position: 'relative' }}>
-      {/* Timeline line */}
-      <div style={{ position: 'absolute', left: 9, top: 20, bottom: 0, width: 1, background: 'var(--line-soft)' }} />
-      <div style={{
-        width: 20, height: 20, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center',
-        background: pass ? 'var(--ok-bg)' : 'oklch(0.26 0.06 25 / 0.4)',
-        border: `1px solid ${pass ? 'var(--ok)' : 'var(--p1)'}`,
-        zIndex: 1,
-      }}>
-        <span style={{ fontSize: 10, color: pass ? 'var(--ok)' : 'var(--p1)' }}>{pass ? '✓' : '✕'}</span>
-      </div>
-      <div style={{ flex: 1, paddingTop: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 600, color: 'var(--fg-1)' }}>H{index + 1}: {name}</span>
-          <span style={{
-            fontFamily: 'var(--mono)', fontSize: 10, padding: '1px 6px', borderRadius: 4,
-            color: pass ? 'var(--ok)' : 'var(--p1)',
-            background: pass ? 'var(--ok-bg)' : 'oklch(0.26 0.06 25 / 0.3)',
-            border: `1px solid ${pass ? 'var(--ok)' : 'oklch(0.45 0.12 25)'}`,
-          }}>
-            {pass ? 'CONFIRMED' : 'RULED OUT'}
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-          {['schema_diff', 'fls_check', 'splunk_query'].map(tool => (
-            <span key={tool} style={{
-              fontFamily: 'var(--mono)', fontSize: 10.5, padding: '2px 8px', borderRadius: 4,
-              background: 'var(--info-bg)', border: '1px solid var(--line-soft)', color: 'var(--info)',
-            }}>{tool}</span>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function EvidenceCard({ ev }: { ev: Evidence }) {
-  return (
-    <div style={{ background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'var(--info-bg)', border: '1px solid var(--line-soft)', color: 'var(--info)' }}>
-          {ev.source_type}
-        </span>
-      </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--fg-2)', wordBreak: 'break-all' }}>{ev.source_reference}</div>
-      <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--fg-1)', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-        {ev.content}
-      </div>
-      <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--fg-3)', fontStyle: 'italic' }}>{ev.relevance_explanation}</div>
-    </div>
-  )
-}
-
 function CollapsiblePanel({ title, children }: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(true)
   return (
@@ -124,7 +71,7 @@ export default function IncidentDetail() {
   const [formFix, setFormFix] = useState('')
   const [formFixType, setFormFixType] = useState<FixType>('apex_code_change')
   const [formAiCorrect, setFormAiCorrect] = useState(true)
-  const [formResolvedBy, setFormResolvedBy] = useState('j.kowalski')
+  const [formResolvedBy, setFormResolvedBy] = useState('')
   const [formNotes, setFormNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -244,6 +191,8 @@ export default function IncidentDetail() {
   }
 
   const inc = incident
+  const row = inc.recon_row ?? null
+  const citedSimilar = new Set((inc.claims ?? []).flatMap(c => c.similar_incident_ids))
   const confidence = inc.confidence ?? 0
   const confPct = Math.round(Math.min(Math.max(confidence, 0), 1) * 100)
 
@@ -258,8 +207,17 @@ export default function IncidentDetail() {
         }
       />
 
-      <div style={{ maxWidth: 1320, margin: '0 auto', padding: '18px 24px 80px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20, alignItems: 'start' }}>
+      <div style={{ maxWidth: 1320, margin: '0 auto', padding: '18px 16px 80px' }}>
+        <style>{`
+          .inc-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; align-items: start; }
+          .inc-rail { position: sticky; top: 68px; }
+          @media (max-width: 900px) {
+            .inc-grid { grid-template-columns: minmax(0, 1fr); }
+            .inc-rail { position: static; }
+            .inc-cells { grid-template-columns: 1fr 1fr !important; }
+          }
+        `}</style>
+        <div className="inc-grid">
           {/* LEFT COLUMN */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -267,69 +225,39 @@ export default function IncidentDetail() {
             <Panel title="Incident" bodyPadding={14}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
                 <SeverityBadge severity={inc.severity} />
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-2)' }}>{inc.id ?? '—'}</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-2)', overflowWrap: 'anywhere' }}>{inc.id ?? '—'}</span>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--info)' }}>SF → DB2</span>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>{inc.recon_row_id ?? '—'}</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)', overflowWrap: 'anywhere' }}>{row?.sf_record_id ?? inc.recon_row_id ?? '—'}</span>
                 <StatusPill variant={statusVariant(inc.status)} style={{ marginLeft: 'auto' }} />
-                <button style={{ padding: '4px 12px', borderRadius: 5, border: '1px solid var(--line)', background: 'var(--bg-2)', color: 'var(--fg-1)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}>
-                  Export
-                </button>
-                <button style={{ padding: '4px 12px', borderRadius: 5, border: '1px solid var(--ok)', background: 'var(--ok-bg)', color: 'var(--ok)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}>
-                  Apply Fix
-                </button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, background: 'var(--line)', borderRadius: 6, overflow: 'hidden' }}>
+              <div className="inc-cells" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, background: 'var(--line)', borderRadius: 6, overflow: 'hidden' }}>
                 {[
-                  { label: 'SF Object.Field', value: 'Account.AnnualRevenue' },
-                  { label: 'DB2 Table.Column', value: 'ACCT_FACT.ANNUAL_REV' },
-                  { label: 'Integration', value: inc.llm_model ?? 'MuleSoft CDC' },
+                  { label: 'SF Object.Field', value: row ? `${row.sf_object}.${row.sf_field}` : '—' },
+                  { label: 'DB2 Table.Column', value: row ? `${row.db2_table}.${row.db2_column}` : '—' },
+                  { label: 'Discrepancy', value: row?.discrepancy_type ?? '—' },
+                  { label: 'Salesforce value', value: row?.sf_value ?? 'null' },
+                  { label: 'DB2 value', value: row?.db2_value ?? 'null' },
+                  { label: 'Integration', value: row?.integration_name ?? '—' },
                 ].map(cell => (
                   <div key={cell.label} style={{ background: 'var(--bg-2)', padding: '8px 10px' }}>
                     <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>{cell.label}</div>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-1)', fontWeight: 500 }}>{cell.value}</div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-1)', fontWeight: 500, overflowWrap: 'anywhere' }}>{cell.value}</div>
                   </div>
                 ))}
               </div>
             </Panel>
 
-            {/* Hypothesis Execution */}
-            <Panel title="Hypothesis Execution" meta={`${inc.hypotheses_tested.length} tested`}>
-              <div style={{ paddingTop: 4 }}>
-                {inc.hypotheses_tested.length === 0 && (
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-3)', textAlign: 'center', padding: '20px 0' }}>No hypotheses recorded</div>
-                )}
-                {inc.hypotheses_tested.map((hyp, i) => (
-                  <HypStep key={hyp} name={hyp} pass={!inc.hypotheses_ruled_out.includes(hyp)} index={i} />
-                ))}
-              </div>
+            <UnconfirmedBanner inc={inc} />
+            <ReviewReasons reasons={inc.requires_human_review ? inc.review_reasons : []} />
+
+            {/* Root cause */}
+            <Panel title={isUnconfirmed(inc) ? 'Best Guess (unconfirmed)' : 'Root Cause'} meta={inc.root_cause_category ?? undefined}>
+              <div style={{ fontSize: 13.5, color: 'var(--fg-1)', lineHeight: 1.6 }}>{inc.root_cause_summary ?? 'No explanation produced.'}</div>
             </Panel>
 
-            {/* Evidence panel */}
-            <Panel title="Evidence" meta={`${inc.evidence.length} sources`}>
-              {inc.evidence.length === 0 ? (
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-3)', textAlign: 'center', padding: '20px 0' }}>No evidence attached</div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-                  {inc.evidence.map((ev, i) => <EvidenceCard key={ev.id ?? i} ev={ev} />)}
-                </div>
-              )}
-            </Panel>
-
-            {/* Similar Incidents */}
-            {inc.similar_incidents.length > 0 && (
-              <Panel title="Similar Past Incidents" meta={`${inc.similar_incidents.length} found`}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-                  {inc.similar_incidents.map((sid, i) => (
-                    <div key={sid} style={{ background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px' }}>
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-2)', marginBottom: 4 }}>{sid.slice(0, 20)}…</div>
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--info)' }}>
-                        similarity: {inc.similarity_scores[i] != null ? `${Math.round(inc.similarity_scores[i] * 100)}%` : '—'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Panel>
-            )}
+            <HypothesisTimeline inc={inc} />
+            <CriticPanel inc={inc} />
+            <SimilarIncidents items={inc.similar_incidents_detail} cited={citedSimilar} />
 
             {/* Suggested Fix */}
             <CollapsiblePanel title="Suggested Fix">
@@ -356,13 +284,13 @@ export default function IncidentDetail() {
                     { dt: 'Status', dd: inc.status },
                     { dt: 'Confidence', dd: fmtConfidence(inc.confidence) },
                     { dt: 'Tool Calls', dd: inc.total_tool_calls },
-                    { dt: 'Latency', dd: fmtLatency(inc.latency_ms) },
+                    { dt: 'LLM time', dd: fmtLatency(inc.latency_ms) },
                     { dt: 'Created', dd: fmtDate(inc.created_at) },
                   ].map(({ dt, dd }) => (
-                    <>
-                      <dt key={`dt-${dt}`} style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{dt}</dt>
-                      <dd key={`dd-${dt}`} style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-1)', margin: 0 }}>{String(dd)}</dd>
-                    </>
+                    <Fragment key={dt}>
+                      <dt style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{dt}</dt>
+                      <dd style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-1)', margin: 0 }}>{String(dd)}</dd>
+                    </Fragment>
                   ))}
                 </dl>
               </CollapsiblePanel>
@@ -383,6 +311,8 @@ export default function IncidentDetail() {
                 </pre>
               </Panel>
             )}
+
+            <TracePanel inc={inc} />
 
             {/* Resolution form */}
             <Panel title="Resolve Incident">
@@ -455,8 +385,8 @@ export default function IncidentDetail() {
                     </button>
                   </div>
                   <div>
-                    <label style={labelStyle}>Resolved By</label>
-                    <input style={{ ...fieldStyle, resize: undefined }} value={formResolvedBy} onChange={e => setFormResolvedBy(e.target.value)} required />
+                    <label style={labelStyle} htmlFor="resolved-by">Resolved By</label>
+                    <input id="resolved-by" placeholder="your name" style={{ ...fieldStyle, resize: undefined }} value={formResolvedBy} onChange={e => setFormResolvedBy(e.target.value)} required />
                   </div>
                   <div>
                     <label style={labelStyle}>Correction Notes (optional)</label>
@@ -486,7 +416,7 @@ export default function IncidentDetail() {
           </div>
 
           {/* RIGHT RAIL */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 68 }}>
+          <div className="inc-rail" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {/* Confidence panel */}
             <Panel title="Confidence">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', padding: '8px 0' }}>
@@ -494,10 +424,8 @@ export default function IncidentDetail() {
                   {fmtConfidence(inc.confidence)}
                 </div>
                 <ConfidenceBar value={inc.confidence} status="complete" style={{ width: '100%' }} />
-                <div style={{ display: 'flex', gap: 16, fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--fg-3)' }}>
-                  <span>prior: 0.65</span>
-                  <span>likelihood: {fmtConfidence(inc.confidence)}</span>
-                  <span>n=3</span>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--fg-3)', textAlign: 'center', lineHeight: 1.5 }}>
+                  model-stated confidence in the explanation{isUnconfirmed(inc) ? ' · diagnosis not confirmed' : ''}
                 </div>
               </div>
             </Panel>
@@ -506,10 +434,12 @@ export default function IncidentDetail() {
             <Panel title="Quick Stats">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: 'var(--line)', borderRadius: 6, overflow: 'hidden' }}>
                 {[
-                  { label: 'Records Affected', value: '1' },
                   { label: 'Tool Calls', value: String(inc.total_tool_calls) },
-                  { label: 'Time to RCA', value: inc.latency_ms > 0 ? fmtLatency(inc.latency_ms) : '—' },
+                  { label: 'End-to-end', value: inc.e2e_latency_ms ? fmtLatency(inc.e2e_latency_ms) : '—' },
+                  { label: 'LLM time', value: inc.latency_ms > 0 ? fmtLatency(inc.latency_ms) : '—' },
                   { label: 'Tokens', value: fmtTokens(inc.total_tokens_used) },
+                  { label: 'Cost', value: fmtUsd(inc.cost_usd) },
+                  { label: 'Model calls', value: String(inc.llm_calls?.length ?? 0) },
                 ].map(stat => (
                   <div key={stat.label} style={{ background: 'var(--bg-2)', padding: '10px 12px' }}>
                     <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{stat.label}</div>
@@ -523,9 +453,12 @@ export default function IncidentDetail() {
             <Panel title="Activity">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {[
-                  { label: 'AI opened incident', time: fmtDate(inc.created_at), color: 'var(--info)' },
-                  { label: 'AI confirmed hypothesis', time: fmtDate(inc.created_at), color: 'var(--ok)' },
-                  { label: 'You opened detail view', time: 'just now', color: 'var(--fg-3)' },
+                  { label: 'Analysis completed', time: fmtDate(inc.created_at), color: 'var(--info)' },
+                  isUnconfirmed(inc)
+                    ? { label: 'No hypothesis confirmed — sent to review', time: fmtDate(inc.created_at), color: 'var(--warn)' }
+                    : { label: `Confirmed ${inc.root_cause_category ?? inc.final_hypothesis ?? 'a hypothesis'}`, time: fmtDate(inc.created_at), color: 'var(--ok)' },
+                  { label: `Explanation ${inc.judge_decision === 'accept' ? 'accepted' : 'escalated'} by judge`, time: fmtDate(inc.created_at),
+                    color: inc.judge_decision === 'accept' ? 'var(--ok)' : 'var(--warn)' },
                   ...(resolvedAt ? [{ label: 'Resolution recorded', time: fmtDate(resolvedAt), color: 'var(--ok)' }] : []),
                 ].map((item, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>

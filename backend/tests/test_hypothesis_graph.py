@@ -248,4 +248,8 @@ def test_incident_persists_graph_outcome(storage, graph, ground_truth, fake_db):
     for key in ("hypothesis_verdicts", "graph_status", "root_cause_category", "contributing_factors", "graph_version"):
         assert saved[key] == getattr(inc, key), key
     cached = asyncio.run(_analyze_row(row, CONFIG, graph, storage, session_id="persist-graph"))
-    assert cached["cached"] and cached["incident"].hypothesis_verdicts == inc.hypothesis_verdicts
+    # Evidence ids are re-keyed on replay (checked in test_evidence); everything else must match.
+    strip = lambda vs: [{k: v for k, v in x.items() if k != "evidence_ids"} for x in vs]
+    assert cached["cached"] and strip(cached["incident"].hypothesis_verdicts) == strip(inc.hypothesis_verdicts)
+    assert [len(v["evidence_ids"]) for v in cached["incident"].hypothesis_verdicts] == \
+        [len(v["evidence_ids"]) for v in inc.hypothesis_verdicts]

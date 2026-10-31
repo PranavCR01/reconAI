@@ -268,6 +268,17 @@ def _with_fresh_evidence_ids(evidence: list[dict]) -> tuple[list[dict], dict[str
     return [{**ev, "id": mapping.get(ev.get("id"), str(uuid.uuid4()))} for ev in evidence], mapping
 
 
+def _remap(value, mapping: dict[str, str]):
+    """Replace every string that is an old evidence id with its new id, anywhere in a nested value."""
+    if isinstance(value, str):
+        return mapping.get(value, value)
+    if isinstance(value, list):
+        return [_remap(v, mapping) for v in value]
+    if isinstance(value, dict):
+        return {k: _remap(v, mapping) for k, v in value.items()}
+    return value
+
+
 def _similar(candidates: list[dict], limit: int = 5) -> tuple[list[str], list[float]]:
     """The past incidents actually handed to Synthesis (the reranked top `limit`)."""
     top = [c for c in candidates[:limit] if c.get("id")]
@@ -285,15 +296,16 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
         confidence = float(rca.get("confidence", 0.5))
         reasons = _cached_review_reasons(rca)
         llm_calls = rca.get("_llm_calls") or []
-        cached_evidence, _ = _with_fresh_evidence_ids(rca.get("_evidence") or [])
+        cached_evidence, id_map = _with_fresh_evidence_ids(rca.get("_evidence") or [])
         # Cost and trace describe the analysis that produced this result (no new LLM calls are made).
         cost, cost_warnings = incident_cost(llm_calls)
         incident = RCAIncident(
             recon_row_id=row.id,
             similar_incidents=rca.get("_similar_incidents") or [],
             similarity_scores=rca.get("_similarity_scores") or [],
-            **{f: rca[f"_{f}"] for f in _GRAPH_FIELDS if rca.get(f"_{f}") is not None},
-            **_explanation_fields(rca),
+            # Verdicts and claims cite evidence by id; point them at the re-keyed rows.
+            **_remap({f: rca[f"_{f}"] for f in _GRAPH_FIELDS if rca.get(f"_{f}") is not None}, id_map),
+            **_remap(_explanation_fields(rca), id_map),
             hypotheses_tested=rca.get("_hypotheses_tested") or [],
             hypotheses_ruled_out=rca.get("_hypotheses_ruled_out") or [],
             final_hypothesis=rca.get("_final_hypothesis"),
@@ -683,6 +695,16 @@ async def stream_run_analysis(
     )
 
 
+def _row_fields(row) -> dict:
+    """Fields the run views show for each incident, joined from its recon row."""
+    return {
+        "severity": row.severity.value if row and row.severity else None,
+        "sf_object": row.sf_object if row else None,
+        "sf_field": row.sf_field if row else None,
+        "discrepancy_type": row.discrepancy_type.value if row and row.discrepancy_type else None,
+    }
+
+
 @app.get("/api/v1/recon/runs/{run_id}")
 async def get_run(run_id: str, storage: StorageDep):
     try:
@@ -700,7 +722,7 @@ async def get_run(run_id: str, storage: StorageDep):
     for inc in incidents:
         row = row_map.get(str(inc.recon_row_id))
         d = inc.model_dump(mode="json")
-        d["severity"] = row.severity.value if row and row.severity else None
+        d.update(_row_fields(row))
         incidents_out.append(d)
 
     return {
@@ -727,7 +749,7 @@ async def list_run_incidents(run_id: str, storage: StorageDep):
     for inc in incidents:
         row = row_map.get(str(inc.recon_row_id))
         d = inc.model_dump(mode="json")
-        d["severity"] = row.severity.value if row and row.severity else None
+        d.update(_row_fields(row))
         incidents_out.append(d)
 
     return {"run_id": run_id, "incidents": incidents_out}
@@ -765,8 +787,17 @@ async def get_incident(incident_id: str, storage: StorageDep):
             "summary": artifact.content[:280],
         })
 
+    recon_row = None
+    if incident.recon_row_id:
+        try:
+            recon_row = (await storage.get_recon_row(str(incident.recon_row_id))).model_dump(mode="json")
+        except Exception:
+            recon_row = None  # row removed; the page shows the incident without it
+
     return {
         **incident.model_dump(mode="json"),
+        "recon_row": recon_row,
+        "severity": (recon_row or {}).get("severity"),
         "evidence": evidence_json,
         "evidence_by_hypothesis": by_hypothesis,
         "similar_incidents_detail": similar,

@@ -35,6 +35,17 @@ class SupabaseAdapter(StorageAdapter):
     async def _run(self, fn):
         return await asyncio.to_thread(fn)
 
+    async def missing_columns(self, required: dict[str, list[str]]) -> list[str]:
+        """Return 'table.column' for each required column the database rejects."""
+        missing: list[str] = []
+        for table, columns in required.items():
+            for column in columns:
+                try:
+                    await self._run(lambda t=table, c=column: self._client.table(t).select(c).limit(1).execute())
+                except Exception:
+                    missing.append(f"{table}.{column}")
+        return missing
+
     async def save_recon_run(self, run: ReconRun) -> str:
         result = await self._run(
             lambda: self._client.table("recon_runs").insert(_dump(run)).execute()

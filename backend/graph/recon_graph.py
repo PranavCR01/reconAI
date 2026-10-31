@@ -7,7 +7,7 @@ from backend.agents.hypothesis import HypothesisAgent
 from backend.agents.ingestion import IngestionAgent
 from backend.agents.synthesis import run_synthesis
 from backend.config import AgentConfig
-from backend.models.state import ReconState
+from backend.models.state import ReconState, check_node_output
 from backend.tools.rag_tools import rerank_candidates, retrieve_similar_artifacts
 
 MAX_ITERATIONS = 6
@@ -19,38 +19,32 @@ def build_graph(config: AgentConfig, storage):
     hypothesis_agent = HypothesisAgent(config)
 
     def _ingestion(state: ReconState) -> dict:
-        return ingestion_agent.run(state)
+        return check_node_output("ingestion", ingestion_agent.run(state))
 
     def _hypothesis(state: ReconState) -> dict:
-        return hypothesis_agent.run(state)
+        return check_node_output("hypothesis", hypothesis_agent.run(state))
 
     def _evidence(state: ReconState) -> dict:
-        return run_evidence(state)
+        return check_node_output("evidence", run_evidence(state))
 
     def _rag_retrieval(state: ReconState) -> dict:
         candidates = retrieve_similar_artifacts(state, storage)
         reranked, llm_call = rerank_candidates(candidates, state, config)
-        out: dict = {
-            "rag_candidates": candidates,
-            "reranked_candidates": reranked,
-        }
+        out: dict = {"rag_candidates": candidates, "reranked_candidates": reranked}
         if llm_call:
-            # Non-negotiable #4: every LLM call is logged in state like the other agents.
-            out["llm_calls"] = (state.get("llm_calls") or []) + [llm_call]
-            out["total_latency_ms"] = (state.get("total_latency_ms") or 0) + llm_call["latency_ms"]
-        return out
+            # Non-negotiable #4: append the reranker call; the reducer keeps earlier entries.
+            out["llm_calls"] = [llm_call]
+            out["total_latency_ms"] = llm_call["latency_ms"]
+        return check_node_output("rag_retrieval", out)
 
     def _synthesis(state: ReconState) -> dict:
+        result = run_synthesis(state, config)
         # Non-negotiable #1: every tested hypothesis must have ≥1 evidence entry.
         tested = set(state.get("hypotheses_tested") or [])
         covered = {e.get("hypothesis_key") for e in state.get("evidence_collected") or []}
-        result = run_synthesis(state, config)
         if tested and not tested.issubset(covered):
-            result["requires_human_review"] = True
-            rca = result.get("rca_output") or {}
-            rca["requires_human_review"] = True
-            result["rca_output"] = rca
-        return result
+            result["review_reasons"] = list(result.get("review_reasons") or []) + ["missing_evidence"]
+        return check_node_output("synthesis", result)
 
     def _route_after_hypothesis(state: ReconState) -> str:
         if state["iterations"] >= MAX_ITERATIONS:

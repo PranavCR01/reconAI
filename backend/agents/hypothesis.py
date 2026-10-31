@@ -10,6 +10,33 @@ class HypothesisAgent:
         self._config = config
 
     def run(self, state: ReconState) -> dict:
+        return self._to_state_update(self._decide(state))
+
+    @staticmethod
+    def _to_state_update(result: dict) -> dict:
+        """Map a branch decision onto the keys this node owns.
+
+        The graph's root cause and confidence go to graph_* keys (Synthesis owns the
+        final ones); a review flag becomes a named, append-only review reason.
+        """
+        out = dict(result)
+        if "root_cause" in out:
+            out["graph_root_cause"] = out.pop("root_cause")
+        if "confidence" in out:
+            out["graph_confidence"] = out.pop("confidence")
+        flag = out.pop("requires_human_review", None)
+        if flag:
+            hypothesis = out.get("current_hypothesis", "")
+            if hypothesis.startswith("UNKNOWN"):
+                reason = "unknown_type"
+            elif "exhausted" in hypothesis or hypothesis.startswith("H5"):
+                reason = "no_hypothesis_confirmed"
+            else:
+                reason = "graph_low_confidence"
+            out["review_reasons"] = [reason]
+        return out
+
+    def _decide(self, state: ReconState) -> dict:
         row = state["recon_row"]
         dt = row.get("discrepancy_type")
         iterations = state["iterations"] + 1

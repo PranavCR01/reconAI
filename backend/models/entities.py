@@ -103,6 +103,10 @@ class RCAIncident(BaseModel):
     total_tool_calls: int = 0
     total_tokens_used: int = 0
     latency_ms: int = 0
+    # Why the incident needs human review (empty = no review needed). Append-only during a run.
+    review_reasons: list[str] = Field(default_factory=list)
+    # Every LLM call made to produce this analysis (non-negotiable #4).
+    llm_calls: list[dict] = Field(default_factory=list)
     created_at: Optional[datetime] = None
 
 

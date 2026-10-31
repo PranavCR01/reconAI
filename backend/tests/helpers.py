@@ -40,3 +40,37 @@ def run_sample(client, csv_text: str, params: str = "") -> tuple[str, list[dict]
     assert response.status_code == 201, response.text
     run_id = response.json()["run_id"]
     return run_id, stream_events(client, run_id, params)
+
+
+def ground_truth_row(incident: dict):
+    """A ReconRow for a labeled benchmark incident (fields the simulators read)."""
+    import uuid
+
+    from backend.models.entities import DiscrepancyType, ReconRow
+
+    return ReconRow(
+        id=uuid.uuid5(uuid.NAMESPACE_URL, incident["id"]),
+        sf_object=incident["sf_object"],
+        sf_field=incident["sf_field"],
+        sf_record_id=incident["sf_record_id"],
+        sf_value="sf-value",
+        db2_table="DB2_TABLE",
+        db2_column="DB2_COLUMN",
+        db2_value=None if incident["discrepancy_type"] == "NULL_DOWNSTREAM" else "db2-value",
+        discrepancy_type=DiscrepancyType(incident["discrepancy_type"]),
+    )
+
+
+SYNTHESIS_PROMPT = "integration RCA analyst"
+
+
+def synthesis_json(confidence: float = 0.9, root_cause: str = "Root cause from evidence.") -> str:
+    import json
+
+    return json.dumps({
+        "root_cause": root_cause,
+        "suggested_fix": "Apply the fix.",
+        "postmortem_draft": "Postmortem.",
+        "jira_summary": "RCA ticket",
+        "confidence": confidence,
+    })

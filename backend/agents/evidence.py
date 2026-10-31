@@ -264,6 +264,7 @@ def _execute_hypothesis_calls(calls: list[dict]) -> list[dict]:
 def run_evidence(state: ReconState) -> dict:
     pending = state.get("tool_calls") or []
     if not pending:
+        # Coverage retry with nothing queued: count the attempt so the router stops retrying.
         return {"evidence_retry_count": (state.get("evidence_retry_count") or 0) + 1}
 
     by_hypothesis: dict[str, list[dict]] = defaultdict(list)
@@ -274,7 +275,6 @@ def run_evidence(state: ReconState) -> dict:
     for calls in by_hypothesis.values():
         new_evidence.extend(_execute_hypothesis_calls(calls))
 
-    return {
-        "evidence_collected": state["evidence_collected"] + new_evidence,
-        "tool_calls": [],
-    }
+    # evidence_collected is an append-only reducer: return only the new records.
+    # tool_calls is owned by the hypothesis node, which re-queues on its next turn.
+    return {"evidence_collected": new_evidence}

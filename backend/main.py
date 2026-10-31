@@ -34,6 +34,7 @@ from backend.models.entities import (
     Resolution,
     Severity,
 )
+from backend.models.state import initial_state, review_reasons
 from backend.storage.supabase_adapter import SupabaseAdapter
 from backend.tools.rag_tools import compute_recall_at_k, embed_text
 
@@ -50,6 +51,11 @@ _RECALL_TTL = 3600  # 1 hour — recall@k is stable between artifact updates
 _REQUIRED_CSV_COLUMNS = {"sf_object", "sf_field", "sf_record_id", "db2_table", "db2_column"}
 
 _SEVERITY_ORDER = {Severity.P1: 0, Severity.P2: 1, Severity.P3: 2}
+
+# Columns added by migrations in docs/sql/; checked at startup.
+REQUIRED_COLUMNS: dict[str, list[str]] = {
+    "rca_incidents": ["review_reasons", "llm_calls"],
+}
 
 # ---------------------------------------------------------------------------
 # Cost guards — the app is public and every analyzed row costs LLM/embedding calls.
@@ -106,6 +112,12 @@ def _wait_text(seconds: int) -> str:
 async def lifespan(app: FastAPI):
     global _storage
     _storage = SupabaseAdapter.from_env()
+    # Fail loudly (log + Sentry) if a migration in docs/sql/ hasn't been applied.
+    app.state.missing_columns = await _storage.missing_columns(REQUIRED_COLUMNS)
+    if app.state.missing_columns:
+        msg = f"Supabase schema is missing columns {app.state.missing_columns}; apply docs/sql/ migrations"
+        print(f"ERROR: {msg}", flush=True)
+        sentry_sdk.capture_message(msg, level="error")
     try:
         from backend.seed.fsc_incidents import seed_artifacts
         await seed_artifacts(_storage)
@@ -191,6 +203,42 @@ def _no_confirmed_hypothesis(tested: list[str] | None, ruled_out: list[str] | No
     return not tested or set(tested) <= set(ruled_out or [])
 
 
+def _cached_review_reasons(rca: dict) -> list[str]:
+    """Review reasons for a cache entry; derives them for entries written before reasons existed."""
+    if "_review_reasons" in rca:
+        return list(rca["_review_reasons"])
+    reasons = []
+    if _no_confirmed_hypothesis(rca.get("_hypotheses_tested"), rca.get("_hypotheses_ruled_out")):
+        reasons.append("no_hypothesis_confirmed")
+    if float(rca.get("confidence", 0.5)) < 0.75:
+        reasons.append("low_confidence")
+    if not reasons and rca.get("requires_human_review"):
+        reasons.append("legacy_cache_flag")
+    return reasons
+
+
+def _llm_tokens(calls: list[dict]) -> int:
+    return sum(c.get("input_tokens", 0) + c.get("output_tokens", 0) for c in calls)
+
+
+async def _save_incident_and_evidence(storage, incident: RCAIncident, evidence: list[dict]):
+    incident_id = await storage.save_rca_incident(incident)
+    for ev in evidence:
+        try:
+            await storage.save_evidence(Evidence(incident_id=incident_id, **ev))
+        except Exception:
+            pass
+    return incident_id
+
+
+def _evidence_rows(evidence_collected: list[dict]) -> list[dict]:
+    return [
+        {k: ev["evidence_result"][k] for k in ("source_type", "source_reference", "content", "relevance_explanation")}
+        for ev in evidence_collected
+        if ev.get("evidence_result")
+    ]
+
+
 async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool = False, session_id: str = "") -> dict:
     """Full analysis pipeline for one row. Returns a result dict; never raises."""
     cache_key = make_cache_key(row, session_id)
@@ -199,138 +247,85 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
     if cached:
         rca = cached.get("rca_output") or {}
         confidence = float(rca.get("confidence", 0.5))
-        # Cache entries written before the synthesis fix may carry a cleared flag for
-        # exhausted paths, so re-derive it from the stored hypotheses too.
-        human_review = (
-            confidence < 0.75
-            or bool(rca.get("requires_human_review"))
-            or _no_confirmed_hypothesis(rca.get("_hypotheses_tested"), rca.get("_hypotheses_ruled_out"))
-        )
-        status = IncidentStatus.needs_review if human_review else IncidentStatus.complete
+        reasons = _cached_review_reasons(rca)
+        llm_calls = rca.get("_llm_calls") or []
         incident = RCAIncident(
             recon_row_id=row.id,
             hypotheses_tested=rca.get("_hypotheses_tested") or [],
             hypotheses_ruled_out=rca.get("_hypotheses_ruled_out") or [],
+            final_hypothesis=rca.get("_final_hypothesis"),
             total_tool_calls=rca.get("_total_tool_calls") or 0,
-            total_tokens_used=rca.get("_total_tokens_used") or 0,
+            total_tokens_used=rca.get("_total_tokens_used") or _llm_tokens(llm_calls),
+            latency_ms=rca.get("_latency_ms") or 0,
             confidence=confidence,
             root_cause_summary=rca.get("root_cause"),
             suggested_fix=rca.get("suggested_fix"),
             postmortem_draft=rca.get("postmortem_draft"),
             jira_summary=rca.get("jira_summary"),
-            requires_human_review=human_review,
-            status=status,
+            requires_human_review=bool(reasons),
+            review_reasons=reasons,
+            llm_calls=llm_calls,
+            status=IncidentStatus.needs_review if reasons else IncidentStatus.complete,
             llm_model=cached.get("llm_model") or config.synthesis_llm,
         )
         try:
-            incident_id = await storage.save_rca_incident(incident)
+            incident_id = await _save_incident_and_evidence(storage, incident, rca.get("_evidence") or [])
         except Exception as exc:
-            return {"incident_id": None, "incident": None, "cached": True, "human_review": human_review, "error": f"save incident: {exc}"}
-        for ev_data in rca.get("_evidence") or []:
-            try:
-                await storage.save_evidence(Evidence(
-                    incident_id=incident_id,
-                    source_type=ev_data["source_type"],
-                    source_reference=ev_data["source_reference"],
-                    content=ev_data["content"],
-                    relevance_explanation=ev_data["relevance_explanation"],
-                ))
-            except Exception:
-                pass
-        return {"incident_id": incident_id, "incident": incident, "cached": True, "human_review": human_review, "error": None}
-
-    initial_state = {
-        "recon_row": row.model_dump(mode="json"),
-        "current_hypothesis": "",
-        "hypotheses_tested": [],
-        "hypotheses_ruled_out": [],
-        "evidence_collected": [],
-        "rag_candidates": [],
-        "reranked_candidates": [],
-        "root_cause": None,
-        "confidence": None,
-        "rca_output": None,
-        "iterations": 0,
-        "requires_human_review": False,
-        "llm_calls": [],
-        "tool_calls": [],
-        "total_latency_ms": 0,
-        "evidence_retry_count": 0,
-    }
+            return {"incident_id": None, "incident": None, "cached": True, "human_review": bool(reasons), "error": f"save incident: {exc}"}
+        return {"incident_id": incident_id, "incident": incident, "cached": True, "human_review": bool(reasons), "error": None}
 
     try:
-        final = await asyncio.to_thread(graph.invoke, initial_state)
+        final = await asyncio.to_thread(graph.invoke, initial_state(row.model_dump(mode="json")))
     except Exception as exc:
         return {"incident_id": None, "incident": None, "cached": False, "human_review": False, "error": str(exc)}
 
     rca = final.get("rca_output") or {}
-    human_review = bool(final.get("requires_human_review") or rca.get("requires_human_review"))
-    status = IncidentStatus.needs_review if human_review else IncidentStatus.complete
+    reasons = review_reasons(final)
+    llm_calls = final.get("llm_calls") or []
+    # Synthesis degradation is reported on the incident the way the UI expects it.
+    final_hypothesis = "API_UNAVAILABLE" if final.get("synthesis_status") == "api_unavailable" \
+        else (final.get("current_hypothesis") or None)
+    evidence = _evidence_rows(final.get("evidence_collected") or [])
 
     incident = RCAIncident(
         recon_row_id=row.id,
         hypotheses_tested=final.get("hypotheses_tested") or [],
         hypotheses_ruled_out=final.get("hypotheses_ruled_out") or [],
-        final_hypothesis=final.get("current_hypothesis") or None,
-        confidence=rca.get("confidence") or final.get("confidence"),
+        final_hypothesis=final_hypothesis,
+        confidence=rca.get("confidence") if rca.get("confidence") is not None else final.get("confidence"),
         root_cause_summary=rca.get("root_cause") or final.get("root_cause"),
         suggested_fix=rca.get("suggested_fix"),
         postmortem_draft=rca.get("postmortem_draft"),
         jira_summary=rca.get("jira_summary"),
-        requires_human_review=human_review,
-        status=status,
+        requires_human_review=bool(reasons),
+        review_reasons=reasons,
+        llm_calls=llm_calls,
+        status=IncidentStatus.needs_review if reasons else IncidentStatus.complete,
         llm_model=config.synthesis_llm,
         total_tool_calls=len(final.get("evidence_collected") or []),
-        total_tokens_used=sum(
-            (c.get("input_tokens", 0) + c.get("output_tokens", 0))
-            for c in (final.get("llm_calls") or [])
-        ),
+        total_tokens_used=_llm_tokens(llm_calls),
         latency_ms=final.get("total_latency_ms") or 0,
     )
 
     try:
-        incident_id = await storage.save_rca_incident(incident)
+        incident_id = await _save_incident_and_evidence(storage, incident, evidence)
     except Exception as exc:
-        return {"incident_id": None, "incident": None, "cached": False, "human_review": human_review, "error": f"save incident: {exc}"}
+        return {"incident_id": None, "incident": None, "cached": False, "human_review": bool(reasons), "error": f"save incident: {exc}"}
 
-    for ev in final.get("evidence_collected") or []:
-        er = ev.get("evidence_result")
-        if not er:
-            continue
-        try:
-            await storage.save_evidence(Evidence(
-                incident_id=incident_id,
-                source_type=er["source_type"],
-                source_reference=er["source_reference"],
-                content=er["content"],
-                relevance_explanation=er["relevance_explanation"],
-            ))
-        except Exception:
-            pass
-
-    _evidence_cache = [
-        {
-            "source_type": ev["evidence_result"]["source_type"],
-            "source_reference": ev["evidence_result"]["source_reference"],
-            "content": ev["evidence_result"]["content"],
-            "relevance_explanation": ev["evidence_result"]["relevance_explanation"],
-        }
-        for ev in (final.get("evidence_collected") or [])
-        if ev.get("evidence_result")
-    ]
     await write_cache(storage, cache_key, {
         **rca,
-        "_hypotheses_tested": final.get("hypotheses_tested") or [],
-        "_hypotheses_ruled_out": final.get("hypotheses_ruled_out") or [],
-        "_total_tool_calls": len(final.get("evidence_collected") or []),
-        "_total_tokens_used": sum(
-            (c.get("input_tokens", 0) + c.get("output_tokens", 0))
-            for c in (final.get("llm_calls") or [])
-        ),
-        "_evidence": _evidence_cache,
+        "_hypotheses_tested": incident.hypotheses_tested,
+        "_hypotheses_ruled_out": incident.hypotheses_ruled_out,
+        "_final_hypothesis": incident.final_hypothesis,
+        "_review_reasons": reasons,
+        "_llm_calls": llm_calls,
+        "_latency_ms": incident.latency_ms,
+        "_total_tool_calls": incident.total_tool_calls,
+        "_total_tokens_used": incident.total_tokens_used,
+        "_evidence": evidence,
     }, config.synthesis_llm)
 
-    return {"incident_id": incident_id, "incident": incident, "cached": False, "human_review": human_review, "error": None}
+    return {"incident_id": incident_id, "incident": incident, "cached": False, "human_review": bool(reasons), "error": None}
 
 
 # ---------------------------------------------------------------------------

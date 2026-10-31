@@ -34,7 +34,7 @@ def _build_prompt(state: ReconState, error_context: str = "") -> str:
     candidates = state.get("reranked_candidates") or state.get("rag_candidates") or []
     hypotheses_tested = state.get("hypotheses_tested") or []
     hypotheses_ruled_out = state.get("hypotheses_ruled_out") or []
-    hypothesis_root_cause = state.get("root_cause")
+    hypothesis_root_cause = state.get("graph_root_cause")
 
     ev_lines = []
     for e in evidence:
@@ -172,18 +172,20 @@ def _is_api_unavailable(exc: Exception) -> bool:
 def run_synthesis(state: ReconState, config: AgentConfig) -> dict:
     model = config.synthesis_llm
 
-    total_input_tokens = 0
-    total_output_tokens = 0
-    total_latency_ms = 0
+    llm_calls: list[dict] = []
     data: dict = {}
     error_context = ""
 
     api_unavailable = False
-    for attempt in range(_MAX_RETRIES):
+    for attempt in range(1, _MAX_RETRIES + 1):
         prompt = _build_prompt(state, error_context)
         try:
             raw, in_tok, out_tok, lat_ms = _call_llm(prompt, model)
         except Exception as exc:
+            # Non-negotiable #4: failed calls are logged too, not just successful ones.
+            llm_calls.append({"agent": "synthesis", "model": model, "attempt": attempt,
+                              "input_tokens": 0, "output_tokens": 0, "latency_ms": 0,
+                              "error": f"{type(exc).__name__}: {exc}"[:300]})
             if _is_api_unavailable(exc):
                 sentry_sdk.capture_exception(exc)
                 data = dict(_API_UNAVAILABLE_OUTPUT)
@@ -192,23 +194,29 @@ def run_synthesis(state: ReconState, config: AgentConfig) -> dict:
             error_context = str(exc)
             continue
 
-        total_input_tokens += in_tok
-        total_output_tokens += out_tok
-        total_latency_ms += lat_ms
-
         parsed, error_context = _parse_and_validate(raw)
+        call = {"agent": "synthesis", "model": model, "attempt": attempt,
+                "input_tokens": in_tok, "output_tokens": out_tok, "latency_ms": lat_ms}
+        if error_context:
+            call["error"] = f"invalid output: {error_context}"[:300]
+        llm_calls.append(call)
         if not error_context:
             data = parsed
             break
 
-    root_cause = data.get("root_cause") or state.get("root_cause") or "Root cause undetermined — requires human review."
+    root_cause = data.get("root_cause") or state.get("graph_root_cause") or "Root cause undetermined — requires human review."
     confidence = float(data.get("confidence", 0.5))
     suggested_fix = data.get("suggested_fix") or "Manual investigation required by on-call engineer."
     postmortem_draft = data.get("postmortem_draft") or ""
     jira_summary = data.get("jira_summary") or f"RCA: {root_cause[:80]}"
-    # Keep the hypothesis graph's review flag (exhausted paths, low graph confidence);
-    # the LLM's self-reported confidence can add review but never clear it.
-    requires_human_review = confidence < 0.75 or api_unavailable or bool(state.get("requires_human_review"))
+
+    # Synthesis can only *add* review reasons; the graph's reasons live in state and
+    # can't be cleared by anything this node returns (review_reasons is append-only).
+    reasons: list[str] = []
+    if api_unavailable:
+        reasons.append("llm_unavailable")
+    if confidence < 0.75:
+        reasons.append("low_confidence")
 
     rca_output = RCAOutput(
         root_cause=root_cause,
@@ -218,25 +226,15 @@ def run_synthesis(state: ReconState, config: AgentConfig) -> dict:
         suggested_fix=suggested_fix,
         postmortem_draft=postmortem_draft,
         jira_summary=jira_summary,
-        requires_human_review=requires_human_review,
+        requires_human_review=bool(reasons),
     )
 
-    llm_call_entry = {
-        "agent": "synthesis",
-        "model": model,
-        "input_tokens": total_input_tokens,
-        "output_tokens": total_output_tokens,
-        "latency_ms": total_latency_ms,
-    }
-
-    out: dict = {
+    return {
         "rca_output": rca_output.model_dump(mode="json"),
         "root_cause": root_cause,
         "confidence": confidence,
-        "requires_human_review": requires_human_review,
-        "llm_calls": (state.get("llm_calls") or []) + [llm_call_entry],
-        "total_latency_ms": (state.get("total_latency_ms") or 0) + total_latency_ms,
+        "synthesis_status": "api_unavailable" if api_unavailable else ("ok" if data else "invalid_output"),
+        "llm_calls": llm_calls,
+        "total_latency_ms": sum(c["latency_ms"] for c in llm_calls),
+        "review_reasons": reasons,
     }
-    if api_unavailable:
-        out["current_hypothesis"] = "API_UNAVAILABLE"
-    return out

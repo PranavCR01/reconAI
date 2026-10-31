@@ -153,7 +153,6 @@ export default function RunSummary() {
   }
 
   const { run, incidents } = data
-  const total = data.total_incidents
   const needsReview = data.needs_review
   const resolvedCount = incidents.filter(i => i.status === 'complete').length
   const p1Count = incidents.filter(i => i.severity === 'P1').length

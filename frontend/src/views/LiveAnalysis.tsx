@@ -186,8 +186,6 @@ export default function LiveAnalysis() {
   const allIncidents = store.getIncidentsSorted()
   const total = allIncidents.length
   const p1Count = allIncidents.filter(i => i.severity === 'P1').length
-  const p2Count = allIncidents.filter(i => i.severity === 'P2').length
-  const p3Count = allIncidents.filter(i => i.severity === 'P3').length
   // resolvedCount: only 'complete' (not needs_review) — used for No Review Needed stat cell and tab
   const resolvedCount = allIncidents.filter(i => i.status === 'complete').length
   const needsReviewCount = allIncidents.filter(i => i.requires_human_review === true).length

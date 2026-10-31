@@ -6,8 +6,6 @@ interface Props {
 
 function SigmaCell({ sigma }: { sigma: number }) {
   const color = sigma >= 3.0 ? 'var(--p1)' : sigma >= 1.5 ? 'var(--warn)' : 'var(--fg-2)'
-  const cls = sigma >= 3.0 ? 'up' : sigma < 0 ? 'down' : 'flat'
-  const sign = sigma > 0 ? '+' : ''
   return (
     <span style={{ font: '600 13px var(--mono)', color }}>
       {sigma >= 0 ? `+${Math.round(Math.abs(sigma * 10))}` : `-${Math.round(Math.abs(sigma * 10))}`}

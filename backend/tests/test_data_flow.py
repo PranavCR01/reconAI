@@ -10,7 +10,7 @@ from backend.models.state import (
     APPEND_ONLY, OWNERS, REVIEW_REASONS, StateOwnershipError, check_node_output, initial_state, review_reasons,
 )
 from backend.tests.fakes.fake_llm import api_status_error
-from backend.tests.helpers import SYNTHESIS_PROMPT, ground_truth_row, synthesis_json
+from backend.tests.helpers import SYNTHESIS_PROMPT, ground_truth_row
 
 CONFIG = AgentConfig()
 
@@ -40,8 +40,10 @@ def test_every_node_writes_only_keys_it_owns(graph, ground_truth):
 
 
 @pytest.mark.parametrize("node,update", [
-    ("synthesis", {"current_hypothesis": "API_UNAVAILABLE"}),
-    ("synthesis", {"requires_human_review": False}),
+    ("proposer", {"current_hypothesis": "API_UNAVAILABLE"}),
+    ("judge", {"requires_human_review": False}),
+    ("critic", {"rca_output": {}}),
+    ("judge", {"proposal": {}}),
     ("ingestion", {"evidence_collected": []}),
     ("evidence", {"tool_calls": []}),
     ("rag_retrieval", {"rca_output": {}}),
@@ -53,12 +55,12 @@ def test_foreign_writes_are_rejected(node, update):
 
 def test_unknown_review_reason_rejected():
     with pytest.raises(StateOwnershipError):
-        check_node_output("synthesis", {"review_reasons": ["looks_fine"]})
+        check_node_output("judge", {"review_reasons": ["looks_fine"]})
 
 
 def test_append_only_keys_must_be_lists():
     with pytest.raises(StateOwnershipError):
-        check_node_output("synthesis", {"llm_calls": {"agent": "synthesis"}})
+        check_node_output("proposer", {"llm_calls": {"agent": "proposer"}})
 
 
 # ---------------------------------------------------------------------------
@@ -154,16 +156,15 @@ def test_review_matrix(storage, graph, ground_truth, llm, scenarios, llm_confide
 # LLM call log completeness and persistence
 # ---------------------------------------------------------------------------
 def test_every_attempt_is_logged_and_persisted(storage, graph, ground_truth, llm, fake_db):
-    # Rules registered later take priority: the invalid reply answers attempt 1.
-    llm.respond(SYNTHESIS_PROMPT, synthesis_json(0.9), times=1, input_tokens=222, output_tokens=33)
+    # Attempt 1 gets an invalid reply; attempt 2 falls through to the fake's valid default.
     llm.respond(SYNTHESIS_PROMPT, "this is not json", times=1, input_tokens=111, output_tokens=7)
     row = _rows(ground_truth)[0]
     inc = _analyze(storage, graph, row)["incident"]
 
-    synth = [c for c in inc.llm_calls if c["agent"] == "synthesis"]
+    synth = [c for c in inc.llm_calls if c["agent"] == "proposer"]
     assert [c["attempt"] for c in synth] == [1, 2]
     assert "invalid output" in synth[0]["error"] and "error" not in synth[1]
-    assert (synth[0]["input_tokens"], synth[1]["input_tokens"]) == (111, 222)
+    assert (synth[0]["input_tokens"], synth[1]["input_tokens"]) == (111, 1500)
     assert inc.total_tokens_used == sum(c["input_tokens"] + c["output_tokens"] for c in inc.llm_calls)
 
     saved = fake_db.rows("rca_incidents")[-1]
@@ -174,7 +175,7 @@ def test_every_attempt_is_logged_and_persisted(storage, graph, ground_truth, llm
 def test_failed_call_is_logged(storage, graph, ground_truth, llm):
     llm.fail(SYNTHESIS_PROMPT, api_status_error(529))
     inc = _analyze(storage, graph, _rows(ground_truth)[0])["incident"]
-    synth = [c for c in inc.llm_calls if c["agent"] == "synthesis"]
+    synth = [c for c in inc.llm_calls if c["agent"] == "proposer"]
     assert len(synth) == 1 and "APIStatusError" in synth[0]["error"]
     assert "llm_unavailable" in inc.review_reasons
 
@@ -189,7 +190,7 @@ def test_reranker_and_classifier_calls_logged(storage, graph, ground_truth, llm)
     untyped = ReconRow(**{**row.model_dump(), "discrepancy_type": None, "sf_value": "same", "db2_value": "same"})
     inc = _analyze(storage, graph, untyped)["incident"]
     agents = [c["agent"] for c in inc.llm_calls]
-    assert agents[0] == "ingestion" and "reranker" in agents and agents[-1] == "synthesis"
+    assert agents[0] == "ingestion" and "reranker" in agents and agents[-2:] == ["proposer", "critic"]
     assert len(inc.llm_calls) == len(llm.calls), "every fake LLM call must appear in the incident log"
 
 

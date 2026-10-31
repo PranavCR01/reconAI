@@ -113,6 +113,11 @@ class RCAIncident(BaseModel):
     root_cause_category: Optional[str] = None   # set when graph_status == confirmed
     contributing_factors: list[str] = Field(default_factory=list)
     graph_version: Optional[str] = None
+    # Proposer / critic / judge outcome (issue #11).
+    claims: list[dict] = Field(default_factory=list)
+    judge_decision: Optional[str] = None        # accept | escalate
+    revision_count: int = 0
+    prompt_versions: dict = Field(default_factory=dict)
     created_at: Optional[datetime] = None
 
 

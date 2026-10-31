@@ -37,11 +37,18 @@ class ReconState(TypedDict, total=False):
     # retrieval
     rag_candidates: list[dict]
     reranked_candidates: list[dict]
-    # synthesis
+    # proposer
+    proposal: dict | None
+    proposal_count: int
+    synthesis_status: str | None   # ok | api_unavailable | invalid_output
+    # critic
+    critic_verdicts: list[dict]
+    critic_status: str | None      # ok | unavailable | skipped
+    # judge
+    judge_decision: str | None     # accept | revise | escalate
     rca_output: dict | None
     root_cause: str | None
     confidence: float | None
-    synthesis_status: str | None
     # append-only, written by any node
     llm_calls: Annotated[list[dict], operator.add]
     total_latency_ms: Annotated[int, operator.add]
@@ -59,7 +66,9 @@ OWNERS: dict[str, frozenset[str]] = {
     }),
     "evidence": frozenset({"evidence_collected", "evidence_retry_count"}),
     "rag_retrieval": frozenset({"rag_candidates", "reranked_candidates"}),
-    "synthesis": frozenset({"rca_output", "root_cause", "confidence", "synthesis_status"}),
+    "proposer": frozenset({"proposal", "proposal_count", "synthesis_status"}),
+    "critic": frozenset({"critic_verdicts", "critic_status"}),
+    "judge": frozenset({"judge_decision", "rca_output", "root_cause", "confidence"}),
 }
 
 # Why an incident needs human review. Add-only during a run.
@@ -72,6 +81,9 @@ REVIEW_REASONS = frozenset({
     "llm_unavailable",         # synthesis degraded because the LLM API failed
     "legacy_cache_flag",       # cache entry from before reasons existed carried a review flag
     "iteration_limit",         # the graph hit MAX_ITERATIONS before reaching a verdict
+    "critic_rejected",         # claims still unsupported/contradicted after one revision
+    "critic_unavailable",      # the critic couldn't verify the explanation (never auto-accept)
+    "proposer_invalid_output", # the proposer produced no valid explanation
 })
 
 
@@ -98,10 +110,15 @@ def initial_state(recon_row: dict) -> ReconState:
         "evidence_retry_count": 0,
         "rag_candidates": [],
         "reranked_candidates": [],
+        "proposal": None,
+        "proposal_count": 0,
+        "synthesis_status": None,
+        "critic_verdicts": [],
+        "critic_status": None,
+        "judge_decision": None,
         "rca_output": None,
         "root_cause": None,
         "confidence": None,
-        "synthesis_status": None,
         "llm_calls": [],
         "total_latency_ms": 0,
         "review_reasons": [],

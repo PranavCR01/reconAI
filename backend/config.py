@@ -12,7 +12,8 @@ class AgentConfig(BaseModel):
     hypothesis_llm: str = "claude-sonnet-4-6"
     evidence_llm: str = "claude-sonnet-4-6"
     reranker_llm: str = "claude-haiku-4-5-20251001"
-    synthesis_llm: str = "claude-sonnet-4-6"
+    synthesis_llm: str = "claude-sonnet-4-6"   # proposer (writes the explanation)
+    critic_llm: str = "claude-sonnet-4-6"      # reviews the explanation against the evidence
 
 
 CONFIGS: dict[str, AgentConfig] = {
@@ -23,6 +24,7 @@ CONFIGS: dict[str, AgentConfig] = {
         evidence_llm="llama-3.3-70b-versatile",
         reranker_llm="llama-3.3-70b-versatile",
         synthesis_llm="llama-3.3-70b-versatile",
+        critic_llm="llama-3.3-70b-versatile",
     ),
     "hybrid": AgentConfig(
         ingestion_llm="llama-3.3-70b-versatile",

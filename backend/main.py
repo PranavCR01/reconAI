@@ -62,6 +62,17 @@ REQUIRED_COLUMNS["rca_incidents"] += ["hypothesis_verdicts", "graph_status", "ro
                                       "contributing_factors", "graph_version"]
 
 _GRAPH_FIELDS = ("hypothesis_verdicts", "graph_status", "root_cause_category", "contributing_factors", "graph_version")
+REQUIRED_COLUMNS["rca_incidents"] += ["claims", "judge_decision", "revision_count", "prompt_versions"]
+
+
+def _explanation_fields(rca: dict) -> dict:
+    """Claims (with critic verdicts), judge decision, revisions and prompt versions from rca_output."""
+    return {
+        "claims": rca.get("claims") or [],
+        "judge_decision": rca.get("judge_decision"),
+        "revision_count": rca.get("revision_count") or 0,
+        "prompt_versions": rca.get("prompt_versions") or {},
+    }
 
 # ---------------------------------------------------------------------------
 # Cost guards — the app is public and every analyzed row costs LLM/embedding calls.
@@ -278,6 +289,7 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
             similar_incidents=rca.get("_similar_incidents") or [],
             similarity_scores=rca.get("_similarity_scores") or [],
             **{f: rca[f"_{f}"] for f in _GRAPH_FIELDS if rca.get(f"_{f}") is not None},
+            **_explanation_fields(rca),
             hypotheses_tested=rca.get("_hypotheses_tested") or [],
             hypotheses_ruled_out=rca.get("_hypotheses_ruled_out") or [],
             final_hypothesis=rca.get("_final_hypothesis"),
@@ -324,6 +336,7 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
         root_cause_category=final.get("root_cause_category"),
         contributing_factors=final.get("contributing_factors") or [],
         graph_version=final.get("graph_version"),
+        **_explanation_fields(rca),
         hypotheses_tested=final.get("hypotheses_tested") or [],
         hypotheses_ruled_out=final.get("hypotheses_ruled_out") or [],
         final_hypothesis=final_hypothesis,

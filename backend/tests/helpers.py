@@ -61,16 +61,8 @@ def ground_truth_row(incident: dict):
     )
 
 
+# The proposer prompt (it writes the explanation; formerly the synthesis step).
 SYNTHESIS_PROMPT = "integration RCA analyst"
 
 
-def synthesis_json(confidence: float = 0.9, root_cause: str = "Root cause from evidence.") -> str:
-    import json
-
-    return json.dumps({
-        "root_cause": root_cause,
-        "suggested_fix": "Apply the fix.",
-        "postmortem_draft": "Postmortem.",
-        "jira_summary": "RCA ticket",
-        "confidence": confidence,
-    })
+CRITIC_PROMPT = "strict reviewer checking an RCA explanation"

@@ -93,6 +93,10 @@ class FakeLLM:
             return json.dumps(list(range(n))), 300, 8
         if "Reply with exactly one of" in prompt:
             return self.classification, 80, 3
+        if "strict reviewer checking an RCA explanation" in prompt:
+            return critic_reply(prompt), 900, 120
+        if "integration RCA analyst" in prompt:
+            return proposal_reply(prompt, self.synthesis_confidence), 1500, 400
         record = re.search(r"\b(00[0-9A-Za-z]{13,16}|a0[0-9A-Za-z]{13,16})\b", prompt)
         rid = record.group(1) if record else "unknown-record"
         return json.dumps({
@@ -137,3 +141,40 @@ class FakeLLM:
                 return NS(content=text, usage_metadata={"input_tokens": i, "output_tokens": o})
 
         return _ChatModel
+
+
+# ---------------------------------------------------------------------------
+# Default proposer / critic behavior: a faithful model that cites what supports
+# the graph's verdict and approves claims that do. Tests script deviations.
+# ---------------------------------------------------------------------------
+def proposal_reply(prompt: str, confidence: float = 0.9, **overrides) -> str:
+    status = re.search(r"^GRAPH STATUS: (\S+)", prompt, re.M).group(1)
+    category = re.search(r"^GRAPH ROOT-CAUSE CATEGORY: (\S+)", prompt, re.M).group(1)
+    supporting = re.findall(r"^  (E\d+) \[[^,]+, supports\]", prompt, re.M)
+    confirmed = re.findall(r"^  (\S+) \(.*\): CONFIRMED", prompt, re.M)
+    record = re.search(r"\(ID (\S+)\)", prompt)
+    rid = record.group(1) if record else "unknown-record"
+    established = status == "confirmed"
+    root = {
+        "claim_id": "C1", "kind": "root_cause", "status": "established" if established else "hypothesis",
+        "category": category if established else None,
+        "text": f"Root cause for record {rid}: {category if established else 'undetermined; best guess from past incidents'}.",
+        "evidence_ids": supporting, "similar_incident_ids": [], "hypothesis_ids": confirmed,
+    }
+    fix = {"claim_id": "C2", "kind": "fix", "status": "established", "category": None,
+           "text": f"Correct the configuration and backfill record {rid}.", "evidence_ids": [],
+           "similar_incident_ids": [], "hypothesis_ids": []}
+    body = {"claims": [root, fix], "suggested_fix": f"Apply the fix and backfill record {rid}.",
+            "postmortem_draft": f"Postmortem for record {rid}.", "jira_summary": f"RCA {rid}", "confidence": confidence}
+    body.update(overrides)
+    return json.dumps(body)
+
+
+def critic_reply(prompt: str, verdicts: dict | None = None) -> str:
+    """All claims supported unless `verdicts` maps claim_id -> (verdict, reason)."""
+    claim_ids = re.findall(r"^  (C\d+) \[", prompt, re.M)
+    verdicts = verdicts or {}
+    return json.dumps({"verdicts": [
+        {"claim_id": cid, "verdict": verdicts.get(cid, ("supported", "backed by cited evidence"))[0],
+         "reason": verdicts.get(cid, ("supported", "backed by cited evidence"))[1], "evidence_ids": []}
+        for cid in claim_ids]})

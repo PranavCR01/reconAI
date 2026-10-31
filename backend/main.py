@@ -22,7 +22,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from backend.cache.rca_cache import check_cache, make_cache_key, write_cache
-from backend.config import get_config, get_config_by_key
+from backend.config import get_config, get_config_by_key, incident_cost
 from backend.graph.recon_graph import build_graph
 from backend.models.entities import (
     DiscrepancyType,
@@ -63,6 +63,7 @@ REQUIRED_COLUMNS["rca_incidents"] += ["hypothesis_verdicts", "graph_status", "ro
 
 _GRAPH_FIELDS = ("hypothesis_verdicts", "graph_status", "root_cause_category", "contributing_factors", "graph_version")
 REQUIRED_COLUMNS["rca_incidents"] += ["claims", "judge_decision", "revision_count", "prompt_versions"]
+REQUIRED_COLUMNS["rca_incidents"] += ["e2e_latency_ms", "cost_usd", "cost_warnings", "trace"]
 
 
 def _explanation_fields(rca: dict) -> dict:
@@ -275,6 +276,7 @@ def _similar(candidates: list[dict], limit: int = 5) -> tuple[list[str], list[fl
 
 async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool = False, session_id: str = "") -> dict:
     """Full analysis pipeline for one row. Returns a result dict; never raises."""
+    t0 = time.monotonic()
     cache_key = make_cache_key(row, session_id)
     cached = None if bypass_cache else await check_cache(storage, cache_key)
 
@@ -284,6 +286,8 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
         reasons = _cached_review_reasons(rca)
         llm_calls = rca.get("_llm_calls") or []
         cached_evidence, _ = _with_fresh_evidence_ids(rca.get("_evidence") or [])
+        # Cost and trace describe the analysis that produced this result (no new LLM calls are made).
+        cost, cost_warnings = incident_cost(llm_calls)
         incident = RCAIncident(
             recon_row_id=row.id,
             similar_incidents=rca.get("_similar_incidents") or [],
@@ -304,9 +308,13 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
             requires_human_review=bool(reasons),
             review_reasons=reasons,
             llm_calls=llm_calls,
+            cost_usd=cost,
+            cost_warnings=cost_warnings,
+            trace=rca.get("_trace") or [],
             status=IncidentStatus.needs_review if reasons else IncidentStatus.complete,
             llm_model=cached.get("llm_model") or config.synthesis_llm,
         )
+        incident.e2e_latency_ms = int((time.monotonic() - t0) * 1000)
         try:
             incident_id = await _save_incident_and_evidence(storage, incident, cached_evidence)
         except Exception as exc:
@@ -326,6 +334,7 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
         else (final.get("current_hypothesis") or None)
     evidence = _evidence_rows(final.get("evidence_collected") or [])
     similar_ids, similar_scores = _similar(final.get("reranked_candidates") or [])
+    cost, cost_warnings = incident_cost(llm_calls)
 
     incident = RCAIncident(
         recon_row_id=row.id,
@@ -353,6 +362,10 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
         total_tool_calls=len(final.get("evidence_collected") or []),
         total_tokens_used=_llm_tokens(llm_calls),
         latency_ms=final.get("total_latency_ms") or 0,
+        cost_usd=cost,
+        cost_warnings=cost_warnings,
+        trace=final.get("trace") or [],
+        e2e_latency_ms=int((time.monotonic() - t0) * 1000),
     )
 
     try:
@@ -367,6 +380,7 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
         "_final_hypothesis": incident.final_hypothesis,
         "_review_reasons": reasons,
         "_llm_calls": llm_calls,
+        "_trace": incident.trace,
         "_latency_ms": incident.latency_ms,
         "_total_tool_calls": incident.total_tool_calls,
         "_total_tokens_used": incident.total_tokens_used,

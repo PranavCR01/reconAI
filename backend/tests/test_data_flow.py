@@ -199,7 +199,8 @@ def test_reranker_and_classifier_calls_logged(storage, graph, ground_truth, llm)
 # ---------------------------------------------------------------------------
 COMPARED = ["hypotheses_tested", "hypotheses_ruled_out", "final_hypothesis", "confidence", "root_cause_summary",
             "suggested_fix", "postmortem_draft", "jira_summary", "requires_human_review", "review_reasons",
-            "status", "total_tool_calls", "total_tokens_used", "latency_ms", "llm_calls"]
+            "status", "total_tool_calls", "total_tokens_used", "latency_ms", "llm_calls", "trace", "cost_usd",
+            "cost_warnings"]
 
 
 @pytest.mark.parametrize("index", [0, 5, 20, 35, 49])

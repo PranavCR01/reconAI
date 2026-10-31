@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import time
+from datetime import datetime, timezone
+
 from langgraph.graph import END, StateGraph
 
 from backend.agents.evidence import run_evidence
@@ -11,6 +14,53 @@ from backend.models.state import ReconState, check_node_output
 from backend.tools.rag_tools import rerank_candidates, retrieve_similar_artifacts
 
 MAX_ITERATIONS = 10  # one hypothesis per step; the longest plan has 5
+
+
+def _detail(node: str, state: dict, out: dict) -> dict:
+    """What a node did, in a form a person reading the trace can follow."""
+    if node == "ingestion":
+        row = out.get("recon_row") or {}
+        return {"discrepancy_type": row.get("discrepancy_type"), "severity": row.get("severity")}
+    if node == "hypothesis":
+        latest = (out.get("hypothesis_verdicts") or [])[-1:] or [None]
+        queued = [c["hypothesis_key"] for c in out.get("tool_calls") or []]
+        return {"status": out.get("graph_status"), "queued": queued,
+                "evaluated": latest[0] and {k: latest[0][k] for k in ("hypothesis_id", "verdict", "reason")}}
+    if node == "evidence":
+        return {"tools": [{"hypothesis": e.get("hypothesis_key"), "tool": e.get("tool"), "outcome": e.get("outcome")}
+                          for e in out.get("evidence_collected") or []]}
+    if node == "rag_retrieval":
+        return {"candidates": len(out.get("rag_candidates") or []), "reranked": len(out.get("reranked_candidates") or [])}
+    if node == "proposer":
+        return {"status": out.get("synthesis_status"), "claims": len((out.get("proposal") or {}).get("claims") or []),
+                "round": out.get("proposal_count")}
+    if node == "critic":
+        verdicts = [v["verdict"] for v in out.get("critic_verdicts") or []]
+        return {"status": out.get("critic_status"), **{k: verdicts.count(k) for k in ("supported", "unsupported", "contradicted")}}
+    if node == "judge":
+        return {"decision": out.get("judge_decision")}
+    return {}
+
+
+def _traced(node: str, fn):
+    """Time a node and append one trace step (with the LLM calls it made) to its output."""
+    def run(state):
+        started = datetime.now(timezone.utc)
+        t0 = time.monotonic()
+        out = fn(state)
+        step = {
+            "node": node,
+            "started_at": started.isoformat(),
+            "duration_ms": int((time.monotonic() - t0) * 1000),
+            "detail": _detail(node, state, out),
+            "llm_calls": [{k: c.get(k) for k in ("agent", "model", "attempt", "input_tokens", "output_tokens",
+                                                   "latency_ms", "error") if c.get(k) is not None}
+                          for c in out.get("llm_calls") or []],
+        }
+        return {**out, "trace": [step]}
+    return run
+
+
 MAX_EVIDENCE_RETRIES = 2
 
 
@@ -64,13 +114,13 @@ def build_graph(config: AgentConfig, storage):
         return "rag_retrieval"
 
     builder = StateGraph(ReconState)
-    builder.add_node("ingestion", _ingestion)
-    builder.add_node("hypothesis", _hypothesis)
-    builder.add_node("evidence", _evidence)
-    builder.add_node("rag_retrieval", _rag_retrieval)
-    builder.add_node("proposer", _proposer)
-    builder.add_node("critic", _critic)
-    builder.add_node("judge", _judge)
+    builder.add_node("ingestion", _traced("ingestion", _ingestion))
+    builder.add_node("hypothesis", _traced("hypothesis", _hypothesis))
+    builder.add_node("evidence", _traced("evidence", _evidence))
+    builder.add_node("rag_retrieval", _traced("rag_retrieval", _rag_retrieval))
+    builder.add_node("proposer", _traced("proposer", _proposer))
+    builder.add_node("critic", _traced("critic", _critic))
+    builder.add_node("judge", _traced("judge", _judge))
 
     builder.set_entry_point("ingestion")
     builder.add_edge("ingestion", "hypothesis")

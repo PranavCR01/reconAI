@@ -118,6 +118,12 @@ class RCAIncident(BaseModel):
     judge_decision: Optional[str] = None        # accept | escalate
     revision_count: int = 0
     prompt_versions: dict = Field(default_factory=dict)
+    # Tracing and cost (issue #12). latency_ms is the sum of LLM call latencies;
+    # e2e_latency_ms is wall-clock for the whole analysis (graph + persistence prep).
+    e2e_latency_ms: int = 0
+    cost_usd: Optional[float] = None            # None when any call's model has no known price
+    cost_warnings: list[str] = Field(default_factory=list)
+    trace: list[dict] = Field(default_factory=list)
     created_at: Optional[datetime] = None
 
 

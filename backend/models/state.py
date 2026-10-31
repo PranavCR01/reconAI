@@ -53,9 +53,10 @@ class ReconState(TypedDict, total=False):
     llm_calls: Annotated[list[dict], operator.add]
     total_latency_ms: Annotated[int, operator.add]
     review_reasons: Annotated[list[str], operator.add]
+    trace: Annotated[list[dict], operator.add]
 
 
-APPEND_ONLY = frozenset({"llm_calls", "total_latency_ms", "review_reasons"})
+APPEND_ONLY = frozenset({"llm_calls", "total_latency_ms", "review_reasons", "trace"})
 
 OWNERS: dict[str, frozenset[str]] = {
     "ingestion": frozenset({"recon_row"}),
@@ -122,6 +123,7 @@ def initial_state(recon_row: dict) -> ReconState:
         "llm_calls": [],
         "total_latency_ms": 0,
         "review_reasons": [],
+        "trace": [],
     }
 
 

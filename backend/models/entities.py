@@ -117,6 +117,12 @@ class Evidence(BaseModel):
     source_reference: str
     content: str
     relevance_explanation: str
+    # Which hypothesis this evidence was collected for, and what it showed (issue #9).
+    hypothesis_key: Optional[str] = None
+    tool: Optional[str] = None
+    tool_args: Optional[dict] = None
+    outcome: Optional[str] = None  # supports | refutes | neutral | error | skipped
+    raw_result: Optional[dict] = None
     created_at: Optional[datetime] = None
 
 

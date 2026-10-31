@@ -3,6 +3,7 @@ ThreadPoolExecutor fan-out, and H3 early termination (Slice 3).
 """
 from __future__ import annotations
 
+import uuid
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -261,6 +262,65 @@ def _execute_hypothesis_calls(calls: list[dict]) -> list[dict]:
     return results
 
 
+# Where each tool's evidence comes from, for records that carry no EvidenceResult
+# (tool errors, skipped calls).
+_TOOL_SOURCE = {
+    "query_db2_field_history": EvidenceSourceType.sf_field_history,
+    "get_field_permissions": EvidenceSourceType.sf_field_permissions,
+    "get_cdc_field_config": EvidenceSourceType.platform_event_usage,
+    "get_apex_trigger_config": EvidenceSourceType.apex_job_log,
+    "splunk_stub": EvidenceSourceType.splunk_log,
+}
+
+OUTCOMES = ("supports", "refutes", "neutral", "error", "skipped")
+
+
+def _finalize(entry: dict, args: dict) -> dict:
+    """Give every evidence record a stable ID, its outcome, and persistable fields.
+
+    Records without an EvidenceResult (tool error, unregistered tool, skipped call)
+    are kept, not dropped, so a hypothesis with no usable evidence is visible.
+    """
+    h_key = entry.get("hypothesis_key", "unknown")
+    tool = entry.get("tool", "")
+    raw = entry.get("result")
+    er = entry.get("evidence_result")
+    record = {**entry, "evidence_id": str(uuid.uuid4()), "tool_args": args, "raw_result": raw}
+
+    if er:
+        outcome = "supports" if er.get("confirms") else ("refutes" if er.get("rules_out") else "neutral")
+        record.update({
+            "outcome": outcome,
+            "source_type": er["source_type"],
+            "source_reference": er["source_reference"],
+            "content": er["content"],
+            "relevance_explanation": er["relevance_explanation"],
+        })
+        return record
+
+    source_type = _TOOL_SOURCE.get(tool, EvidenceSourceType.middleware_log)
+    if entry.get("skipped"):
+        reason = (raw or {}).get("reason", "skipped")
+        record.update({
+            "outcome": "skipped",
+            "source_type": source_type,
+            "source_reference": f"tool://{tool}/{h_key}/skipped",
+            "content": f"{tool} was not run: {reason}.",
+            "relevance_explanation": "Skipped because an earlier check in this hypothesis was decisive.",
+        })
+        return record
+
+    message = entry.get("error") or (raw or {}).get("message") or "tool returned no evidence"
+    record.update({
+        "outcome": "error",
+        "source_type": source_type,
+        "source_reference": f"tool://{tool}/{h_key}/error",
+        "content": f"{tool} failed: {message}",
+        "relevance_explanation": f"No evidence for {h_key}: the check could not run, so the hypothesis cannot be evaluated.",
+    })
+    return record
+
+
 def run_evidence(state: ReconState) -> dict:
     pending = state.get("tool_calls") or []
     if not pending:
@@ -273,8 +333,13 @@ def run_evidence(state: ReconState) -> dict:
 
     new_evidence: list[dict] = []
     for calls in by_hypothesis.values():
-        new_evidence.extend(_execute_hypothesis_calls(calls))
+        args_by_tool = {c.get("tool", ""): c.get("args", {}) for c in calls}
+        for entry in _execute_hypothesis_calls(calls):
+            new_evidence.append(_finalize(entry, args_by_tool.get(entry.get("tool", ""), {})))
 
     # evidence_collected is an append-only reducer: return only the new records.
     # tool_calls is owned by the hypothesis node, which re-queues on its next turn.
-    return {"evidence_collected": new_evidence}
+    out: dict = {"evidence_collected": new_evidence}
+    if any(e["outcome"] == "error" for e in new_evidence):
+        out["review_reasons"] = ["missing_evidence"]
+    return out

@@ -5,6 +5,7 @@ import csv
 import io
 import json
 import time
+import uuid
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 import statistics
@@ -55,6 +56,7 @@ _SEVERITY_ORDER = {Severity.P1: 0, Severity.P2: 1, Severity.P3: 2}
 # Columns added by migrations in docs/sql/; checked at startup.
 REQUIRED_COLUMNS: dict[str, list[str]] = {
     "rca_incidents": ["review_reasons", "llm_calls"],
+    "rca_evidence": ["hypothesis_key", "tool", "tool_args", "outcome", "raw_result"],
 }
 
 # ---------------------------------------------------------------------------
@@ -231,12 +233,29 @@ async def _save_incident_and_evidence(storage, incident: RCAIncident, evidence: 
     return incident_id
 
 
+_EVIDENCE_FIELDS = ("source_type", "source_reference", "content", "relevance_explanation",
+                   "hypothesis_key", "tool", "tool_args", "outcome", "raw_result")
+
+
 def _evidence_rows(evidence_collected: list[dict]) -> list[dict]:
-    return [
-        {k: ev["evidence_result"][k] for k in ("source_type", "source_reference", "content", "relevance_explanation")}
-        for ev in evidence_collected
-        if ev.get("evidence_result")
-    ]
+    """Every evidence record the graph produced, keyed by its evidence_id (errors and skips included)."""
+    return [{"id": ev["evidence_id"], **{k: ev.get(k) for k in _EVIDENCE_FIELDS}}
+            for ev in evidence_collected if ev.get("evidence_id")]
+
+
+def _with_fresh_evidence_ids(evidence: list[dict]) -> tuple[list[dict], dict[str, str]]:
+    """Cache replays create a new incident, so its evidence rows need new primary keys.
+
+    Returns the re-keyed rows and the old->new mapping for anything that cites them.
+    """
+    mapping = {ev["id"]: str(uuid.uuid4()) for ev in evidence if ev.get("id")}
+    return [{**ev, "id": mapping.get(ev.get("id"), str(uuid.uuid4()))} for ev in evidence], mapping
+
+
+def _similar(candidates: list[dict], limit: int = 5) -> tuple[list[str], list[float]]:
+    """The past incidents actually handed to Synthesis (the reranked top `limit`)."""
+    top = [c for c in candidates[:limit] if c.get("id")]
+    return [str(c["id"]) for c in top], [round(float(c.get("similarity") or 0.0), 4) for c in top]
 
 
 async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool = False, session_id: str = "") -> dict:
@@ -249,8 +268,11 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
         confidence = float(rca.get("confidence", 0.5))
         reasons = _cached_review_reasons(rca)
         llm_calls = rca.get("_llm_calls") or []
+        cached_evidence, _ = _with_fresh_evidence_ids(rca.get("_evidence") or [])
         incident = RCAIncident(
             recon_row_id=row.id,
+            similar_incidents=rca.get("_similar_incidents") or [],
+            similarity_scores=rca.get("_similarity_scores") or [],
             hypotheses_tested=rca.get("_hypotheses_tested") or [],
             hypotheses_ruled_out=rca.get("_hypotheses_ruled_out") or [],
             final_hypothesis=rca.get("_final_hypothesis"),
@@ -269,7 +291,7 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
             llm_model=cached.get("llm_model") or config.synthesis_llm,
         )
         try:
-            incident_id = await _save_incident_and_evidence(storage, incident, rca.get("_evidence") or [])
+            incident_id = await _save_incident_and_evidence(storage, incident, cached_evidence)
         except Exception as exc:
             return {"incident_id": None, "incident": None, "cached": True, "human_review": bool(reasons), "error": f"save incident: {exc}"}
         return {"incident_id": incident_id, "incident": incident, "cached": True, "human_review": bool(reasons), "error": None}
@@ -286,9 +308,12 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
     final_hypothesis = "API_UNAVAILABLE" if final.get("synthesis_status") == "api_unavailable" \
         else (final.get("current_hypothesis") or None)
     evidence = _evidence_rows(final.get("evidence_collected") or [])
+    similar_ids, similar_scores = _similar(final.get("reranked_candidates") or [])
 
     incident = RCAIncident(
         recon_row_id=row.id,
+        similar_incidents=similar_ids,
+        similarity_scores=similar_scores,
         hypotheses_tested=final.get("hypotheses_tested") or [],
         hypotheses_ruled_out=final.get("hypotheses_ruled_out") or [],
         final_hypothesis=final_hypothesis,
@@ -323,6 +348,8 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
         "_total_tool_calls": incident.total_tool_calls,
         "_total_tokens_used": incident.total_tokens_used,
         "_evidence": evidence,
+        "_similar_incidents": similar_ids,
+        "_similarity_scores": similar_scores,
     }, config.synthesis_llm)
 
     return {"incident_id": incident_id, "incident": incident, "cached": False, "human_review": bool(reasons), "error": None}
@@ -677,10 +704,34 @@ async def get_incident(incident_id: str, storage: StorageDep):
 
     evidence = await storage.get_evidence_for_incident(incident_id)
     resolution = await storage.get_resolution_for_incident(incident_id)
+    evidence_json = [e.model_dump(mode="json") for e in evidence]
+
+    # Group evidence by hypothesis, in the order the hypotheses were tested.
+    order = {h: i for i, h in enumerate(incident.hypotheses_tested)}
+    by_hypothesis: dict[str, list[dict]] = {}
+    for ev in sorted(evidence_json, key=lambda e: order.get(e.get("hypothesis_key"), len(order))):
+        by_hypothesis.setdefault(ev.get("hypothesis_key") or "unlinked", []).append(ev)
+
+    similar = []
+    for artifact_id, score in zip(incident.similar_incidents, incident.similarity_scores or []):
+        try:
+            artifact = await storage.get_artifact(str(artifact_id))
+        except Exception:
+            continue  # artifact removed since the incident was analyzed
+        similar.append({
+            "id": str(artifact_id),
+            "similarity": score,
+            "source": artifact.source,
+            "root_cause_category": artifact.root_cause_category,
+            "discrepancy_type": artifact.discrepancy_type,
+            "summary": artifact.content[:280],
+        })
 
     return {
         **incident.model_dump(mode="json"),
-        "evidence": [e.model_dump(mode="json") for e in evidence],
+        "evidence": evidence_json,
+        "evidence_by_hypothesis": by_hypothesis,
+        "similar_incidents_detail": similar,
         "resolution": resolution.model_dump(mode="json") if resolution else None,
     }
 

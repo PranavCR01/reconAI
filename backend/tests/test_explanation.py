@@ -99,14 +99,16 @@ def _claim(**kw):
     (_claim(hypothesis_ids=["H1"]), {}, "contradicted"),
     (_claim(category="DELIVERY_GAP"), {}, "contradicted"),
     (_claim(evidence_ids=[]), {}, "unsupported"),
-    (_claim(kind="mechanism", category=None, evidence_ids=["ev-db2"], hypothesis_ids=[]), {}, "contradicted"),
+    (_claim(kind="mechanism", category=None, evidence_ids=["ev-db2"], hypothesis_ids=[]), {}, "unsupported"),
+    (_claim(kind="mechanism", category=None, evidence_ids=["ev-fls", "ev-db2"], hypothesis_ids=[]), {}, None),
     (_claim(kind="mechanism", category=None, evidence_ids=["ev-err"], hypothesis_ids=[]), {}, "unsupported"),
     (_claim(kind="context", category=None, evidence_ids=["ev-db2"], hypothesis_ids=[],
             text="DB2 never held a value, ruling out an overwrite."), {}, None),
     (_claim(status="established", category=None, hypothesis_ids=[]), {"graph_status": "exhausted"}, "contradicted"),
     (_claim(status="hypothesis", category=None, hypothesis_ids=[], evidence_ids=[]), {"graph_status": "exhausted"}, None),
 ], ids=["clean", "fake_evidence", "fake_past_incident", "placeholder_date", "placeholder_tbd", "refuted_hypothesis",
-        "category_mismatch", "root_cites_nothing", "cites_refuting_evidence", "cites_failed_check",
+        "category_mismatch", "root_cites_nothing", "cites_only_refuting_evidence", "excludes_alternative_with_refutation",
+        "cites_failed_check",
         "context_may_cite_refuting", "exhausted_stated_as_fact", "exhausted_as_hypothesis"])
 def test_deterministic_rules(claim, state_override, expected):
     result = deterministic_checks(claim, {**STATE, **state_override})

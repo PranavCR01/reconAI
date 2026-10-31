@@ -112,7 +112,8 @@ def _delivery_rule(r: dict, row: dict) -> Verdict:
         confidence = None if count >= 2 else 0.70
         return ("confirmed", f"{count} missed event(s)" + ("" if count >= 2 else " (single event: weak evidence)"),
                 f"Splunk shows {count} published event(s) for {_field(row)} on record "
-                f"{row.get('sf_record_id')} that were never delivered downstream (last event {r.get('last_event_ts')}).",
+                f"{row.get('sf_record_id')} that were never delivered downstream (most recent event of any kind in the "
+                f"window: {r.get('last_event_ts')}).",
                 confidence)
     return ("refuted", "all published events were delivered", None, None)
 
@@ -128,8 +129,8 @@ def _dataweave_rule(r: dict, row: dict) -> Verdict:
 def _retry_rule(r: dict, row: dict) -> Verdict:
     if (r.get("retry_count") or 0) >= 2:
         return ("confirmed", f"{r.get('retry_count')} middleware retries",
-                f"Middleware retried delivery of record {row.get('sf_record_id')} {r.get('retry_count')} times; "
-                f"each retry inserted a new row because the DB2 write is not idempotent (INSERT, not MERGE on SalesforceId).", None)
+                f"Middleware retried delivery of record {row.get('sf_record_id')} {r.get('retry_count')} times; the "
+                f"repeated deliveries are the source of the duplicate downstream rows.", None)
     return ("refuted", "no repeated deliveries", None, None)
 
 

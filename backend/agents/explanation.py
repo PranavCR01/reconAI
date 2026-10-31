@@ -131,13 +131,18 @@ def proposer_prompt(state: dict, error_context: str = "") -> str:
 
 
 def critic_prompt(state: dict, claims: list[dict], error_context: str = "") -> str:
-    evidence, _ = aliases(state)
+    evidence, past = aliases(state)
     claim_lines = "\n".join(
         f"  {c['claim_id']} [{c['kind']}, {c['status']}] cites {', '.join(c['cited_aliases']) or 'nothing'}: {c['text']}"
         for c in claims)
+    row = state["recon_row"]
     prompt = template("critic.md").format(
+        sf_object=row.get("sf_object"), sf_field=row.get("sf_field"), sf_record_id=row.get("sf_record_id"),
+        discrepancy_type=row.get("discrepancy_type"), severity=row.get("severity"),
+        integration_name=row.get("integration_name") or "unknown",
         graph_status=state.get("graph_status"), root_cause_category=state.get("root_cause_category") or "none",
-        verdict_lines=_verdict_lines(state), evidence_lines=_evidence_lines(evidence), claim_lines=claim_lines,
+        verdict_lines=_verdict_lines(state), evidence_lines=_evidence_lines(evidence), past_lines=_past_lines(past),
+        claim_lines=claim_lines,
     )
     if error_context:
         prompt += f"\n\nYour previous output was invalid: {error_context}\nReturn corrected JSON only."
@@ -238,7 +243,8 @@ def deterministic_checks(claim: dict, state: dict) -> tuple[str, str] | None:
         return "unsupported", f"cites {', '.join(u.split(':', 1)[1] for u in unknown)}, which does not exist"
     if _PLACEHOLDER.search(claim["text"]):
         return "unsupported", "contains a template placeholder instead of a fact"
-    refuted = [h for h in claim.get("hypothesis_ids") or [] if verdicts.get(h) == "refuted"]
+    # Only a cause claim can assert a mechanism; other claims may state facts from any evidence.
+    refuted = [h for h in claim.get("hypothesis_ids") or [] if verdicts.get(h) == "refuted"] if is_cause else []
     if refuted:
         return "contradicted", f"relies on {', '.join(refuted)}, which the evidence refuted"
     if claim["kind"] == "root_cause":
@@ -249,13 +255,12 @@ def deterministic_checks(claim: dict, state: dict) -> tuple[str, str] | None:
                                     f"{state.get('root_cause_category')}")
         if status == "confirmed" and not claim["evidence_ids"]:
             return "unsupported", "the root cause cites no evidence"
-    if is_cause and claim["status"] == "established":
-        for eid in claim["evidence_ids"]:
-            outcome = (evidence_by_id.get(eid) or {}).get("outcome")
-            if outcome == "refutes":
-                return "contradicted", f"cites evidence that refutes it ({evidence_by_id[eid].get('source_reference')})"
-            if outcome in ("error", "skipped"):
-                return "unsupported", "cites a check that did not run as support"
+    if is_cause and claim["status"] == "established" and claim["evidence_ids"]:
+        # Citing a refutation of a *different* hypothesis to exclude it is fine; a cause
+        # claim with no supporting evidence at all is not.
+        outcomes = [(evidence_by_id.get(eid) or {}).get("outcome") for eid in claim["evidence_ids"]]
+        if not any(o in ("supports", "neutral") for o in outcomes):
+            return "unsupported", "none of the cited evidence supports it (only refuting or failed checks)"
     return None
 
 

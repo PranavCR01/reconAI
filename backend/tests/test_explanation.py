@@ -273,3 +273,33 @@ def test_incident_records_prompt_versions(storage, graph, ground_truth):
 
     inc = asyncio.run(_analyze_row(ground_truth_row(ground_truth[1]), CONFIG, graph, storage, session_id="pv"))["incident"]
     assert inc.prompt_versions == recorded_versions()
+
+
+# ---------------------------------------------------------------------------
+# Confidence cap on unconfirmed diagnoses
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("graph_status,model_conf,stored,low_reason", [
+    ("confirmed", 0.9, 0.9, False),
+    ("exhausted", 0.9, 0.5, False),     # capped; review already comes from no_hypothesis_confirmed
+    ("exhausted", 0.3, 0.3, True),      # below the cap stays as stated
+    ("unknown_type", 0.8, 0.5, False),
+    ("confirmed", 0.6, 0.6, True),
+])
+def test_judge_caps_confidence_when_unconfirmed(graph_status, model_conf, stored, low_reason):
+    from backend.agents.explanation import run_judge
+
+    root = {"claim_id": "C1", "kind": "root_cause", "status": "hypothesis", "category": None, "text": "t",
+            "evidence_ids": [], "similar_incident_ids": [], "hypothesis_ids": []}
+    state = {"synthesis_status": "ok", "critic_status": "ok", "graph_status": graph_status, "proposal_count": 1,
+             "critic_verdicts": [{"claim_id": "C1", "verdict": "supported", "reason": "ok"}],
+             "proposal": {"claims": [root], "confidence": model_conf, "suggested_fix": "f", "jira_summary": "j"}}
+    out = run_judge(state)
+    assert out["confidence"] == stored and out["rca_output"]["confidence"] == stored
+    assert out["rca_output"]["model_confidence"] == model_conf
+    assert ("low_confidence" in out["review_reasons"]) is low_reason
+
+
+def test_unconfirmed_incident_never_shows_high_confidence(storage, graph, scenarios):
+    scenarios.add("NOFAULT-CONF", "NO_FAULT_FOUND")
+    final = _run(graph, _row("NOFAULT-CONF", "STALE_VALUE"))
+    assert final["graph_status"] == "exhausted" and final["confidence"] <= 0.5

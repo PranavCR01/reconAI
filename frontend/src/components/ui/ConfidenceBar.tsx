@@ -4,6 +4,8 @@ interface ConfidenceBarProps {
   value: number | null
   status?: 'queued' | 'analyzing' | 'complete'
   style?: CSSProperties
+  /** Never show green: the diagnosis is unconfirmed or the explanation was escalated. */
+  caution?: boolean
 }
 
 function getLevel(pct: number): 'high' | 'med' | 'low' {
@@ -18,9 +20,10 @@ const FILL_GRADIENT: Record<'high' | 'med' | 'low', string> = {
   low:  'linear-gradient(90deg, var(--p1), oklch(0.72 0.18 25))',
 }
 
-export function ConfidenceBar({ value, status = 'complete', style }: ConfidenceBarProps) {
+export function ConfidenceBar({ value, status = 'complete', style, caution = false }: ConfidenceBarProps) {
   const pct = value != null ? Math.round(Math.min(Math.max(value, 0), 1) * 100) : 0
-  const level = getLevel(pct)
+  const raw = getLevel(pct)
+  const level = caution && raw === 'high' ? 'med' : raw
   const isQueued = status === 'queued'
   const isAnalyzing = status === 'analyzing'
   const label = isQueued ? '—' : isAnalyzing ? '…' : `${pct}%`
@@ -32,7 +35,7 @@ export function ConfidenceBar({ value, status = 'complete', style }: ConfidenceB
       </span>
       <div style={{ flex: 1, height: 4, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden' }}>
         {!isQueued && !isAnalyzing && value != null && (
-          <div style={{ width: `${pct}%`, height: '100%', borderRadius: 2, background: FILL_GRADIENT[level] }} />
+          <div data-testid="confidence-fill" data-level={level} style={{ width: `${pct}%`, height: '100%', borderRadius: 2, background: FILL_GRADIENT[level] }} />
         )}
       </div>
       <span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, fontWeight: 500, color: isQueued || isAnalyzing ? 'var(--fg-3)' : 'var(--fg-1)', width: 38, textAlign: 'right', flexShrink: 0 }}>

@@ -1,5 +1,5 @@
 // Pure helpers for the incident views (unit-tested in src/lib/incident.test.ts).
-import type { Evidence, HypothesisVerdictRecord, RCAIncident } from '@/types'
+import type { Evidence, FixType, HypothesisVerdictRecord, RCAIncident } from '@/types'
 
 export const REVIEW_REASON_TEXT: Record<string, string> = {
   unknown_type: 'discrepancy type has no diagnosis path',
@@ -85,4 +85,39 @@ export function hypothesisPills(
     const v = byId.get(name)
     return { name, state: v ? STATE[v] : 'pending' }
   })
+}
+
+/** The resolution form's starting fix type, from the confirmed root-cause category. The analyst can change it. */
+const FIX_FOR_CATEGORY: Record<string, FixType> = {
+  FLS_STRIPPED: 'fls_permission_grant',
+  CDC_FIELD_EXCLUDED: 'cdc_channel_config',
+  DATAWAVE_TRANSFORM_ERROR: 'dataweave_mapping_fix',
+  APEX_SUPPRESSION: 'apex_code_change',
+  DELIVERY_GAP: 'replay_manual_trigger',
+  DOWNSTREAM_OVERWRITE: 'data_backfill',
+}
+
+export function defaultFixType(category: string | null | undefined): FixType {
+  return (category && FIX_FOR_CATEGORY[category]) || 'other'
+}
+
+/** Per-object rollup for the run summary (incidents carry sf_object from the run API). */
+export function byObject<T extends { sf_object?: string | null }>(incidents: T[]): [string, T[]][] {
+  const groups = new Map<string, T[]>()
+  for (const inc of incidents) {
+    const key = inc.sf_object || 'unknown'
+    groups.set(key, [...(groups.get(key) ?? []), inc])
+  }
+  return [...groups.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+}
+
+/** True when a confidence number should not be shown as reassuring (green). */
+export function confidenceNeedsCaution(inc: Pick<RCAIncident, 'graph_status' | 'judge_decision'>): boolean {
+  return isUnconfirmed(inc) || inc.judge_decision === 'escalate'
+}
+
+export function confidenceNote(inc: Pick<RCAIncident, 'graph_status' | 'judge_decision'>): string {
+  if (isUnconfirmed(inc)) return 'diagnosis not confirmed · capped at 50%'
+  if (inc.judge_decision === 'escalate') return 'explanation escalated to review'
+  return 'model-stated confidence in the explanation'
 }

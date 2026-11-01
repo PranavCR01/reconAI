@@ -117,6 +117,8 @@ Each node may only write the state keys it owns (`OWNERS` in `backend/models/sta
 - Prompts are versioned by content hash in `backend/prompts/VERSIONS.json`; update it in the same change as a prompt edit.
 - Schema migrations live in `docs/sql/` (001–006). Apply them before deploying code that writes new columns; startup logs + Sentry flag missing columns.
 - Docs: `python scripts/check_docs.py` (also a pytest) checks tagged metrics (`<!--m:stem/path:fmt-->value`) against `evals/results`, bans stale claims, and checks links/paths.
+- Browser testing: `python -m backend.tests.e2e_server` (scripted model, in-memory DB). `E2E_REAL_LLM=1` uses real models from `.env` but still the in-memory DB; rows run sequentially, roughly 30–60 s and $0.03–0.07 each.
+- Judge caps stored confidence at 0.5 when the graph is unconfirmed (`model_confidence` keeps the model's figure); the UI never shows green confidence on unconfirmed or escalated incidents.
 - Rate-limit client IP: rightmost `X-Forwarded-For` entry (`TRUSTED_PROXY_HOPS`, default 1) or `TRUSTED_IP_HEADER`. Verify against the host's real headers.
 
 ---

@@ -73,17 +73,38 @@ def embed_text(text: str) -> list[float]:
     return response.data[0].embedding
 
 
-def retrieve_similar_artifacts(state: dict, storage) -> list[dict]:
-    """Embed the current row context and call match_artifacts RPC synchronously. Raises on failure."""
+# Plain-language description of each confirmed cause, so the query matches past incidents
+# by mechanism (what went wrong), not just by object and field.
+CATEGORY_TERMS = {
+    "FLS_STRIPPED": "field-level security FLS: integration user lacks read permission on the field",
+    "CDC_FIELD_EXCLUDED": "change data capture CDC: field excluded from the tracked field list",
+    "DELIVERY_GAP": "missed CDC events not delivered downstream; Splunk shows delivery gap or consumer lag",
+    "DATAWAVE_TRANSFORM_ERROR": "MuleSoft DataWeave mapping transform error wrote the wrong value",
+    "DUPLICATE_DOWNSTREAM": "duplicate rows downstream from retry and missing idempotency key",
+    "DOWNSTREAM_OVERWRITE": "value reached DB2 then was overwritten or cleared downstream",
+    "APEX_SUPPRESSION": "Apex trigger conditional publish suppressed the change event",
+}
+
+
+def retrieval_query(state: dict) -> str:
+    """What similar-incident retrieval searches with.
+
+    The row's object, field, discrepancy type and integration, plus, when the graph
+    confirmed a cause, that cause in words. Unconfirmed runs add nothing about the
+    hypotheses: the refuted ones are exactly what the past incidents should NOT be about.
+    """
     row = state.get("recon_row", {})
-    query = " ".join(filter(None, [
-        row.get("sf_object"),
-        row.get("sf_field"),
-        row.get("discrepancy_type"),
-        row.get("integration_name"),
-        " ".join(state.get("hypotheses_tested") or []),
-        " ".join(state.get("hypotheses_ruled_out") or []),
-    ])).strip()
+    parts = [row.get("sf_object"), row.get("sf_field"), row.get("discrepancy_type"), row.get("integration_name")]
+    if state.get("graph_status") == "confirmed":
+        category = state.get("root_cause_category")
+        confirmed = next((v for v in state.get("hypothesis_verdicts") or [] if v.get("verdict") == "confirmed"), None)
+        parts += [CATEGORY_TERMS.get(category, category), confirmed and confirmed.get("label")]
+    return " ".join(p for p in parts if p).strip()
+
+
+def retrieve_similar_artifacts(state: dict, storage) -> list[dict]:
+    """Embed the retrieval query and call the match_artifacts RPC synchronously. Raises on failure."""
+    query = retrieval_query(state)
     if not query:
         return []
     # Errors propagate: the graph records them as a retrieval error, distinct from zero results.

@@ -7,7 +7,7 @@ import { SeverityBadge } from '@/components/ui/Badge'
 import { ConfidenceBar } from '@/components/ui/ConfidenceBar'
 import { HypothesisPills } from '@/components/ui/HypothesisPills'
 import type { HypothesisItem } from '@/components/ui/HypothesisPills'
-import { hypothesisPills } from '@/lib/incident'
+import { confidenceNeedsCaution, hypothesisPills } from '@/lib/incident'
 import { EvidenceChip } from '@/components/ui/EvidenceChip'
 import { Panel } from '@/components/ui/Panel'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
@@ -224,7 +224,7 @@ export default function LiveAnalysis() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      <TopBar
+      <TopBar sub
         center={
           <Breadcrumbs crumbs={[
             { label: 'Runs', to: '/upload' },
@@ -599,6 +599,7 @@ function IncidentCard({ incident: inc, runId }: { incident: RCAIncident; runId: 
           <ConfidenceBar
             value={inc.confidence}
             status={isAnalyzing ? 'analyzing' : 'complete'}
+            caution={confidenceNeedsCaution(inc)}
             style={{ flex: 1 }}
           />
           <div style={{ display: 'flex', gap: 6 }}>

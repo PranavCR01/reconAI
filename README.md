@@ -200,7 +200,7 @@ cd frontend && npm test && npm run lint && npm run build
 python scripts/check_docs.py                          # doc numbers match evals/results, no stale claims
 ```
 
-Browser journey against an in-memory backend: `python -m backend.tests.e2e_server`, `npm run dev`, then `node e2e/journey.mjs` (from `frontend/`).
+Browser journey against an in-memory backend: `python -m backend.tests.e2e_server`, `npm run dev`, then `node e2e/journey.mjs` (from `frontend/`). Add `E2E_REAL_LLM=1` to the server command to use real models from your `.env` (still an in-memory database; each row costs money).
 
 **Run the health check**
 

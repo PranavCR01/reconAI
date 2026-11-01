@@ -23,7 +23,7 @@ const chip = (color: string): React.CSSProperties => ({
 const empty: React.CSSProperties = { fontFamily: mono, fontSize: 12, color: 'var(--fg-3)', textAlign: 'center', padding: '16px 0' }
 
 // ---------------------------------------------------------------------------
-export function UnconfirmedBanner({ inc }: { inc: Pick<RCAIncident, 'graph_status'> }) {
+export function UnconfirmedBanner({ inc, similarCount = 0 }: { inc: Pick<RCAIncident, 'graph_status'>; similarCount?: number }) {
   if (!isUnconfirmed(inc)) return null
   return (
     <div role="alert" data-testid="unconfirmed-banner" style={{
@@ -31,8 +31,10 @@ export function UnconfirmedBanner({ inc }: { inc: Pick<RCAIncident, 'graph_statu
       color: 'var(--fg-1)', fontSize: 13, lineHeight: 1.5,
     }}>
       <b style={{ color: 'var(--warn)' }}>Unconfirmed.</b>{' '}
-      No hypothesis was confirmed by evidence. The root cause below is the model's best guess from similar past
-      incidents and was sent for human review.
+      No hypothesis was confirmed by evidence, so this incident was sent for human review.{' '}
+      {similarCount > 0
+        ? `The explanation below is the model's best guess, informed by ${similarCount} similar past incident${similarCount === 1 ? '' : 's'}.`
+        : 'No similar past incidents were found either, so the explanation below is an unsupported guess.'}
     </div>
   )
 }

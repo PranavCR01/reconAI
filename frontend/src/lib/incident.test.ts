@@ -51,3 +51,30 @@ describe('formatting', () => {
     expect(fmtUsd(0.052)).toBe('$0.052')
   })
 })
+
+describe('fixes from manual testing', () => {
+  it('fix type defaults from the confirmed category', async () => {
+    const { defaultFixType } = await import('./incident')
+    expect(defaultFixType('FLS_STRIPPED')).toBe('fls_permission_grant')
+    expect(defaultFixType('CDC_FIELD_EXCLUDED')).toBe('cdc_channel_config')
+    expect(defaultFixType('DATAWAVE_TRANSFORM_ERROR')).toBe('dataweave_mapping_fix')
+    expect(defaultFixType('APEX_SUPPRESSION')).toBe('apex_code_change')
+    expect(defaultFixType(null)).toBe('other')
+    expect(defaultFixType('SOMETHING_NEW')).toBe('other')
+  })
+
+  it('by-object groups by the real object, largest first', async () => {
+    const { byObject } = await import('./incident')
+    const groups = byObject([{ sf_object: 'Contact' }, { sf_object: 'Address__c' }, { sf_object: 'Contact' }, { sf_object: null }])
+    expect(groups.map(([o, g]) => [o, g.length])).toEqual([['Contact', 2], ['Address__c', 1], ['unknown', 1]])
+  })
+
+  it('confidence is never reassuring on unconfirmed or escalated incidents', async () => {
+    const { confidenceNeedsCaution, confidenceNote } = await import('./incident')
+    expect(confidenceNeedsCaution({ graph_status: 'confirmed', judge_decision: 'accept' })).toBe(false)
+    expect(confidenceNeedsCaution({ graph_status: 'exhausted', judge_decision: 'escalate' })).toBe(true)
+    expect(confidenceNeedsCaution({ graph_status: 'confirmed', judge_decision: 'escalate' })).toBe(true)
+    expect(confidenceNote({ graph_status: 'exhausted', judge_decision: 'escalate' })).toContain('not confirmed')
+    expect(confidenceNote({ graph_status: 'confirmed', judge_decision: 'escalate' })).toContain('escalated')
+  })
+})

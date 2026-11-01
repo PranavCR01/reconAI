@@ -242,6 +242,8 @@ export default function Benchmark() {
   const m = OFFLINE.metrics
   const planted = OFFLINE.critic_planted.by_draft
   const deterministicDefects = Object.entries(planted).filter(([k, e]) => k !== 'clean' && e.expected_stage === 'deterministic')
+  const noisyOld = OFFLINE.ablations?.['delivery_first_all_confounders']
+  const noisyNew = OFFLINE.ablations?.['all_confounders']
   const detCaught = deterministicDefects.reduce((s, [, e]) => s + (e.caught?.k ?? 0), 0)
   const detTotal = deterministicDefects.reduce((s, [, e]) => s + (e.caught?.n ?? 0), 0)
 
@@ -316,7 +318,8 @@ export default function Benchmark() {
               this page comes from a committed results file and can be regenerated with one command.
             </p>
             <div className="bmk-four-col">
-              <Tile label="Graph accuracy" value={pct(m.accuracy.overall)} sub={ci(m.accuracy.overall)} />
+              <Tile label="Delivery-first + noise" value={pct(noisyOld?.accuracy)}
+                sub={`accuracy vs ${pct(noisyNew?.accuracy)} as built (${noisyOld?.accuracy.k ?? '?'}/${noisyOld?.accuracy.n ?? '?'}): check order matters`} />
               <Tile label="Unsafe auto-clear" value={pct(m.routing.unsafe_auto_clear)} sub="wrong and not sent to review" />
               <Tile label="Critic: planted errors" value={detTotal ? `${Math.round((detCaught / detTotal) * 100)}%` : 'n/a'}
                 sub={`${detCaught}/${detTotal} caught by deterministic checks`} />
@@ -340,6 +343,8 @@ export default function Benchmark() {
         {/* ── Diagnosis ── */}
         <Section label="Diagnosis" title="Hypothesis graph accuracy by discrepancy type" alt>
           <Prose>
+            Graph accuracy is {pct(m.accuracy.overall)} ({ci(m.accuracy.overall)}). That is expected by construction:
+            every simulated record contains its labeled fault, so this checks the logic, not real-world accuracy.
             The graph checks one hypothesis at a time and stops at the first confirmation. It needed{' '}
             {m.efficiency.mean_hypotheses_tested?.toFixed(2)} checks on average, and stayed within the labeled minimum
             path on {pct(m.efficiency.within_min_hypotheses)} of incidents. Small buckets have wide intervals.

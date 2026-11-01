@@ -156,3 +156,27 @@ describe('DeploymentTable SigmaCell', () => {
     expect(screen.getByTestId('incidents-24h').textContent).toBe('7σ=2.4')
   })
 })
+
+describe('UnconfirmedBanner wording', () => {
+  it('says the guess is unsupported when nothing similar was found', () => {
+    render(<UnconfirmedBanner inc={{ graph_status: 'exhausted' }} similarCount={0} />)
+    expect(screen.getByTestId('unconfirmed-banner').textContent).toContain('No similar past incidents were found')
+  })
+  it('names how many similar incidents informed the guess', () => {
+    render(<UnconfirmedBanner inc={{ graph_status: 'exhausted' }} similarCount={3} />)
+    expect(screen.getByTestId('unconfirmed-banner').textContent).toContain('informed by 3 similar past incidents')
+  })
+})
+
+describe('ConfidenceBar caution', () => {
+  it('a high value is not shown green when caution is set', async () => {
+    const { ConfidenceBar } = await import('@/components/ui/ConfidenceBar')
+    const { rerender } = render(<ConfidenceBar value={0.9} />)
+    const level = () => screen.getByTestId('confidence-fill').dataset.level
+    expect(level()).toBe('high')
+    rerender(<ConfidenceBar value={0.9} caution />)
+    expect(level()).toBe('med')
+    rerender(<ConfidenceBar value={0.3} caution />)
+    expect(level()).toBe('low')
+  })
+})

@@ -64,6 +64,10 @@ arguments, the raw result and an outcome (supports / refutes / neutral / error /
 failures are recorded as `error` evidence, not dropped. Every tested hypothesis must have evidence
 (coverage invariant); otherwise the incident gets `missing_evidence`.
 
+Similar-incident retrieval searches with the row's object, field and type plus, when a cause was
+confirmed, that cause in words. Refuted hypotheses are left out: they are what past incidents
+should not be about.
+
 Tool results come from simulators (`backend/tools/`) driven by a declared fault per record
 (`data/scenarios.json`) plus seeded confounders. Unknown records get input-seeded random signals.
 
@@ -81,6 +85,8 @@ can overstate or contradict the evidence.
   LLM stage: meaning-level review of the claims that passed.
 - **Judge** (code only): accept when every claim is supported and the graph confirmed a cause;
   otherwise one revision with the critic's feedback, then escalate.
+- **Confidence cap:** when no hypothesis is confirmed, stored confidence is capped at 0.5 (the
+  model's own figure is kept as `model_confidence`). A guess can't be more certain than its evidence.
 
 Prompts live in `backend/prompts/` and are versioned by content hash (`VERSIONS.json`); a test
 fails if a prompt changes without a version bump. Incidents store the prompt versions used.

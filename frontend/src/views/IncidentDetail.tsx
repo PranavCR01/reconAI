@@ -7,7 +7,7 @@ import { ConfidenceBar } from '@/components/ui/ConfidenceBar'
 import { Panel } from '@/components/ui/Panel'
 import { getIncident, resolveIncident } from '@/lib/api'
 import { CriticPanel, HypothesisTimeline, ReviewReasons, SimilarIncidents, TracePanel, UnconfirmedBanner } from '@/components/incident/IncidentPanels'
-import { fmtUsd, isUnconfirmed } from '@/lib/incident'
+import { confidenceNeedsCaution, confidenceNote, defaultFixType, fmtUsd, isUnconfirmed } from '@/lib/incident'
 import { fmtDate, fmtLatency, fmtTokens, fmtConfidence } from '@/lib/format'
 import type { RCAIncident, Evidence, FixType, ResolveRequest, Resolution } from '@/types'
 
@@ -99,6 +99,7 @@ export default function IncidentDetail() {
           setFormNotes(data.resolution.correction_notes ?? '')
         } else {
           setFormRoot(data.root_cause_summary ?? '')
+          setFormFixType(defaultFixType(data.root_cause_category))
         }
         setLoading(false)
       })
@@ -159,7 +160,7 @@ export default function IncidentDetail() {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-        <TopBar center={<Breadcrumbs crumbs={[{ label: 'Live Analysis', to: runId ? `/runs/${runId}` : '/' }, { label: '…' }]} />} />
+        <TopBar sub center={<Breadcrumbs crumbs={[{ label: 'Live Analysis', to: runId ? `/runs/${runId}` : '/' }, { label: '…' }]} />} />
         <div style={{ maxWidth: 1320, margin: '0 auto', padding: '18px 24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <SkeletonBlock h={40} />
@@ -174,7 +175,7 @@ export default function IncidentDetail() {
   if (error || !incident) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-        <TopBar center={<Breadcrumbs crumbs={[{ label: 'Live Analysis', to: runId ? `/runs/${runId}` : '/' }, { label: 'Error' }]} />} />
+        <TopBar sub center={<Breadcrumbs crumbs={[{ label: 'Live Analysis', to: runId ? `/runs/${runId}` : '/' }, { label: 'Error' }]} />} />
         <div style={{ maxWidth: 1320, margin: '0 auto', padding: '40px 24px', textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--p1)' }}>
           <div>
             <div style={{ marginBottom: 12 }}>Unable to load incident data. The server may be warming up.</div>
@@ -194,11 +195,12 @@ export default function IncidentDetail() {
   const row = inc.recon_row ?? null
   const citedSimilar = new Set((inc.claims ?? []).flatMap(c => c.similar_incident_ids))
   const confidence = inc.confidence ?? 0
+  const caution = confidenceNeedsCaution(inc)
   const confPct = Math.round(Math.min(Math.max(confidence, 0), 1) * 100)
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      <TopBar
+      <TopBar sub
         center={
           <Breadcrumbs crumbs={[
             { label: 'Live Analysis', to: runId ? `/runs/${runId}` : '/' },
@@ -247,7 +249,7 @@ export default function IncidentDetail() {
               </div>
             </Panel>
 
-            <UnconfirmedBanner inc={inc} />
+            <UnconfirmedBanner inc={inc} similarCount={inc.similar_incidents_detail?.length ?? 0} />
             <ReviewReasons reasons={inc.requires_human_review ? inc.review_reasons : []} />
 
             {/* Root cause */}
@@ -420,12 +422,12 @@ export default function IncidentDetail() {
             {/* Confidence panel */}
             <Panel title="Confidence">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', padding: '8px 0' }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 52, fontWeight: 700, color: confPct >= 75 ? 'var(--ok)' : confPct >= 50 ? 'var(--warn)' : 'var(--p1)', lineHeight: 1 }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 52, fontWeight: 700, color: confPct >= 75 && !caution ? 'var(--ok)' : confPct >= 50 ? 'var(--warn)' : 'var(--p1)', lineHeight: 1 }}>
                   {fmtConfidence(inc.confidence)}
                 </div>
-                <ConfidenceBar value={inc.confidence} status="complete" style={{ width: '100%' }} />
+                <ConfidenceBar value={inc.confidence} status="complete" caution={caution} style={{ width: '100%' }} />
                 <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--fg-3)', textAlign: 'center', lineHeight: 1.5 }}>
-                  model-stated confidence in the explanation{isUnconfirmed(inc) ? ' · diagnosis not confirmed' : ''}
+                  {confidenceNote(inc)}
                 </div>
               </div>
             </Panel>

@@ -70,7 +70,7 @@ Not measured: needs real embeddings (OPENAI_API_KEY) in live mode.
 
 ## Cost and latency (per incident)
 
-- Cost: median $0.0153, p95 $0.0153, total $0.7619; planted-claim critic $1.5615
+- Cost: median $0.0153, p95 $0.0153, total $0.7663; planted-claim critic $1.5615
 - Tokens: median 3228; LLM calls: median 3
 - End-to-end: median n/a, p95 n/a; LLM time: median n/a
 

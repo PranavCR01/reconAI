@@ -27,6 +27,7 @@ from backend.prompts import template, versions
 
 PROMPTS = ("proposer.md", "critic.md")
 MAX_REVISIONS = 1
+UNCONFIRMED_CONFIDENCE_CAP = 0.5
 _ATTEMPTS_PER_CALL = 2  # one retry with error context on invalid output (non-negotiable #6)
 
 ClaimKind = Literal["root_cause", "mechanism", "impact", "fix", "context"]
@@ -345,9 +346,13 @@ def run_judge(state: dict) -> dict:
     verdict_by_claim = {v["claim_id"]: v for v in state.get("critic_verdicts") or []}
     claims = [{**c, "critic": verdict_by_claim.get(c["claim_id"])} for c in proposal["claims"]]
     root = next(c for c in claims if c["kind"] == "root_cause")
-    confidence = float(proposal.get("confidence") or 0.0)
-    if confidence < 0.75:
+    model_confidence = float(proposal.get("confidence") or 0.0)
+    if model_confidence < 0.75:
         reasons.append("low_confidence")  # non-negotiable #3
+    # A guess can't be more certain than its evidence: when no hypothesis was confirmed the
+    # stated confidence is capped (the graph already sent the incident to review).
+    confidence = model_confidence if state.get("graph_status") == "confirmed" \
+        else min(model_confidence, UNCONFIRMED_CONFIDENCE_CAP)
 
     # Non-negotiable #1 and the graph's own completion are re-checked here, at the end.
     tested = set(state.get("hypotheses_tested") or [])
@@ -362,6 +367,7 @@ def run_judge(state: dict) -> dict:
     rca_output = {
         "root_cause": root["text"],
         "confidence": confidence,
+        "model_confidence": model_confidence,
         "evidence_ids": cited_evidence,
         "similar_past_incidents": cited_past,
         "suggested_fix": proposal.get("suggested_fix") or "",

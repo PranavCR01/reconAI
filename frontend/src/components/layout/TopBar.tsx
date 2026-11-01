@@ -5,17 +5,20 @@ import { BrandMark } from '@/components/ui/BrandMark'
 export interface TopBarProps {
   center?: ReactNode
   right?: ReactNode
+  /** A page's own bar under the app header: breadcrumbs only, no second logo. */
+  sub?: boolean
 }
 
-export function TopBar({ center, right }: TopBarProps) {
+export function TopBar({ center, right, sub = false }: TopBarProps) {
   return (
     <header
       className="topbar-header"
+      data-testid={sub ? 'page-bar' : 'app-bar'}
       style={{
         position: 'sticky',
-        top: 0,
-        zIndex: 20,
-        height: 52,
+        top: sub ? 52 : 0,
+        zIndex: sub ? 19 : 20,
+        height: sub ? 42 : 52,
         borderBottom: '1px solid var(--line)',
         display: 'flex',
         alignItems: 'center',
@@ -23,8 +26,8 @@ export function TopBar({ center, right }: TopBarProps) {
         gap: 18,
       }}
     >
-      {/* Brand */}
-      <Link
+      {/* Brand (app header only) */}
+      {!sub && <Link
         to="/"
         style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', fontWeight: 600, letterSpacing: '-0.01em', flexShrink: 0, cursor: 'pointer' }}
       >
@@ -34,7 +37,7 @@ export function TopBar({ center, right }: TopBarProps) {
           <span className="hide-sm" style={{ color: 'var(--fg-3)', margin: '0 4px' }}>/</span>
           <span className="hide-sm" style={{ color: 'var(--fg-2)', fontWeight: 500 }}>Reconciliation</span>
         </span>
-      </Link>
+      </Link>}
 
       {/* Center (nav or breadcrumbs) */}
       {center}

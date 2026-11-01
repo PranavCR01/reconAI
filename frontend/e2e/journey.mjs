@@ -61,6 +61,11 @@ check(await page.getByText('schema_diff').count() === 0, 'no hardcoded tool chip
 check(await page.getByTestId('unconfirmed-banner').count() === 0, 'no unconfirmed banner on a confirmed incident')
 check(await page.getByText('Contact.Phone').count() >= 1, 'header shows the real object.field')
 check(await page.locator('[data-testid="trace-step"]').count() >= 7, 'trace tab lists the pipeline steps')
+check(await page.getByTestId('app-bar').count() === 1 && await page.getByTestId('page-bar').count() === 1, 'one app header plus one page bar')
+check(await page.locator('[data-testid="page-bar"] a[href="/"]').count() === 0, 'page bar carries no second logo')
+check(await page.locator('select').first().inputValue() === 'fls_permission_grant', 'fix type defaults from the FLS category')
+const phoneSimilar = await page.locator('[data-testid="similar"]').allTextContents()
+check(phoneSimilar.length > 0 && phoneSimilar[0].includes('FLS_blocking'), `top similar incident is an FLS incident (got ${phoneSimilar[0]?.slice(0, 60)})`)
 
 // Exhausted incident: Address__c.PostalCode (no fault in the simulated world)
 const postal = find('PostalCode')
@@ -69,6 +74,10 @@ const xv = await verdicts()
 check(xv.length > 0 && xv.every(v => v !== 'confirmed'), `PostalCode: no confirmed step (got ${xv})`)
 check(await page.getByTestId('unconfirmed-banner').count() === 1, 'unconfirmed banner shown')
 check((await page.getByTestId('review-reasons').textContent() ?? '').includes('no hypothesis confirmed'), 'review reasons shown')
+check((await page.getByTestId('confidence-fill').getAttribute('data-level')) !== 'high', 'unconfirmed confidence is not shown green')
+check(postal.confidence <= 0.5, `unconfirmed confidence capped (got ${postal.confidence})`)
+const banner = await page.getByTestId('unconfirmed-banner').textContent() ?? ''
+check(/No similar past incidents were found|informed by \d+ similar/.test(banner), 'banner says what retrieval found')
 
 // Critic rejection (only when the server scripts it)
 if (process.env.E2E_REJECT_FIELD) {
@@ -92,6 +101,10 @@ const lines = clip.split('\n')
 check(lines.length === 10, `clipboard has one line per incident (got ${lines.length})`)
 check(lines[0].startsWith('[P1]'), 'P1 incidents first')
 check(await page.getByText('Coming Soon').count() === 0, 'no coming-soon modal')
+check(await page.getByText('RAG Recall@k').count() === 0 && await page.getByText('LLM Comparison').count() === 0, 'weak recall panel and dead comparison panel removed')
+const objects = await page.locator('table').filter({ hasText: 'SF OBJECT' }).locator('tbody tr').count().catch(() => 0)
+const objText = await page.getByText('By Object').locator('xpath=../..').textContent()
+check(['Contact', 'FinancialAccount__c', 'KYC_Record__c', 'Address__c'].every(o => objText.includes(o)), `by-object lists the real objects (${objects} rows)`)
 
 // Analytics + benchmark render
 await page.goto(`${BASE}/analytics`)
@@ -99,6 +112,8 @@ await page.waitForTimeout(1500)
 await page.goto(`${BASE}/benchmark`)
 await page.getByRole('heading', { name: 'Eval results' }).waitFor({ timeout: 10000 }).catch(() => {})
 check(await page.getByRole('heading', { name: 'Eval results' }).count() === 1, 'benchmark page renders from eval results')
+check(await page.getByTestId('app-bar').count() === 0, 'benchmark is standalone (no app header)')
+check(await page.getByText('Delivery-first + noise').count() === 1, 'benchmark leads with the ablation')
 
 // Mobile: no horizontal scroll on the six routes
 const mobile = await browser.newContext({ viewport: { width: 390, height: 844 } })

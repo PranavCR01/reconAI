@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, Cell,
+  Legend, ResponsiveContainer,
 } from 'recharts'
-import benchmarkData from '../data/benchmark_data.json'
+import evalResults from '../data/eval_results.json'
 
 /* ── Design-system colours ── */
 const C = {
@@ -19,6 +19,7 @@ const C = {
   ok:       'oklch(0.74 0.16 155)',
   info:     'oklch(0.74 0.12 220)',
   violet:   'oklch(0.72 0.14 295)',
+  warn:     'oklch(0.80 0.14 80)',
 }
 
 /* Hex equivalents for Recharts — CSS vars do not resolve inside SVG */
@@ -28,52 +29,87 @@ const HEX = {
   fg:   '#f4f5f8',
   fg2:  '#8c93a8',
   fg3:  '#5c6278',
+  ok:   '#22c55e',
+  info: '#38bdf8',
+  bad:  '#ef4444',
 }
 
-const { configs, failure_patterns, meta, written } = benchmarkData
+/* ── Eval results (generated: python -m backend.evals.run, then committed) ── */
 
-/* ── Data transforms ── */
-
-function buildAccuracyRow(
-  label: string,
-  key: 'root_cause_accuracy' | 'human_review_accuracy' | 'avg_confidence',
-): Record<string, number | string> {
-  const row: Record<string, number | string> = { metric: label }
-  for (const c of configs) row[c.name] = c[key]
-  return row
+type Rate = { k: number; n: number; rate: number | null; ci95: [number, number] | null }
+type Ablation = { description: string; accuracy: Rate; review_rate: Rate; unsafe_auto_clear: Rate }
+type PlantedEntry = {
+  drafts: number
+  critic_unavailable: number
+  expected_stage?: string
+  caught?: Rate
+  caught_by_deterministic?: Rate
+  caught_by_llm?: Rate
+  false_rejection?: Rate
+}
+type Results = {
+  mode: 'offline' | 'live'
+  config: string
+  models: string[]
+  runs: number
+  created_at: string
+  git_sha: string | null
+  source_file: string
+  graph_version: string
+  dataset: { incidents: number; sha256: string }
+  caveats: string[]
+  environment_notes: string[]
+  metrics: {
+    accuracy: { overall: Rate; by_discrepancy_type: Record<string, Rate> }
+    efficiency: { within_min_hypotheses: Rate; mean_hypotheses_tested: number | null }
+    routing: {
+      unsafe_auto_clear: Rate
+      review_rate: Rate
+      review_vs_label: { precision: Rate; recall: Rate }
+    }
+    explanation: { judge_decisions: Record<string, number>; revised: Rate; grounded_when_accepted: Rate }
+    consistency: Record<string, Rate> | null
+    retrieval: { status: string; reason?: string }
+    cost_latency: Record<string, number | null>
+  }
+  critic_planted: { incidents: number; by_draft: Record<string, PlantedEntry>; cost_usd: number | null }
+  ablations: Record<string, Ablation> | null
+  failure_patterns: { kind: string; detail: string; count: number; incidents: string[] }[]
 }
 
-const accuracyData = [
-  buildAccuracyRow('Root Cause', 'root_cause_accuracy'),
-  buildAccuracyRow('Human Review', 'human_review_accuracy'),
-  buildAccuracyRow('Confidence', 'avg_confidence'),
-]
+const ALL = (evalResults as unknown as { results: Record<string, Results> }).results
+const OFFLINE = ALL['offline_claude']
+const LIVE = Object.entries(ALL).filter(([name]) => name.startsWith('live_')).map(([, r]) => r)
 
-const latencyData = configs.map((c) => ({
-  name: c.name.replace('Groq Llama 3.3 70B', 'Groq Llama').replace('Claude Sonnet', 'Claude'),
-  value: c.avg_latency_s,
-  color: c.color,
+const pct = (r?: Rate | null) => (r && r.rate !== null ? `${Math.round(r.rate * 100)}%` : 'n/a')
+const ci = (r?: Rate | null) =>
+  r && r.ci95 ? `${r.k}/${r.n} · 95% CI ${Math.round(r.ci95[0] * 100)}–${Math.round(r.ci95[1] * 100)}%` : 'not measured'
+const usd = (v: number | null | undefined) => (v === null || v === undefined ? 'n/a' : `$${v.toFixed(4)}`)
+const secs = (v: number | null | undefined) => (v === null || v === undefined ? 'n/a' : `${(v / 1000).toFixed(1)} s`)
+
+const byTypeData = Object.entries(OFFLINE.metrics.accuracy.by_discrepancy_type).map(([type, r]) => ({
+  name: type.replace('_DOWNSTREAM', '').replace('_', ' '),
+  accuracy: r.rate === null ? 0 : Math.round(r.rate * 100),
+  n: r.n,
 }))
 
-const costData = configs.map((c) => ({
-  name: c.name.replace('Groq Llama 3.3 70B', 'Groq Llama').replace('Claude Sonnet', 'Claude'),
-  value: +(c.cost_per_incident * 1000).toFixed(2),
-  color: c.color,
+const ablationData = Object.entries(OFFLINE.ablations ?? {}).map(([name, a]) => ({
+  name: name.replace(/_/g, ' '),
+  description: a.description,
+  accuracy: a.accuracy.rate === null ? 0 : Math.round(a.accuracy.rate * 100),
+  review: a.review_rate.rate === null ? 0 : Math.round(a.review_rate.rate * 100),
+  unsafe: a.unsafe_auto_clear.rate === null ? 0 : Math.round(a.unsafe_auto_clear.rate * 100),
 }))
 
-const reviewData = configs.map((c) => ({
-  name: c.name.replace('Groq Llama 3.3 70B', 'Groq Llama').replace('Claude Sonnet', 'Claude'),
-  pct: Math.round((c.needs_review_count / c.total) * 100),
-  count: c.needs_review_count,
-  total: c.total,
-  color: c.color,
-}))
-
-const failureData = failure_patterns.map((fp) => ({
-  name: fp.pattern,
-  count: fp.incident_count,
-  color: fp.color,
-}))
+const DEFECT_LABEL: Record<string, string> = {
+  clean: 'Clean draft (should pass)',
+  fabricated_evidence: 'Cites evidence that does not exist',
+  fabricated_past_incident: 'Cites a past incident that does not exist',
+  wrong_category: 'Names the wrong root-cause category',
+  contradicts_refuted: 'Relies on a refuted hypothesis',
+  placeholder_text: 'Contains template placeholders',
+  unsupported_mechanism: 'Plausible mechanism no evidence supports',
+}
 
 /* ── Shared sub-components ── */
 
@@ -137,36 +173,101 @@ const tooltipBase = {
 
 /* ── Main view ── */
 
+function Section({ label, title, alt, children }: { label: string; title: string; alt?: boolean; children: React.ReactNode }) {
+  return (
+    <section className="bmk-section" style={alt
+      ? { background: C.bg1, borderTop: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}` }
+      : { background: C.bg }}>
+      <div style={{ maxWidth: 960, margin: '0 auto' }}>
+        <SectionLabel>{label}</SectionLabel>
+        <h2 style={{ margin: '16px 0 16px', fontSize: 24, fontWeight: 700, letterSpacing: '-0.015em', color: C.fg }}>
+          {title}
+        </h2>
+        {children}
+      </div>
+    </section>
+  )
+}
+
+function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div style={{ background: C.bg2, border: `1px solid ${C.line}`, borderRadius: 8, padding: '12px 16px', minWidth: 0 }}>
+      <div style={{ font: `700 22px var(--mono)`, color: C.fg, letterSpacing: '-0.02em', lineHeight: 1, marginBottom: 6 }}>
+        {value}
+      </div>
+      <div style={{ font: `500 11px var(--mono)`, color: C.fg3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        {label}
+      </div>
+      {sub && <div style={{ font: `400 11px var(--mono)`, color: C.fg3, marginTop: 6, overflowWrap: 'anywhere' }}>{sub}</div>}
+    </div>
+  )
+}
+
+function Prose({ children }: { children: React.ReactNode }) {
+  return <p style={{ margin: '0 0 24px', fontSize: 14.5, color: C.fg2, maxWidth: 700, lineHeight: 1.7 }}>{children}</p>
+}
+
+function Table({ head, rows }: { head: string[]; rows: (string | number)[][] }) {
+  return (
+    <div style={{ overflowX: 'auto', border: `1px solid ${C.line}`, borderRadius: 10 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
+          <tr>
+            {head.map((h) => (
+              <th key={h} style={{ textAlign: 'left', padding: '10px 14px', color: C.fg3, font: `600 11px var(--mono)`,
+                textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `1px solid ${C.line}`, background: C.bg2 }}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i}>
+              {row.map((cell, j) => (
+                <td key={j} style={{ padding: '10px 14px', color: j === 0 ? C.fg1 : C.fg2, borderBottom: i < rows.length - 1 ? `1px solid ${C.line}` : 'none',
+                  fontFamily: j === 0 ? 'var(--sans)' : 'var(--mono)', fontSize: j === 0 ? 13 : 12 }}>
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export default function Benchmark() {
+  const m = OFFLINE.metrics
+  const planted = OFFLINE.critic_planted.by_draft
+  const deterministicDefects = Object.entries(planted).filter(([k, e]) => k !== 'clean' && e.expected_stage === 'deterministic')
+  const noisyOld = OFFLINE.ablations?.['delivery_first_all_confounders']
+  const noisyNew = OFFLINE.ablations?.['all_confounders']
+  const detCaught = deterministicDefects.reduce((s, [, e]) => s + (e.caught?.k ?? 0), 0)
+  const detTotal = deterministicDefects.reduce((s, [, e]) => s + (e.caught?.n ?? 0), 0)
+
   return (
     <>
       <style>{`
-        .bmk-section { padding: 72px 32px; }
+        .bmk-section { padding: 64px 32px; }
         .bmk-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        .bmk-three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
         .bmk-four-col { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-        .bmk-finding-item { display: flex; gap: 10; align-items: flex-start; margin-bottom: 14px; }
-        .bmk-fail-card {
-          background: oklch(0.19 0.006 250);
-          border: 1px solid oklch(0.30 0.008 250);
-          border-radius: 10px; padding: 20px 22px;
-        }
         @media (max-width: 768px) {
-          .bmk-section { padding: 48px 20px !important; }
+          .bmk-section { padding: 44px 16px !important; }
           .bmk-two-col { grid-template-columns: 1fr !important; }
-          .bmk-three-col { grid-template-columns: 1fr !important; }
           .bmk-four-col { grid-template-columns: 1fr 1fr !important; }
+          .bmk-nav { padding: 0 16px !important; }
         }
       `}</style>
 
       <div style={{
         background: C.bg, color: C.fg,
         fontFamily: 'var(--sans)', fontSize: 13, lineHeight: 1.5,
-        WebkitFontSmoothing: 'antialiased', minHeight: '100vh',
+        WebkitFontSmoothing: 'antialiased', minHeight: '100vh', overflowX: 'hidden',
       }}>
-
         {/* ── Nav ── */}
-        <nav style={{
+        <nav className="bmk-nav" style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           height: 60, padding: '0 32px', flexShrink: 0,
           borderBottom: `1px solid ${C.line}`,
@@ -205,358 +306,185 @@ export default function Benchmark() {
           </div>
         </nav>
 
-        {/* ── Hero header ── */}
-        <section style={{
-          padding: '56px 32px 48px',
-          background: C.bg1,
-          borderBottom: `1px solid ${C.line}`,
-        }}>
+        {/* ── Hero ── */}
+        <section style={{ padding: '56px 32px 48px', background: C.bg1, borderBottom: `1px solid ${C.line}` }} className="bmk-section">
           <div style={{ maxWidth: 960, margin: '0 auto' }}>
-            <SectionLabel>LLM Benchmark</SectionLabel>
-            <h1 style={{
-              margin: '16px 0 12px',
-              fontSize: 40, fontWeight: 700, letterSpacing: '-0.025em',
-              lineHeight: 1.1, color: C.fg,
-            }}>
-              Benchmark Results
+            <SectionLabel>Evaluation</SectionLabel>
+            <h1 style={{ margin: '16px 0 12px', fontSize: 40, fontWeight: 700, letterSpacing: '-0.025em', lineHeight: 1.1, color: C.fg }}>
+              Eval results
             </h1>
-            <p style={{ margin: '0 0 32px', fontSize: 16, color: C.fg2, maxWidth: 580, lineHeight: 1.65 }}>
-              3 LLM configurations · 50 incidents · ground truth comparison
+            <p style={{ margin: '0 0 32px', fontSize: 16, color: C.fg2, maxWidth: 640, lineHeight: 1.65 }}>
+              {OFFLINE.dataset.incidents} labeled incidents · hypothesis graph {OFFLINE.graph_version} · every number on
+              this page comes from a committed results file and can be regenerated with one command.
             </p>
-
-            {/* Meta stat row */}
-            <div className="bmk-four-col" style={{ maxWidth: 700 }}>
-              {[
-                { label: 'Incidents', value: String(meta.total_incidents) },
-                { label: 'FSC Objects', value: String(meta.objects_covered) },
-                { label: 'Discrepancy Types', value: String(meta.discrepancy_types) },
-                { label: 'Ground Truth', value: 'Labeled' },
-              ].map(({ label, value }) => (
-                <div key={label} style={{
-                  background: C.bg2, border: `1px solid ${C.line}`,
-                  borderRadius: 8, padding: '12px 16px',
-                }}>
-                  <div style={{ font: `700 22px var(--mono)`, color: C.fg, letterSpacing: '-0.02em', lineHeight: 1, marginBottom: 6 }}>
-                    {value}
-                  </div>
-                  <div style={{ font: `500 11px var(--mono)`, color: C.fg3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    {label}
-                  </div>
-                </div>
-              ))}
+            <div className="bmk-four-col">
+              <Tile label="Delivery-first + noise" value={pct(noisyOld?.accuracy)}
+                sub={`accuracy vs ${pct(noisyNew?.accuracy)} as built (${noisyOld?.accuracy.k ?? '?'}/${noisyOld?.accuracy.n ?? '?'}): check order matters`} />
+              <Tile label="Unsafe auto-clear" value={pct(m.routing.unsafe_auto_clear)} sub="wrong and not sent to review" />
+              <Tile label="Critic: planted errors" value={detTotal ? `${Math.round((detCaught / detTotal) * 100)}%` : 'n/a'}
+                sub={`${detCaught}/${detTotal} caught by deterministic checks`} />
+              <Tile label="Live model run" value={LIVE.length ? 'measured' : 'pending'}
+                sub={LIVE.length ? LIVE.map((r) => r.config).join(', ') : 'offline results only'} />
             </div>
           </div>
         </section>
 
-        {/* ── Why We Benchmarked ── */}
-        <section className="bmk-section" style={{ background: C.bg }}>
-          <div style={{ maxWidth: 960, margin: '0 auto' }}>
-            <SectionLabel>Motivation</SectionLabel>
-            <h2 style={{ margin: '16px 0 16px', fontSize: 24, fontWeight: 700, letterSpacing: '-0.015em', color: C.fg }}>
-              Why We Benchmarked
-            </h2>
-            <p style={{ margin: 0, fontSize: 15, color: C.fg2, maxWidth: 680, lineHeight: 1.75 }}>
-              {written.why}
-            </p>
+        {/* ── Caveats ── */}
+        <Section label="Read this first" title="What these numbers do and don't show">
+          <div style={{ maxWidth: 720 }}>
+            {OFFLINE.caveats.map((c) => (
+              <div key={c} style={{ borderLeft: `2px solid ${C.warn}`, paddingLeft: 12, marginBottom: 12, color: C.fg1, fontSize: 14, lineHeight: 1.6 }}>
+                {c}
+              </div>
+            ))}
           </div>
-        </section>
+        </Section>
 
-        {/* ── Methodology ── */}
-        <section className="bmk-section" style={{ background: C.bg1, borderTop: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}` }}>
-          <div style={{ maxWidth: 960, margin: '0 auto' }}>
-            <SectionLabel>Methodology</SectionLabel>
-            <h2 style={{ margin: '16px 0 16px', fontSize: 24, fontWeight: 700, letterSpacing: '-0.015em', color: C.fg }}>
-              How the test was run
-            </h2>
-            <p style={{ margin: '0 0 28px', fontSize: 15, color: C.fg2, maxWidth: 680, lineHeight: 1.75 }}>
-              {written.methodology}
-            </p>
-            <div style={{
-              display: 'inline-flex', flexWrap: 'wrap', gap: 8,
-              font: `500 11.5px var(--mono)`, color: C.fg3,
-            }}>
-              {[
-                'NULL_DOWNSTREAM', 'VALUE_MISMATCH', 'MISSING_RECORD',
-                'STALE_VALUE', 'SCHEMA_DRIFT',
-              ].map((t) => (
-                <span key={t} style={{
-                  padding: '4px 10px', borderRadius: 5,
-                  background: C.bg2, border: `1px solid ${C.line}`,
-                }}>
-                  {t}
-                </span>
-              ))}
-            </div>
-            <div style={{ marginTop: 16, font: `400 12px var(--mono)`, color: C.fg3, lineHeight: 1.6 }}>
-              Ground truth: {meta.ground_truth_method}
-            </div>
-          </div>
-        </section>
+        {/* ── Diagnosis ── */}
+        <Section label="Diagnosis" title="Hypothesis graph accuracy by discrepancy type" alt>
+          <Prose>
+            Graph accuracy is {pct(m.accuracy.overall)} ({ci(m.accuracy.overall)}). That is expected by construction:
+            every simulated record contains its labeled fault, so this checks the logic, not real-world accuracy.
+            The graph checks one hypothesis at a time and stops at the first confirmation. It needed{' '}
+            {m.efficiency.mean_hypotheses_tested?.toFixed(2)} checks on average, and stayed within the labeled minimum
+            path on {pct(m.efficiency.within_min_hypotheses)} of incidents. Small buckets have wide intervals.
+          </Prose>
+          <ChartCard title="Root-cause accuracy (%) · bar label = incidents in bucket">
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={byTypeData} barCategoryGap="35%">
+                <CartesianGrid strokeDasharray="3 3" stroke={HEX.line} vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: HEX.fg2, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fill: HEX.fg2, fontSize: 11 }} axisLine={false} tickLine={false}
+                  tickFormatter={(v: number) => `${v}%`} />
+                <Tooltip {...tooltipBase} formatter={(v: number | string, _n: string, p: { payload?: { n: number } }) =>
+                  [`${v}% of ${p?.payload?.n ?? ''}`, 'Accuracy']} />
+                <Bar dataKey="accuracy" fill={HEX.ok} radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Section>
 
-        {/* ── Chart 1: 3-way accuracy comparison ── */}
-        <section className="bmk-section" style={{ background: C.bg }}>
-          <div style={{ maxWidth: 960, margin: '0 auto' }}>
-            <SectionLabel>Accuracy</SectionLabel>
-            <h2 style={{ margin: '16px 0 32px', fontSize: 24, fontWeight: 700, letterSpacing: '-0.015em', color: C.fg }}>
-              3-way accuracy comparison
-            </h2>
-            <ChartCard title="Root cause accuracy · human review accuracy · avg confidence  (%)">
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={accuracyData} barCategoryGap="28%" barGap={4}>
+        {/* ── Ablations ── */}
+        {ablationData.length > 0 && (
+          <Section label="Ablations" title="Does the check order matter? Change it and see">
+            <Prose>
+              The same 50 incidents, re-run with the world or the graph changed. Confounders are seeded noise: an
+              unrelated missed event (which looks like a delivery failure) and dormant Apex logic. Checking delivery
+              first, as the pre-2.0 graph did, is what lets that noise win.
+            </Prose>
+            <ChartCard title="Accuracy vs share sent to human review (%)">
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={ablationData} barCategoryGap="28%" barGap={4}>
                   <CartesianGrid strokeDasharray="3 3" stroke={HEX.line} vertical={false} />
-                  <XAxis
-                    dataKey="metric"
-                    tick={{ fill: HEX.fg2, fontSize: 12 }}
-                    axisLine={false} tickLine={false}
-                  />
-                  <YAxis
-                    domain={[0, 100]}
-                    tick={{ fill: HEX.fg2, fontSize: 11 }}
-                    axisLine={false} tickLine={false}
-                    tickFormatter={(v: number) => `${v}%`}
-                  />
-                  <Tooltip
-                    {...tooltipBase}
-                    formatter={(v: number | string, name: string) => [`${v}%`, name]}
-                  />
-                  <Legend
-                    wrapperStyle={{ fontSize: 12, color: HEX.fg2, paddingTop: 16 }}
-                  />
-                  {configs.map((c) => (
-                    <Bar key={c.name} dataKey={c.name} fill={c.color} radius={[3, 3, 0, 0]} />
-                  ))}
+                  <XAxis dataKey="name" tick={{ fill: HEX.fg2, fontSize: 10 }} axisLine={false} tickLine={false} interval={0}
+                    angle={-25} textAnchor="end" height={70} />
+                  <YAxis domain={[0, 100]} tick={{ fill: HEX.fg2, fontSize: 11 }} axisLine={false} tickLine={false}
+                    tickFormatter={(v: number) => `${v}%`} />
+                  <Tooltip {...tooltipBase} formatter={(v: number | string, name: string) => [`${v}%`, name]} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: HEX.fg2, paddingTop: 12 }} />
+                  <Bar dataKey="accuracy" name="Accuracy" fill={HEX.ok} radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="review" name="Sent to review" fill={HEX.info} radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="unsafe" name="Unsafe auto-clear" fill={HEX.bad} radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </ChartCard>
-          </div>
-        </section>
-
-        {/* ── Chart 2: Latency + Cost ── */}
-        <section className="bmk-section" style={{ background: C.bg1, borderTop: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}` }}>
-          <div style={{ maxWidth: 960, margin: '0 auto' }}>
-            <SectionLabel>Performance &amp; Cost</SectionLabel>
-            <h2 style={{ margin: '16px 0 32px', fontSize: 24, fontWeight: 700, letterSpacing: '-0.015em', color: C.fg }}>
-              Latency vs cost per incident
-            </h2>
-            <div className="bmk-two-col">
-              <ChartCard title="Avg latency per run (seconds)">
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={latencyData} barCategoryGap="40%">
-                    <CartesianGrid strokeDasharray="3 3" stroke={HEX.line} vertical={false} />
-                    <XAxis dataKey="name" tick={{ fill: HEX.fg2, fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: HEX.fg2, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}s`} />
-                    <Tooltip
-                      {...tooltipBase}
-                      formatter={(v: number | string) => [`${v}s`, 'Avg latency']}
-                    />
-                    <Bar dataKey="value" radius={[3, 3, 0, 0]}>
-                      {latencyData.map((d) => (
-                        <Cell key={d.name} fill={d.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
-
-              <ChartCard title="Estimated cost per incident (millicents)">
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={costData} barCategoryGap="40%">
-                    <CartesianGrid strokeDasharray="3 3" stroke={HEX.line} vertical={false} />
-                    <XAxis dataKey="name" tick={{ fill: HEX.fg2, fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: HEX.fg2, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}m¢`} />
-                    <Tooltip
-                      {...tooltipBase}
-                      formatter={(v: number | string) => [`${v}m¢ ($${(Number(v) / 100000).toFixed(5)})`, 'Cost/incident']}
-                    />
-                    <Bar dataKey="value" radius={[3, 3, 0, 0]}>
-                      {costData.map((d) => (
-                        <Cell key={d.name} fill={d.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-                <div style={{ font: `400 11px var(--mono)`, color: C.fg3, marginTop: 10 }}>
-                  1 m¢ = $0.00001 · Groq is free-tier; cost reflects token throughput budget
-                </div>
-              </ChartCard>
+            <div style={{ marginTop: 16 }}>
+              <Table head={['Variant', 'What changed']} rows={ablationData.map((a) => [a.name, a.description])} />
             </div>
-          </div>
-        </section>
+          </Section>
+        )}
 
-        {/* ── Key Findings ── */}
-        <section className="bmk-section" style={{ background: C.bg }}>
-          <div style={{ maxWidth: 960, margin: '0 auto' }}>
-            <SectionLabel>Key Findings</SectionLabel>
-            <h2 style={{ margin: '16px 0 28px', fontSize: 24, fontWeight: 700, letterSpacing: '-0.015em', color: C.fg }}>
-              Headline conclusions
-            </h2>
-            <div style={{ maxWidth: 720 }}>
-              {written.key_findings.map((finding, i) => (
-                <div key={i} style={{
-                  borderLeft: '2px solid var(--info)',
-                  paddingLeft: '12px',
-                  marginBottom: '12px',
-                  color: 'var(--fg-1)',
-                  fontSize: '14px',
-                  lineHeight: '1.6',
-                }}>
-                  {finding}
+        {/* ── Safety routing ── */}
+        <Section label="Safety" title="When the system is wrong, does a person see it?" alt>
+          <div className="bmk-four-col" style={{ marginBottom: 20 }}>
+            <Tile label="Unsafe auto-clear" value={pct(m.routing.unsafe_auto_clear)} sub={ci(m.routing.unsafe_auto_clear)} />
+            <Tile label="Sent to review" value={pct(m.routing.review_rate)} sub={ci(m.routing.review_rate)} />
+            <Tile label="Review precision vs labels" value={pct(m.routing.review_vs_label.precision)} sub={ci(m.routing.review_vs_label.precision)} />
+            <Tile label="Review recall vs labels" value={pct(m.routing.review_vs_label.recall)} sub={ci(m.routing.review_vs_label.recall)} />
+          </div>
+          <Prose>
+            The review labels were written for an earlier design and assume some incidents are ambiguous. The simulated
+            world makes most of them unambiguous, so the graph rarely asks for review and agreement with those labels
+            is low. We report the disagreement rather than tune to it.
+          </Prose>
+        </Section>
+
+        {/* ── Critic ── */}
+        <Section label="Critic" title="Planted errors in RCA explanations">
+          <Prose>
+            For each confirmed incident we build a correct draft explanation, then copies with exactly one planted
+            error, and run the real critic on each. Deterministic checks run first; the LLM critic only sees what they
+            pass. The last row can only be caught by the LLM, so its offline number reflects a scripted critic.
+          </Prose>
+          <Table
+            head={['Draft', 'Expected stage', 'Caught', 'Interval']}
+            rows={Object.entries(planted).map(([kind, e]) => kind === 'clean'
+              ? [DEFECT_LABEL[kind] ?? kind, '—', `${pct(e.false_rejection)} rejected`, ci(e.false_rejection)]
+              : [DEFECT_LABEL[kind] ?? kind, e.expected_stage ?? '', pct(e.caught), ci(e.caught)])}
+          />
+        </Section>
+
+        {/* ── Live ── */}
+        <Section label="Live models" title="Real-model runs" alt>
+          {LIVE.length === 0 ? (
+            <Prose>
+              No live run is committed yet, so explanation quality, the LLM critic, run-to-run consistency, cost and
+              latency are not reported here. Run it with{' '}
+              <code style={{ fontFamily: 'var(--mono)', fontSize: 12.5 }}>python -m backend.evals.run --mode live --config claude --runs 3 --yes</code>.
+            </Prose>
+          ) : LIVE.map((r) => {
+            const cl = r.metrics.cost_latency
+            const llmRow = r.critic_planted.by_draft['unsupported_mechanism']
+            return (
+              <div key={r.source_file} style={{ marginBottom: 28 }}>
+                <div style={{ font: `600 13px var(--mono)`, color: C.fg1, marginBottom: 12 }}>
+                  {r.config} · {r.models.join(', ')} · {r.runs} run(s) · {r.created_at.slice(0, 10)}
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>
+                <div className="bmk-four-col">
+                  <Tile label="Accuracy" value={pct(r.metrics.accuracy.overall)} sub={ci(r.metrics.accuracy.overall)} />
+                  <Tile label="Accepted explanations" value={String(r.metrics.explanation.judge_decisions['accept'] ?? 0)}
+                    sub={`grounded ${pct(r.metrics.explanation.grounded_when_accepted)}`} />
+                  <Tile label="LLM critic catch" value={pct(llmRow?.caught)} sub={ci(llmRow?.caught)} />
+                  <Tile label="Consistency" value={pct(r.metrics.consistency?.['judge_decision'])} sub="same judge decision across runs" />
+                  <Tile label="Cost / incident" value={usd(cl['cost_usd_median'])} sub={`p95 ${usd(cl['cost_usd_p95'])}`} />
+                  <Tile label="End-to-end" value={secs(cl['e2e_latency_ms_median'])} sub={`p95 ${secs(cl['e2e_latency_ms_p95'])}`} />
+                  <Tile label="LLM time" value={secs(cl['llm_latency_ms_median'])} sub="median per incident" />
+                  <Tile label="Retrieval" value={r.metrics.retrieval.status === 'measured' ? 'measured' : 'n/a'}
+                    sub={r.metrics.retrieval.reason ?? ''} />
+                </div>
+              </div>
+            )
+          })}
+        </Section>
 
-        {/* ── Chart 3: Human review flagging ── */}
-        <section className="bmk-section" style={{ background: C.bg1, borderTop: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}` }}>
-          <div style={{ maxWidth: 960, margin: '0 auto' }}>
-            <SectionLabel>Human Review</SectionLabel>
-            <h2 style={{ margin: '16px 0 10px', fontSize: 24, fontWeight: 700, letterSpacing: '-0.015em', color: C.fg }}>
-              Human review flagging rate
-            </h2>
-            <p style={{ margin: '0 0 28px', fontSize: 13.5, color: C.fg2, maxWidth: 580, lineHeight: 1.65 }}>
-              Incidents where <code style={{ fontFamily: 'var(--mono)', fontSize: 12 }}>requires_human_review = true</code> — measuring
-              how well each config knows when to escalate, not just whether it answers.
-            </p>
-            <ChartCard title="% of incidents flagged for human review">
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={reviewData} barCategoryGap="45%">
-                  <CartesianGrid strokeDasharray="3 3" stroke={HEX.line} vertical={false} />
-                  <XAxis dataKey="name" tick={{ fill: HEX.fg2, fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis
-                    domain={[0, 60]}
-                    tick={{ fill: HEX.fg2, fontSize: 11 }}
-                    axisLine={false} tickLine={false}
-                    tickFormatter={(v: number) => `${v}%`}
-                  />
-                  <Tooltip
-                    {...tooltipBase}
-                    formatter={(v: number | string, _name: string, payload: { payload?: { count: number; total: number } }) => [
-                      `${v}%  (${payload?.payload?.count ?? ''} / ${payload?.payload?.total ?? ''} incidents)`,
-                      'Flagged for review',
-                    ]}
-                  />
-                  <Bar dataKey="pct" radius={[3, 3, 0, 0]}>
-                    {reviewData.map((d) => (
-                      <Cell key={d.name} fill={d.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
-          </div>
-        </section>
-
-        {/* ── Chart 4 + Failure pattern cards ── */}
-        <section className="bmk-section" style={{ background: C.bg }}>
-          <div style={{ maxWidth: 960, margin: '0 auto' }}>
-            <SectionLabel>Failure Patterns</SectionLabel>
-            <h2 style={{ margin: '16px 0 10px', fontSize: 24, fontWeight: 700, letterSpacing: '-0.015em', color: C.fg }}>
-              Where all three configs fail
-            </h2>
-            <p style={{ margin: '0 0 28px', fontSize: 13.5, color: C.fg2, maxWidth: 600, lineHeight: 1.65 }}>
-              11 incidents across all configs share the same three failure modes —
-              graph-level issues that are model-agnostic and high-leverage to fix.
-            </p>
-
-            <ChartCard title="Incidents affected per failure mode (shared across all configs)">
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={failureData} barCategoryGap="40%">
-                  <CartesianGrid strokeDasharray="3 3" stroke={HEX.line} vertical={false} />
-                  <XAxis dataKey="name" tick={{ fill: HEX.fg2, fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis
-                    allowDecimals={false}
-                    tick={{ fill: HEX.fg2, fontSize: 11 }}
-                    axisLine={false} tickLine={false}
-                    tickFormatter={(v: number) => `${v}`}
-                  />
-                  <Tooltip
-                    {...tooltipBase}
-                    formatter={(v: number | string) => [`${v} incidents`, 'Affected']}
-                  />
-                  <Bar dataKey="count" radius={[3, 3, 0, 0]}>
-                    {failureData.map((d) => (
-                      <Cell key={d.name} fill={d.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
-
-            {/* Failure cards */}
-            <div className="bmk-three-col" style={{ marginTop: 24 }}>
-              {failure_patterns.map((fp) => (
-                <div key={fp.pattern} className="bmk-fail-card">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <span style={{
-                      width: 8, height: 8, borderRadius: '50%',
-                      background: fp.color, flexShrink: 0,
-                    }} />
-                    <span style={{ font: `600 13px var(--sans)`, color: C.fg }}>{fp.pattern}</span>
+        {/* ── Failures ── */}
+        <Section label="Failures" title="Failure patterns">
+          {[OFFLINE, ...LIVE].map((r) => (
+            <div key={r.source_file} style={{ marginBottom: 16 }}>
+              <div style={{ font: `600 12px var(--mono)`, color: C.fg3, marginBottom: 8 }}>{r.mode} / {r.config}</div>
+              {r.failure_patterns.length === 0
+                ? <div style={{ color: C.fg2, fontSize: 13.5 }}>None in this run.</div>
+                : r.failure_patterns.map((f) => (
+                  <div key={f.kind + f.detail} style={{ color: C.fg2, fontSize: 13.5, marginBottom: 6, overflowWrap: 'anywhere' }}>
+                    <b style={{ color: C.fg1 }}>{f.kind}</b> ({f.detail}): {f.count} — {f.incidents.join(', ')}
                   </div>
-                  <div style={{
-                    display: 'inline-block', marginBottom: 10,
-                    font: `600 11px var(--mono)`, color: fp.color,
-                    background: `${fp.color}18`, border: `1px solid ${fp.color}40`,
-                    borderRadius: 4, padding: '2px 7px',
-                  }}>
-                    {fp.incident_count} incidents
-                  </div>
-                  <p style={{ margin: 0, fontSize: 13, color: C.fg2, lineHeight: 1.7 }}>
-                    {fp.description}
-                  </p>
-                </div>
-              ))}
+                ))}
             </div>
-          </div>
-        </section>
+          ))}
+        </Section>
 
-        {/* ── Production recommendation ── */}
-        <section className="bmk-section" style={{ background: C.bg1, borderTop: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}` }}>
-          <div style={{ maxWidth: 960, margin: '0 auto' }}>
-            <SectionLabel>Recommendation</SectionLabel>
-            <h2 style={{ margin: '16px 0 16px', fontSize: 24, fontWeight: 700, letterSpacing: '-0.015em', color: C.fg }}>
-              What this means for production
-            </h2>
-            <p style={{ margin: '0 0 28px', fontSize: 15, color: C.fg2, maxWidth: 680, lineHeight: 1.75 }}>
-              {written.recommendation}
-            </p>
-
-            {/* Config recommendation table */}
-            <div style={{
-              background: C.bg2, border: `1px solid ${C.line}`,
-              borderRadius: 10, overflow: 'hidden', maxWidth: 700,
-            }}>
-              {[
-                { config: 'Claude Sonnet', color: '#22c55e', use: 'P1 incidents · KYC/financial fields · SCHEMA_DRIFT' },
-                { config: 'Groq Llama 3.3 70B', color: '#a855f7', use: 'High-volume P3 NULL_DOWNSTREAM at scale' },
-                { config: 'Hybrid (default)', color: '#3b82f6', use: 'General production — Groq classifies, Sonnet synthesizes' },
-              ].map(({ config, color, use }, i, arr) => (
-                <div
-                  key={config}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 14,
-                    padding: '14px 20px',
-                    borderBottom: i < arr.length - 1 ? `1px solid ${C.line}` : 'none',
-                  }}
-                >
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                  <span style={{ font: `600 13px var(--mono)`, color: C.fg, minWidth: 180 }}>{config}</span>
-                  <span style={{ fontSize: 13, color: C.fg2 }}>{use}</span>
-                </div>
-              ))}
-            </div>
+        {/* ── Reproduce ── */}
+        <Section label="Reproduce" title="Regenerate these results" alt>
+          <pre style={{ margin: 0, padding: 16, background: C.bg2, border: `1px solid ${C.line}`, borderRadius: 8,
+            font: `400 12px var(--mono)`, color: C.fg1, overflowX: 'auto', whiteSpace: 'pre' }}>
+{`python -m backend.evals.run --mode offline --config claude
+python -m backend.evals.run --mode live --config claude --runs 3 --yes`}
+          </pre>
+          <div style={{ marginTop: 12, font: `400 12px var(--mono)`, color: C.fg3, overflowWrap: 'anywhere' }}>
+            Source: {OFFLINE.source_file} · dataset sha256 {OFFLINE.dataset.sha256.slice(0, 12)}
+            {OFFLINE.git_sha ? ` · commit ${OFFLINE.git_sha.slice(0, 7)}` : ''}
           </div>
-        </section>
-
-        {/* ── Conclusion ── */}
-        <section className="bmk-section" style={{ background: C.bg }}>
-          <div style={{ maxWidth: 960, margin: '0 auto' }}>
-            <p style={{ margin: 0, fontSize: 14, color: C.fg3, maxWidth: 600, lineHeight: 1.75, fontFamily: 'var(--mono)' }}>
-              {written.conclusion}
-            </p>
-          </div>
-        </section>
+        </Section>
 
         {/* ── Footer ── */}
         <footer style={{
@@ -570,7 +498,6 @@ export default function Benchmark() {
         }}>
           reconAI · LangGraph · Claude API · Supabase pgvector · UIUC 2026
         </footer>
-
       </div>
     </>
   )

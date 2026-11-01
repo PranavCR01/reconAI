@@ -35,6 +35,17 @@ class SupabaseAdapter(StorageAdapter):
     async def _run(self, fn):
         return await asyncio.to_thread(fn)
 
+    async def missing_columns(self, required: dict[str, list[str]]) -> list[str]:
+        """Return 'table.column' for each required column the database rejects."""
+        missing: list[str] = []
+        for table, columns in required.items():
+            for column in columns:
+                try:
+                    await self._run(lambda t=table, c=column: self._client.table(t).select(c).limit(1).execute())
+                except Exception:
+                    missing.append(f"{table}.{column}")
+        return missing
+
     async def save_recon_run(self, run: ReconRun) -> str:
         result = await self._run(
             lambda: self._client.table("recon_runs").insert(_dump(run)).execute()
@@ -130,6 +141,12 @@ class SupabaseAdapter(StorageAdapter):
             .execute()
         )
         return RCAIncident.model_validate(result.data)
+
+    async def get_recon_row(self, row_id: str) -> ReconRow:
+        result = await self._run(
+            lambda: self._client.table("recon_rows").select("*").eq("id", row_id).single().execute()
+        )
+        return ReconRow.model_validate(result.data)
 
     async def get_evidence_for_incident(self, incident_id: str) -> list[Evidence]:
         result = await self._run(
@@ -278,6 +295,12 @@ class SupabaseAdapter(StorageAdapter):
             .execute()
         )
         return result.data
+
+    async def count_artifacts(self) -> int:
+        result = await self._run(
+            lambda: self._client.table("recon_artifacts").select("id", count="exact").limit(1).execute()
+        )
+        return result.count or 0
 
     async def get_total_runs_count(self) -> int:
         result = await self._run(

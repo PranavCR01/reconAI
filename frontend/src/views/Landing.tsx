@@ -221,8 +221,8 @@ export default function Landing() {
               color: C.fg2, lineHeight: 1.6,
               maxWidth: 560,
             }}>
-              ReconAI diagnoses root causes in just a couple of minutes — with cited evidence,
-              suggested fixes, and a postmortem draft ready to send.
+              ReconAI checks each discrepancy against an encoded decision tree, cites the evidence
+              for every claim, and sends anything it can't confirm to a person.
             </p>
 
             {/* CTAs */}
@@ -340,12 +340,12 @@ export default function Landing() {
                   {
                     n: '02',
                     title: 'Analyze',
-                    body: 'A LangGraph hypothesis graph tests FLS permissions, CDC channel config, DataWeave transforms, and Apex triggers — in parallel, with real tool calls.',
+                    body: 'A hypothesis graph checks FLS, CDC config, Apex suppression, DataWeave and delivery one at a time, and stops at the first check the evidence confirms. (Demo tools are simulated.)',
                   },
                   {
                     n: '03',
                     title: 'Fix',
-                    body: 'Every incident gets cited evidence, a suggested fix, a postmortem draft, and a Jira summary. Ready to action in one click.',
+                    body: 'Every claim in the explanation cites its evidence and is checked by a critic. Unconfirmed or unverified results go to review. Copy Jira summaries in one click.',
                   },
                 ].map(({ n, title, body }) => (
                   <div key={n} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
@@ -392,17 +392,17 @@ export default function Landing() {
               {[
                 {
                   title: 'LangGraph hypothesis graph',
-                  detail: 'H1 DB2 history · H2 Splunk triage · H3a FLS · H3b CDC · H3c Apex · H4 transform · H5 RAG fallback',
+                  detail: 'One ordered plan per discrepancy type · confirmed / refuted / inconclusive per check · stops at first confirmation',
                   color: C.info,
                 },
                 {
                   title: 'pgvector RAG',
-                  detail: '23 FSC seed artifacts · HNSW similarity search · temporal weighting · LLM reranker',
+                  detail: '25 resolved past incidents · HNSW similarity search · LLM reranker',
                   color: C.ok,
                 },
                 {
-                  title: 'Claude Sonnet synthesis',
-                  detail: 'Cited evidence not hallucination · confidence calibration · postmortem generation',
+                  title: 'Proposer · critic · judge',
+                  detail: 'Claims cite evidence IDs · code checks then model review · judge accepts, revises once, or escalates',
                   color: C.violet,
                 },
                 {

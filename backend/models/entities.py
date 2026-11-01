@@ -103,6 +103,29 @@ class RCAIncident(BaseModel):
     total_tool_calls: int = 0
     total_tokens_used: int = 0
     latency_ms: int = 0
+    # Why the incident needs human review (empty = no review needed). Append-only during a run.
+    review_reasons: list[str] = Field(default_factory=list)
+    # Every LLM call made to produce this analysis (non-negotiable #4).
+    llm_calls: list[dict] = Field(default_factory=list)
+    # Hypothesis graph outcome (issue #10).
+    hypothesis_verdicts: list[dict] = Field(default_factory=list)
+    graph_status: Optional[str] = None          # confirmed | exhausted | unknown_type
+    root_cause_category: Optional[str] = None   # set when graph_status == confirmed
+    contributing_factors: list[str] = Field(default_factory=list)
+    graph_version: Optional[str] = None
+    # Proposer / critic / judge outcome (issue #11).
+    claims: list[dict] = Field(default_factory=list)
+    judge_decision: Optional[str] = None        # accept | escalate
+    revision_count: int = 0
+    prompt_versions: dict = Field(default_factory=dict)
+    # Tracing and cost (issue #12). latency_ms is the sum of LLM call latencies;
+    # e2e_latency_ms is wall-clock for the whole analysis (graph + persistence prep).
+    e2e_latency_ms: int = 0
+    cost_usd: Optional[float] = None            # None when any call's model has no known price
+    cost_warnings: list[str] = Field(default_factory=list)
+    trace: list[dict] = Field(default_factory=list)
+    # Set when similar-incident retrieval failed (issue #15); None means it ran (possibly with 0 results).
+    retrieval_error: Optional[str] = None
     created_at: Optional[datetime] = None
 
 
@@ -113,6 +136,12 @@ class Evidence(BaseModel):
     source_reference: str
     content: str
     relevance_explanation: str
+    # Which hypothesis this evidence was collected for, and what it showed (issue #9).
+    hypothesis_key: Optional[str] = None
+    tool: Optional[str] = None
+    tool_args: Optional[dict] = None
+    outcome: Optional[str] = None  # supports | refutes | neutral | error | skipped
+    raw_result: Optional[dict] = None
     created_at: Optional[datetime] = None
 
 

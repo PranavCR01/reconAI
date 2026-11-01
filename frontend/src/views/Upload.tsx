@@ -815,7 +815,7 @@ function UploadForm() {
         )}
 
         {/* Rows */}
-        {displayedRuns.map((run, idx) => {
+        {displayedRuns.map((run) => {
           const heights = sparkHeights(run.runId)
           const statusVariant = STATUS_VARIANT[run.status] ?? 'queued'
           const isProd = run.environment === 'PROD'

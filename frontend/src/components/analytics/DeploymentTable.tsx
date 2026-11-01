@@ -4,13 +4,11 @@ interface Props {
   data: DeploymentCorrelation[]
 }
 
-function SigmaCell({ sigma }: { sigma: number }) {
+export function SigmaCell({ incidents, sigma }: { incidents: number; sigma: number }) {
   const color = sigma >= 3.0 ? 'var(--p1)' : sigma >= 1.5 ? 'var(--warn)' : 'var(--fg-2)'
-  const cls = sigma >= 3.0 ? 'up' : sigma < 0 ? 'down' : 'flat'
-  const sign = sigma > 0 ? '+' : ''
   return (
-    <span style={{ font: '600 13px var(--mono)', color }}>
-      {sigma >= 0 ? `+${Math.round(Math.abs(sigma * 10))}` : `-${Math.round(Math.abs(sigma * 10))}`}
+    <span data-testid="incidents-24h" style={{ font: '600 13px var(--mono)', color }}>
+      {incidents}
       <span style={{ display: 'inline-block', fontSize: 10.5, color: 'var(--fg-3)', fontWeight: 500, marginLeft: 4 }}>
         σ={sigma.toFixed(1)}
       </span>
@@ -111,7 +109,7 @@ export function DeploymentTable({ data }: Props) {
                   </span>
                 </td>
                 <td style={{ padding: '11px 12px', borderBottom: '1px dashed var(--line-soft)', textAlign: 'right' }}>
-                  <SigmaCell sigma={dep.sigma} />
+                  <SigmaCell incidents={dep.incidents_24h} sigma={dep.sigma} />
                 </td>
                 <td style={{ padding: '11px 12px', borderBottom: '1px dashed var(--line-soft)' }}>
                   <span style={{ font: '500 12px var(--mono)', color: 'var(--fg-1)' }}>

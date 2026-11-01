@@ -7,6 +7,7 @@ import { SeverityBadge } from '@/components/ui/Badge'
 import { ConfidenceBar } from '@/components/ui/ConfidenceBar'
 import { HypothesisPills } from '@/components/ui/HypothesisPills'
 import type { HypothesisItem } from '@/components/ui/HypothesisPills'
+import { confidenceNeedsCaution, hypothesisPills } from '@/lib/incident'
 import { EvidenceChip } from '@/components/ui/EvidenceChip'
 import { Panel } from '@/components/ui/Panel'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
@@ -52,9 +53,6 @@ function sseToIncident(e: SSEIncidentEvent): RCAIncident {
   }
 }
 
-function buildHypItems(tested: string[], ruledOut: string[]): HypothesisItem[] {
-  return tested.map(h => ({ name: h, state: (ruledOut.includes(h) ? 'fail' : 'done') as HypothesisItem['state'] }))
-}
 
 function statusVariant(inc: RCAIncident): 'ok' | 'review' | 'analyzing' | 'queued' | 'fail' | 'default' {
   if (inc.status === 'complete') return 'ok'
@@ -74,22 +72,19 @@ function StatCell({ label, value, color, note }: { label: string; value: string 
   )
 }
 
+// The pipeline every row goes through (backend/graph/recon_graph.py).
 const AGENT_STEPS = [
-  { label: 'Schema diff', desc: 'SF field vs DB2 column type check' },
-  { label: 'FLS pull', desc: 'Field-level security permissions' },
-  { label: 'DB2 query', desc: 'Downstream value lookup' },
-  { label: 'Hypothesis ranking', desc: 'LLM hypothesis scoring' },
-  { label: 'Remediation', desc: 'Suggested fix generation' },
-  { label: 'Confidence', desc: 'Final confidence scoring' },
+  { label: 'Ingestion', desc: 'Classify discrepancy type and severity' },
+  { label: 'Hypothesis graph', desc: 'Pick the next check; confirm, refute or mark inconclusive' },
+  { label: 'Evidence', desc: 'Run the check’s tool and record cited evidence' },
+  { label: 'Retrieval', desc: 'Find and rerank similar past incidents' },
+  { label: 'Proposer', desc: 'Draft the explanation as cited claims' },
+  { label: 'Critic', desc: 'Check each claim against the evidence' },
+  { label: 'Judge', desc: 'Accept, revise once, or send to review' },
 ]
 
-const SOURCE_CONNECTIONS = [
-  { name: 'Salesforce FSC', ok: true },
-  { name: 'DB2 Warehouse', ok: true },
-  { name: 'Splunk', ok: true },
-  { name: 'MuleSoft', ok: false },
-  { name: 'GitHub', ok: true },
-]
+// Tool results in this demo come from simulators, not live systems.
+const TOOL_SOURCES = ['Salesforce (FLS, CDC, Apex)', 'DB2 history and rows', 'Splunk delivery logs']
 
 export default function LiveAnalysis() {
   const { runId } = useParams<{ runId: string }>()
@@ -104,7 +99,7 @@ export default function LiveAnalysis() {
   const [totalRows, setTotalRows] = useState(0)
   const [cacheHits, setCacheHits] = useState(0)
   const [expectedRows, setExpectedRows] = useState(0)
-  const [apiStats, setApiStats] = useState<{ avgTokens: number; totalCalls: number; avgLatencyMs: number; count: number } | null>(null)
+  const [apiStats, setApiStats] = useState<{ avgTokens: number; totalCalls: number; avgLatencyMs: number; costUsd: number | null; count: number } | null>(null)
   const sseCleanupRef = useRef<(() => void) | null>(null)
 
   const handleStop = useCallback(() => {
@@ -157,7 +152,9 @@ export default function LiveAnalysis() {
                 setApiStats({
                   avgTokens: Math.round(fresh.reduce((s, i) => s + (i.total_tokens_used ?? 0), 0) / n),
                   totalCalls: fresh.reduce((s, i) => s + (i.total_tool_calls ?? 0), 0),
-                  avgLatencyMs: fresh.reduce((s, i) => s + (i.latency_ms ?? 0), 0) / n,
+                  avgLatencyMs: fresh.reduce((s, i) => s + (i.e2e_latency_ms || i.latency_ms || 0), 0) / n,
+                  costUsd: fresh.some(i => i.cost_usd === null || i.cost_usd === undefined)
+                    ? null : fresh.reduce((s, i) => s + (i.cost_usd ?? 0), 0),
                   count: n,
                 })
               }
@@ -186,8 +183,6 @@ export default function LiveAnalysis() {
   const allIncidents = store.getIncidentsSorted()
   const total = allIncidents.length
   const p1Count = allIncidents.filter(i => i.severity === 'P1').length
-  const p2Count = allIncidents.filter(i => i.severity === 'P2').length
-  const p3Count = allIncidents.filter(i => i.severity === 'P3').length
   // resolvedCount: only 'complete' (not needs_review) — used for No Review Needed stat cell and tab
   const resolvedCount = allIncidents.filter(i => i.status === 'complete').length
   const needsReviewCount = allIncidents.filter(i => i.requires_human_review === true).length
@@ -201,7 +196,7 @@ export default function LiveAnalysis() {
   const displayCount = apiStats?.count ?? total
   const displayAvgLatencyMs = apiStats?.avgLatencyMs ?? 0
   const displayAvgCalls = displayCount > 0 ? (displayTotalCalls / displayCount).toFixed(1) : '—'
-  const displayApproxSpend = displayAvgTokens > 0 ? displayAvgTokens * displayCount * 0.000003 : 0
+  const displayCost = apiStats?.costUsd ?? null
 
   const topObjects = useMemo(() => {
     const counts = new Map<string, number>()
@@ -229,7 +224,7 @@ export default function LiveAnalysis() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      <TopBar
+      <TopBar sub
         center={
           <Breadcrumbs crumbs={[
             { label: 'Runs', to: '/upload' },
@@ -303,13 +298,21 @@ export default function LiveAnalysis() {
       )}
 
       {/* Stats bar */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', borderBottom: '1px solid var(--line)', background: 'var(--bg-1)' }}>
+      <style>{`
+        .la-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+        .la-main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; }
+        @media (max-width: 900px) {
+          .la-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+          .la-main { grid-template-columns: minmax(0, 1fr); }
+        }
+      `}</style>
+      <div className="la-stats" style={{ borderBottom: '1px solid var(--line)', background: 'var(--bg-1)' }}>
         <StatCell label="Discrepancies" value={total} />
         <StatCell label="P1 Critical" value={p1Count} color="var(--p1)" />
         <StatCell label="No Review Needed" value={resolvedCount} color="var(--ok)" />
         <StatCell label="Needs Review" value={needsReviewCount} color="var(--warn)" />
         <StatCell label="Analyzing" value={analyzingCount} />
-        <StatCell label="Mean Time / Incident" value={displayAvgLatencyMs > 0 ? fmtLatency(displayAvgLatencyMs) : '—'} note={isDone && cacheHitPct === 100 && displayAvgLatencyMs === 0 ? 'cache hit' : undefined} />
+        <StatCell label="Mean end-to-end / incident" value={displayAvgLatencyMs > 0 ? fmtLatency(displayAvgLatencyMs) : '—'} note={isDone && cacheHitPct === 100 && displayAvgLatencyMs === 0 ? 'cache hit' : undefined} />
       </div>
 
       {/* Toolbar */}
@@ -343,7 +346,7 @@ export default function LiveAnalysis() {
       </div>
 
       {/* Main grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', minHeight: 'calc(100vh - 210px)' }}>
+      <div className="la-main" style={{ minHeight: 'calc(100vh - 210px)' }}>
         {/* Feed */}
         <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10, borderRight: '1px solid var(--line)' }}>
           <AnimatePresence>
@@ -461,8 +464,8 @@ export default function LiveAnalysis() {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {AGENT_STEPS.map((step, i) => (
                 <div key={step.label} style={{ display: 'flex', gap: 10, padding: '7px 0', borderBottom: i < AGENT_STEPS.length - 1 ? '1px solid var(--line-soft)' : 'none' }}>
-                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--ok-bg)', border: '1px solid var(--ok)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                    <span style={{ fontSize: 10, color: 'var(--ok)' }}>✓</span>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--bg-2)', border: '1px solid var(--line)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <span style={{ fontSize: 10, color: 'var(--fg-2)', fontFamily: 'var(--mono)' }}>{i + 1}</span>
                   </div>
                   <div>
                     <div style={{ fontFamily: 'var(--mono)', fontSize: 11.5, fontWeight: 500, color: 'var(--fg-1)' }}>{step.label}</div>
@@ -479,7 +482,7 @@ export default function LiveAnalysis() {
                 { label: 'Tokens / incident', value: displayAvgTokens > 0 ? fmtTokens(displayAvgTokens) : '—' },
                 { label: 'Avg tool calls', value: displayTotalCalls > 0 ? displayAvgCalls : '—' },
                 { label: 'Cache hit %', value: cacheHitPct !== null ? `${cacheHitPct}%` : '—' },
-                { label: 'Approx. spend', value: displayApproxSpend > 0 ? fmtCurrency(displayApproxSpend) : '—' },
+                { label: 'Model cost (analyses)', value: displayCost !== null && displayCost > 0 ? fmtCurrency(displayCost) : '—' },
               ].map(row => (
                 <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>{row.label}</span>
@@ -489,15 +492,12 @@ export default function LiveAnalysis() {
             </div>
           </Panel>
 
-          <Panel title="Source Connections">
+          <Panel title="Tool Sources">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              {SOURCE_CONNECTIONS.map(src => (
-                <div key={src.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--fg-1)' }}>{src.name}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--mono)', fontSize: 10.5, color: src.ok ? 'var(--ok)' : 'var(--warn)' }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: src.ok ? 'var(--ok)' : 'var(--warn)' }} />
-                    {src.ok ? 'connected' : 'degraded'}
-                  </span>
+              {TOOL_SOURCES.map(name => (
+                <div key={name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--fg-1)' }}>{name}</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--fg-3)' }}>simulated</span>
                 </div>
               ))}
             </div>
@@ -534,7 +534,7 @@ function IncidentCard({ incident: inc, runId }: { incident: RCAIncident; runId: 
   const navigate = useNavigate()
   const isAnalyzing = inc.status === 'running'
   const borderColor = inc.severity ? SEV_COLOR[inc.severity] : 'var(--line)'
-  const hypItems = buildHypItems(inc.hypotheses_tested, inc.hypotheses_ruled_out)
+  const hypItems: HypothesisItem[] = hypothesisPills(inc.hypotheses_tested, inc.hypothesis_verdicts)
 
   return (
     <motion.div
@@ -599,6 +599,7 @@ function IncidentCard({ incident: inc, runId }: { incident: RCAIncident; runId: 
           <ConfidenceBar
             value={inc.confidence}
             status={isAnalyzing ? 'analyzing' : 'complete'}
+            caution={confidenceNeedsCaution(inc)}
             style={{ flex: 1 }}
           />
           <div style={{ display: 'flex', gap: 6 }}>

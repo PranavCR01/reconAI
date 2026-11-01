@@ -31,8 +31,6 @@ export function IncidentsOverTime({ data }: Props) {
     totals[k] = (data.series[k] ?? []).reduce((a, b) => a + b, 0)
   }
 
-  const deployDates = new Set(data.deployments.map(d => d.date))
-
   const fmtDate = (iso: string) => {
     const d = new Date(iso + 'T00:00:00Z')
     return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`

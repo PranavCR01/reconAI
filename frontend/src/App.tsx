@@ -13,54 +13,35 @@ const Benchmark = lazy(() => import('./views/Benchmark'))
 
 const _API = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api/v1'
 
-function HealthBanner() {
-  const [down, setDown] = useState(false)
-  const [dismissed, setDismissed] = useState(false)
-  const consecutiveFailures = useRef(0)
+export type HealthState = 'ok' | 'degraded' | 'down'
 
-  useEffect(() => {
-    async function check() {
-      try {
-        const res = await fetch(`${_API}/health`, { signal: AbortSignal.timeout(20000) })
-        if (res.ok) {
-          consecutiveFailures.current = 0
-          setDown(false)
-          setDismissed(false)
-        } else {
-          consecutiveFailures.current += 1
-          if (consecutiveFailures.current >= 2) setDown(true)
-        }
-      } catch {
-        consecutiveFailures.current += 1
-        if (consecutiveFailures.current >= 2) setDown(true)
-      }
-    }
-    const initialTimer = setTimeout(check, 10_000)
-    const id = setInterval(check, 90_000)
-    return () => { clearTimeout(initialTimer); clearInterval(id) }
-  }, [])
+export const HEALTH_TEXT: Record<Exclude<HealthState, 'ok'>, string> = {
+  down: 'ReconAI is temporarily unavailable. Please try again shortly.',
+  degraded: 'Some features are limited right now (similar past incidents may be missing). Analyses still run.',
+}
 
-  if (!down || dismissed) return null
-
+export function HealthNotice({ state, onDismiss }: { state: HealthState; onDismiss: () => void }) {
+  if (state === 'ok') return null
+  const down = state === 'down'
   return (
-    <div style={{
+    <div role="status" data-testid="health-banner" data-state={state} style={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
-      background: 'oklch(0.18 0.06 25)',
-      borderBottom: '1px solid oklch(0.55 0.20 25)',
+      background: down ? 'oklch(0.18 0.06 25)' : 'oklch(0.20 0.04 75)',
+      borderBottom: `1px solid ${down ? 'oklch(0.55 0.20 25)' : 'oklch(0.55 0.12 75)'}`,
       padding: '9px 20px',
       display: 'flex', alignItems: 'center', gap: 10,
       fontFamily: 'var(--mono)', fontSize: 12,
-      color: 'oklch(0.80 0.12 25)',
+      color: down ? 'oklch(0.80 0.12 25)' : 'oklch(0.85 0.10 75)',
     }}>
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ flexShrink: 0 }}>
         <path d="M8 2L14.9 14H1.1L8 2z" /><path d="M8 7v3M8 12v.5" />
       </svg>
-      ReconAI is temporarily unavailable. Our team has been notified.
+      {HEALTH_TEXT[state]}
       <button
-        onClick={() => setDismissed(true)}
+        onClick={onDismiss}
         style={{
           marginLeft: 'auto', background: 'none', border: 0,
-          color: 'oklch(0.65 0.10 25)', cursor: 'pointer',
+          color: 'inherit', opacity: 0.8, cursor: 'pointer',
           fontFamily: 'var(--mono)', fontSize: 14, lineHeight: 1, padding: '0 4px',
         }}
         aria-label="Dismiss"
@@ -69,6 +50,34 @@ function HealthBanner() {
       </button>
     </div>
   )
+}
+
+function HealthBanner() {
+  const [state, setState] = useState<HealthState>('ok')
+  const [dismissed, setDismissed] = useState(false)
+  const consecutiveFailures = useRef(0)
+
+  useEffect(() => {
+    async function check() {
+      try {
+        const res = await fetch(`${_API}/health`, { signal: AbortSignal.timeout(20000) })
+        if (!res.ok) throw new Error(String(res.status))
+        const body = await res.json().catch(() => ({}))
+        consecutiveFailures.current = 0
+        const next: HealthState = body?.status === 'degraded' ? 'degraded' : 'ok'
+        setState(prev => { if (prev !== next) setDismissed(false); return next })
+      } catch {
+        consecutiveFailures.current += 1
+        if (consecutiveFailures.current >= 2) setState('down')
+      }
+    }
+    const initialTimer = setTimeout(check, 10_000)
+    const id = setInterval(check, 90_000)
+    return () => { clearTimeout(initialTimer); clearInterval(id) }
+  }, [])
+
+  if (dismissed) return null
+  return <HealthNotice state={state} onDismiss={() => setDismissed(true)} />
 }
 
 function RouteTracker() {
@@ -133,6 +142,7 @@ function AppRight() {
   return (
     <>
       <span
+        className="hide-sm"
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -158,9 +168,10 @@ function AppRight() {
           }}
         />
         <span style={{ color: 'var(--fg-3)', fontWeight: 400 }}>org</span>
-        td-bank-na
+        demo-org
       </span>
       <button
+        className="hide-sm"
         style={{
           width: 30,
           height: 30,
@@ -180,6 +191,7 @@ function AppRight() {
         </svg>
       </button>
       <span
+        className="hide-sm"
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -209,9 +221,9 @@ function AppRight() {
             flexShrink: 0,
           }}
         >
-          JK
+          DU
         </span>
-        j.kowalski
+        demo.user
       </span>
     </>
   )

@@ -516,13 +516,21 @@ async def seed_artifacts(storage) -> int:
     if existing:
         return 0
 
-    seeded = 0
+    seeded, failures = 0, []
     for artifact in _INCIDENTS:
         try:
             embedding = await asyncio.to_thread(embed_text, artifact.content)
             await storage.save_artifact(artifact, embedding)
             seeded += 1
-        except Exception:
-            continue
+        except Exception as exc:
+            failures.append((artifact.source, exc))
 
+    if failures:
+        # A silently empty knowledge base means every incident runs without past-incident context.
+        import sentry_sdk
+
+        source, exc = failures[0]
+        print(f"ERROR: knowledge-base seeding failed for {len(failures)}/{len(_INCIDENTS)} artifacts; "
+              f"first: {source}: {type(exc).__name__}: {exc}", flush=True)
+        sentry_sdk.capture_exception(exc)
     return seeded

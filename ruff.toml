@@ -1,0 +1,5 @@
+# CI lint: real bugs only (pyflakes + syntax errors). Style rules are not enforced.
+target-version = "py311"
+
+[lint]
+select = ["E9", "F"]

@@ -4,9 +4,10 @@ import { TopBar, Breadcrumbs } from '@/components/layout/TopBar'
 import { StatusPill } from '@/components/ui/StatusPill'
 import { SeverityBadge } from '@/components/ui/Badge'
 import { Panel } from '@/components/ui/Panel'
-import { getRun, getRecallMetrics } from '@/lib/api'
-import { fmtDate, fmtLatency, fmtConfidence, fmtTokens } from '@/lib/format'
-import type { RunDetailResponse, RCAIncident, Severity, BenchmarkResponse, RecallMetrics, LlmConfig } from '@/types'
+import { getRun } from '@/lib/api'
+import { fmtDate, fmtLatency, fmtConfidence } from '@/lib/format'
+import { byObject, jiraLines } from '@/lib/incident'
+import type { RunDetailResponse, RCAIncident, Severity } from '@/types'
 
 function StatCell({ label, value, color }: { label: string; value: string | number; color?: string }) {
   return (
@@ -50,33 +51,18 @@ interface ObjRow {
 }
 
 function buildByObject(incidents: RCAIncident[]): ObjRow[] {
-  const map: Record<string, { count: number; p1: number; p2: number; p3: number; resolved: number; confSum: number; confN: number }> = {}
-  for (const inc of incidents) {
-    const obj = 'Account' // fallback since sf_object is on ReconRow, not on incident directly
-    if (!map[obj]) map[obj] = { count: 0, p1: 0, p2: 0, p3: 0, resolved: 0, confSum: 0, confN: 0 }
-    const row = map[obj]
-    row.count++
-    if (inc.severity === 'P1') row.p1++
-    if (inc.severity === 'P2') row.p2++
-    if (inc.severity === 'P3') row.p3++
-    if (inc.status === 'complete') row.resolved++
-    if (inc.confidence != null) { row.confSum += inc.confidence; row.confN++ }
-  }
-  return Object.entries(map).map(([sfObject, r]) => ({
-    sfObject,
-    count: r.count,
-    p1: r.p1,
-    p2: r.p2,
-    p3: r.p3,
-    resolved: r.resolved,
-    avgConf: r.confN > 0 ? r.confSum / r.confN : 0,
-  }))
-}
-
-const CONFIG_DISPLAY: Record<LlmConfig, string> = {
-  claude: 'Claude Haiku / Sonnet',
-  groq: 'Groq Llama 3.3 70B',
-  hybrid: 'Hybrid (Haiku + Groq)',
+  return byObject(incidents).map(([sfObject, group]) => {
+    const withConf = group.filter(i => i.confidence != null)
+    return {
+      sfObject,
+      count: group.length,
+      p1: group.filter(i => i.severity === 'P1').length,
+      p2: group.filter(i => i.severity === 'P2').length,
+      p3: group.filter(i => i.severity === 'P3').length,
+      resolved: group.filter(i => i.status === 'complete').length,
+      avgConf: withConf.length ? withConf.reduce((s, i) => s + (i.confidence ?? 0), 0) / withConf.length : 0,
+    }
+  })
 }
 
 export default function RunSummary() {
@@ -84,9 +70,7 @@ export default function RunSummary() {
   const [data, setData] = useState<RunDetailResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [recall, setRecall] = useState<RecallMetrics | null>(null)
-  const [benchmark] = useState<BenchmarkResponse | null>(null)
-  const [jiraModalOpen, setJiraModalOpen] = useState(false)
+  const [jiraCopied, setJiraCopied] = useState<'idle' | 'copied' | 'failed'>('idle')
 
   function fetchWithRetry<T>(fn: () => Promise<T>, retries = 2, delay = 3000): Promise<T> {
     return fn().catch((e) =>
@@ -102,9 +86,6 @@ export default function RunSummary() {
     fetchWithRetry(() => getRun(runId))
       .then(d => { setData(d); setLoading(false) })
       .catch(e => { setError(String(e)); setLoading(false) })
-    getRecallMetrics()
-      .then(setRecall)
-      .catch(() => { /* non-fatal */ })
   }, [runId])
 
   function handleDownloadJson() {
@@ -123,7 +104,7 @@ export default function RunSummary() {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-        <TopBar center={<Breadcrumbs crumbs={[{ label: 'Runs' }, { label: '…' }]} />} />
+        <TopBar sub center={<Breadcrumbs crumbs={[{ label: 'Runs' }, { label: '…' }]} />} />
         <div style={{ maxWidth: 1320, margin: '0 auto', padding: '18px 24px' }}>
           {[200, 100, 300].map((h, i) => (
             <div key={i} style={{ height: h, borderRadius: 8, background: 'linear-gradient(90deg, var(--bg-2) 0%, var(--bg-3) 50%, var(--bg-2) 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', marginBottom: 16 }} />
@@ -136,7 +117,7 @@ export default function RunSummary() {
   if (error || !data) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-        <TopBar center={<Breadcrumbs crumbs={[{ label: 'Runs' }, { label: 'Error' }]} />} />
+        <TopBar sub center={<Breadcrumbs crumbs={[{ label: 'Runs' }, { label: 'Error' }]} />} />
         <div style={{ maxWidth: 1320, margin: '0 auto', padding: '40px 24px', textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--p1)' }}>
           <div>
             <div style={{ marginBottom: 12 }}>Unable to load run data. The server may be warming up.</div>
@@ -153,7 +134,6 @@ export default function RunSummary() {
   }
 
   const { run, incidents } = data
-  const total = data.total_incidents
   const needsReview = data.needs_review
   const resolvedCount = incidents.filter(i => i.status === 'complete').length
   const p1Count = incidents.filter(i => i.severity === 'P1').length
@@ -161,7 +141,7 @@ export default function RunSummary() {
     ? incidents.reduce((s, i) => s + (i.confidence ?? 0), 0) / incidents.length
     : 0
   const avgLatency = incidents.length > 0
-    ? incidents.reduce((s, i) => s + i.latency_ms, 0) / incidents.length
+    ? incidents.reduce((s, i) => s + (i.e2e_latency_ms || i.latency_ms), 0) / incidents.length
     : 0
 
   const hypFreqAll = buildHypFreq(incidents)
@@ -177,7 +157,7 @@ export default function RunSummary() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      <TopBar
+      <TopBar sub
         center={
           <Breadcrumbs crumbs={[
             { label: 'Runs', to: '/upload' },
@@ -202,8 +182,15 @@ export default function RunSummary() {
               <button onClick={handleDownloadJson} style={{ padding: '5px 14px', borderRadius: 5, border: '1px solid var(--line)', background: 'var(--bg-2)', color: 'var(--fg-1)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}>
                 Download JSON
               </button>
-              <button onClick={() => setJiraModalOpen(true)} style={{ padding: '5px 14px', borderRadius: 5, border: '1px solid var(--info)', background: 'var(--info-bg)', color: 'var(--info)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}>
-                Export to Jira
+              <button
+                onClick={() => {
+                  const ordered = [...incidents].sort((a, b) => (a.severity ?? 'P9').localeCompare(b.severity ?? 'P9'))
+                  navigator.clipboard.writeText(jiraLines(ordered))
+                    .then(() => setJiraCopied('copied'), () => setJiraCopied('failed'))
+                }}
+                style={{ padding: '5px 14px', borderRadius: 5, border: '1px solid var(--info)', background: 'var(--info-bg)', color: 'var(--info)', fontFamily: 'var(--mono)', fontSize: 11, cursor: 'pointer' }}
+              >
+                {jiraCopied === 'copied' ? 'Copied ✓' : jiraCopied === 'failed' ? 'Copy failed' : 'Copy Jira summaries'}
               </button>
             </div>
           </div>
@@ -223,7 +210,7 @@ export default function RunSummary() {
           <StatCell label="Needs Review" value={needsReview} color="var(--warn)" />
           <StatCell label="P1 Critical" value={p1Count} color="var(--p1)" />
           <StatCell label="Avg Confidence" value={fmtConfidence(avgConf)} />
-          <StatCell label="Avg Latency" value={avgLatency > 0 ? fmtLatency(avgLatency) : '—'} />
+          <StatCell label="Avg end-to-end / incident" value={avgLatency > 0 ? fmtLatency(avgLatency) : '—'} />
         </div>
 
         {/* 2-col grid */}
@@ -283,94 +270,7 @@ export default function RunSummary() {
           </Panel>
         </div>
 
-        {/* Recall@k */}
-        <Panel title="RAG Recall@k" meta="vector retrieval quality · same discrepancy_type = relevant" style={{ marginBottom: 20 }}>
-          {recall == null ? (
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--fg-3)', padding: '12px 0' }}>
-              Computing…
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, padding: '8px 0' }}>
-              {([1, 2, 3, 5] as const).map(k => {
-                const key = `recall@${k}` as keyof RecallMetrics
-                const pct = Math.round((recall[key] ?? 0) * 100)
-                return (
-                  <div key={k} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-3)' }}>recall@{k}</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: 'var(--ok)' }}>{pct}%</span>
-                    </div>
-                    <div style={{ height: 6, background: 'var(--bg-3)', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, var(--ok), oklch(0.80 0.14 155))', borderRadius: 3 }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </Panel>
 
-        {/* LLM Comparison */}
-        <Panel title="LLM Comparison">
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--mono)', fontSize: 12 }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                  {['Model', 'Config', 'Avg Confidence', 'Avg Latency', 'Avg Tokens'].map(h => (
-                    <th key={h} style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--fg-3)', fontWeight: 500, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {benchmark ? (
-                  benchmark.results.map(row => (
-                    <tr key={row.config} style={{ borderBottom: '1px solid var(--line-soft)' }}>
-                      <td style={{ padding: '8px 10px', color: 'var(--fg-1)', fontWeight: 500 }}>{CONFIG_DISPLAY[row.config as LlmConfig] ?? row.model}</td>
-                      <td style={{ padding: '8px 10px' }}>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: 10, padding: '2px 7px', borderRadius: 4, background: 'var(--bg-3)', border: '1px solid var(--line)', color: 'var(--fg-2)' }}>
-                          {row.config}
-                        </span>
-                      </td>
-                      <td style={{ padding: '8px 10px', color: 'var(--ok)', fontWeight: 600 }}>{fmtConfidence(row.avg_confidence)}</td>
-                      <td style={{ padding: '8px 10px', color: 'var(--fg-2)' }}>{fmtLatency(row.avg_latency_ms)}</td>
-                      <td style={{ padding: '8px 10px', color: 'var(--fg-2)' }}>{fmtTokens(row.avg_tokens)}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} style={{ padding: '20px 10px', textAlign: 'center', color: 'var(--fg-3)', fontSize: 11 }}>
-                      No benchmark data available
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
-
-        {/* Jira modal */}
-        {jiraModalOpen && (
-          <div
-            onClick={() => setJiraModalOpen(false)}
-            style={{ position: 'fixed', inset: 0, background: 'oklch(0 0 0 / 0.6)', zIndex: 50, display: 'grid', placeItems: 'center' }}
-          >
-            <div
-              onClick={e => e.stopPropagation()}
-              style={{ background: 'var(--bg-1)', border: '1px solid var(--line)', borderRadius: 12, padding: '28px 32px', maxWidth: 440, width: '90%', display: 'flex', flexDirection: 'column', gap: 16 }}
-            >
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: 'var(--fg)' }}>Jira Integration — Coming Soon</div>
-              <div style={{ fontFamily: 'var(--sans)', fontSize: 13.5, color: 'var(--fg-2)', lineHeight: 1.6 }}>
-                Direct Jira export will be available in a future release. Copy Jira summaries from individual incident detail pages.
-              </div>
-              <button
-                onClick={() => setJiraModalOpen(false)}
-                style={{ alignSelf: 'flex-end', padding: '6px 18px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--bg-2)', color: 'var(--fg-1)', fontFamily: 'var(--mono)', fontSize: 12, cursor: 'pointer' }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

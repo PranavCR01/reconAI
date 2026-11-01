@@ -5,6 +5,7 @@ import csv
 import io
 import json
 import time
+import uuid
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 import statistics
@@ -21,7 +22,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from backend.cache.rca_cache import check_cache, make_cache_key, write_cache
-from backend.config import get_config, get_config_by_key
+from backend.config import get_config, get_config_by_key, incident_cost
 from backend.graph.recon_graph import build_graph
 from backend.models.entities import (
     DiscrepancyType,
@@ -34,6 +35,7 @@ from backend.models.entities import (
     Resolution,
     Severity,
 )
+from backend.models.state import initial_state, review_reasons
 from backend.storage.supabase_adapter import SupabaseAdapter
 from backend.tools.rag_tools import compute_recall_at_k, embed_text
 
@@ -51,6 +53,46 @@ _REQUIRED_CSV_COLUMNS = {"sf_object", "sf_field", "sf_record_id", "db2_table", "
 
 _SEVERITY_ORDER = {Severity.P1: 0, Severity.P2: 1, Severity.P3: 2}
 
+# Columns added by migrations in docs/sql/; checked at startup.
+REQUIRED_COLUMNS: dict[str, list[str]] = {
+    "rca_incidents": ["review_reasons", "llm_calls"],
+    "rca_evidence": ["hypothesis_key", "tool", "tool_args", "outcome", "raw_result"],
+}
+REQUIRED_COLUMNS["rca_incidents"] += ["hypothesis_verdicts", "graph_status", "root_cause_category",
+                                      "contributing_factors", "graph_version"]
+
+_GRAPH_FIELDS = ("hypothesis_verdicts", "graph_status", "root_cause_category", "contributing_factors", "graph_version")
+REQUIRED_COLUMNS["rca_incidents"] += ["claims", "judge_decision", "revision_count", "prompt_versions"]
+REQUIRED_COLUMNS["rca_incidents"] += ["e2e_latency_ms", "cost_usd", "cost_warnings", "trace"]
+REQUIRED_COLUMNS["rca_incidents"] += ["retrieval_error"]
+
+# Review reasons that mean a dependency failed, not that the case is hard: never cache these.
+_OUTAGE_REASONS = {"llm_unavailable", "critic_unavailable", "proposer_invalid_output", "missing_evidence"}
+
+
+def degraded_because(final: dict, reasons: list[str]) -> list[str]:
+    """Why a fresh result is degraded (empty = healthy). Degraded results are not cached, so the
+    same rows are analyzed again once the dependency recovers."""
+    why = sorted(set(reasons) & _OUTAGE_REASONS)
+    if final.get("retrieval_error"):
+        why.append("retrieval_error")
+    if any(e.get("outcome") == "error" for e in final.get("evidence_collected") or []):
+        why.append("tool_error")
+    # Invalid output that a retry fixed is not an outage; an API error on any call is.
+    if any(c.get("error") and not str(c["error"]).startswith("invalid output") for c in final.get("llm_calls") or []):
+        why.append("llm_call_error")
+    return sorted(set(why))
+
+
+def _explanation_fields(rca: dict) -> dict:
+    """Claims (with critic verdicts), judge decision, revisions and prompt versions from rca_output."""
+    return {
+        "claims": rca.get("claims") or [],
+        "judge_decision": rca.get("judge_decision"),
+        "revision_count": rca.get("revision_count") or 0,
+        "prompt_versions": rca.get("prompt_versions") or {},
+    }
+
 # ---------------------------------------------------------------------------
 # Cost guards — the app is public and every analyzed row costs LLM/embedding calls.
 # In-memory: limits reset when the process restarts (fine for a single Render instance).
@@ -63,15 +105,35 @@ ROWS_PER_DAY = 5000              # all clients combined — the real spend cap
 BYPASS_CACHE_PER_IP_PER_HOUR = 5
 BENCHMARKS_PER_IP_PER_HOUR = 3
 _HOUR, _DAY = 3600, 86400
+# Rows analyzed at once per stream. Each row is mostly waiting on model calls.
+ROW_CONCURRENCY = max(1, int(os.environ.get("ROW_CONCURRENCY", "4") or 4))
 
 _rate_events: dict[str, deque] = defaultdict(deque)  # key -> deque[(timestamp, amount)]
 
 
-def _client_ip(request: Request) -> str:
-    fwd = request.headers.get("x-forwarded-for")
+def client_ip(headers, peer: str | None) -> str:
+    """Client IP for rate limiting.
+
+    The leftmost X-Forwarded-For entry is whatever the client sent, so it can be spoofed.
+    Each proxy appends the address it received the request from, so the trustworthy entry
+    is the one added by the first proxy we control: counting from the right, skip
+    TRUSTED_PROXY_HOPS - 1 entries (default 1 hop: Render's load balancer -> rightmost).
+    If the platform sets a header the client cannot forge, name it in TRUSTED_IP_HEADER.
+    Verify against the deployment's real headers before relying on per-IP limits; the
+    global daily caps are the hard guard either way.
+    """
+    trusted = os.environ.get("TRUSTED_IP_HEADER", "").strip().lower()
+    if trusted and headers.get(trusted):
+        return headers.get(trusted).strip()
+    fwd = [p.strip() for p in (headers.get("x-forwarded-for") or "").split(",") if p.strip()]
     if fwd:
-        return fwd.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+        hops = max(1, int(os.environ.get("TRUSTED_PROXY_HOPS", "1") or 1))
+        return fwd[-hops] if len(fwd) >= hops else fwd[0]
+    return peer or "unknown"
+
+
+def _client_ip(request: Request) -> str:
+    return client_ip(request.headers, request.client.host if request.client else None)
 
 
 def _retry_after(key: str, limit: int, window_s: int, amount: int = 1) -> int:
@@ -106,11 +168,26 @@ def _wait_text(seconds: int) -> str:
 async def lifespan(app: FastAPI):
     global _storage
     _storage = SupabaseAdapter.from_env()
+    # Fail loudly (log + Sentry) if a migration in docs/sql/ hasn't been applied.
+    app.state.missing_columns = await _storage.missing_columns(REQUIRED_COLUMNS)
+    if app.state.missing_columns:
+        msg = f"Supabase schema is missing columns {app.state.missing_columns}; apply docs/sql/ migrations"
+        print(f"ERROR: {msg}", flush=True)
+        sentry_sdk.capture_message(msg, level="error")
+    from backend.seed.fsc_incidents import seed_artifacts
     try:
-        from backend.seed.fsc_incidents import seed_artifacts
         await seed_artifacts(_storage)
-    except Exception:
-        pass
+    except Exception as exc:
+        print(f"ERROR: knowledge-base seeding failed: {type(exc).__name__}: {exc}", flush=True)
+        sentry_sdk.capture_exception(exc)
+    try:
+        app.state.kb_artifacts = await _storage.count_artifacts()
+    except Exception as exc:
+        app.state.kb_artifacts = None
+        sentry_sdk.capture_exception(exc)
+    if not app.state.kb_artifacts:
+        print("ERROR: knowledge base is empty; incidents will run without past-incident context", flush=True)
+        sentry_sdk.capture_message("knowledge base is empty after startup", level="error")
     yield
 
 
@@ -125,8 +202,9 @@ app.add_middleware(
         "http://localhost:5176",
         "http://localhost:5199",
         "https://recon-ai-iota.vercel.app",
-        "https://*.vercel.app",
     ],
+    # Starlette does not expand "*" inside allow_origins; preview deploys need a regex.
+    allow_origin_regex=r"https://[a-z0-9-]+\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -191,146 +269,195 @@ def _no_confirmed_hypothesis(tested: list[str] | None, ruled_out: list[str] | No
     return not tested or set(tested) <= set(ruled_out or [])
 
 
+def _cached_review_reasons(rca: dict) -> list[str]:
+    """Review reasons for a cache entry; derives them for entries written before reasons existed."""
+    if "_review_reasons" in rca:
+        return list(rca["_review_reasons"])
+    reasons = []
+    if _no_confirmed_hypothesis(rca.get("_hypotheses_tested"), rca.get("_hypotheses_ruled_out")):
+        reasons.append("no_hypothesis_confirmed")
+    if float(rca.get("confidence", 0.5)) < 0.75:
+        reasons.append("low_confidence")
+    if not reasons and rca.get("requires_human_review"):
+        reasons.append("legacy_cache_flag")
+    return reasons
+
+
+def _llm_tokens(calls: list[dict]) -> int:
+    return sum(c.get("input_tokens", 0) + c.get("output_tokens", 0) for c in calls)
+
+
+async def _save_incident_and_evidence(storage, incident: RCAIncident, evidence: list[dict]):
+    incident_id = await storage.save_rca_incident(incident)
+    for ev in evidence:
+        try:
+            await storage.save_evidence(Evidence(incident_id=incident_id, **ev))
+        except Exception:
+            pass
+    return incident_id
+
+
+_EVIDENCE_FIELDS = ("source_type", "source_reference", "content", "relevance_explanation",
+                   "hypothesis_key", "tool", "tool_args", "outcome", "raw_result")
+
+
+def _evidence_rows(evidence_collected: list[dict]) -> list[dict]:
+    """Every evidence record the graph produced, keyed by its evidence_id (errors and skips included)."""
+    return [{"id": ev["evidence_id"], **{k: ev.get(k) for k in _EVIDENCE_FIELDS}}
+            for ev in evidence_collected if ev.get("evidence_id")]
+
+
+def _with_fresh_evidence_ids(evidence: list[dict]) -> tuple[list[dict], dict[str, str]]:
+    """Cache replays create a new incident, so its evidence rows need new primary keys.
+
+    Returns the re-keyed rows and the old->new mapping for anything that cites them.
+    """
+    mapping = {ev["id"]: str(uuid.uuid4()) for ev in evidence if ev.get("id")}
+    return [{**ev, "id": mapping.get(ev.get("id"), str(uuid.uuid4()))} for ev in evidence], mapping
+
+
+def _remap(value, mapping: dict[str, str]):
+    """Replace every string that is an old evidence id with its new id, anywhere in a nested value."""
+    if isinstance(value, str):
+        return mapping.get(value, value)
+    if isinstance(value, list):
+        return [_remap(v, mapping) for v in value]
+    if isinstance(value, dict):
+        return {k: _remap(v, mapping) for k, v in value.items()}
+    return value
+
+
+def _similar(candidates: list[dict], limit: int = 5) -> tuple[list[str], list[float]]:
+    """The past incidents actually handed to Synthesis (the reranked top `limit`)."""
+    top = [c for c in candidates[:limit] if c.get("id")]
+    return [str(c["id"]) for c in top], [round(float(c.get("similarity") or 0.0), 4) for c in top]
+
+
 async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool = False, session_id: str = "") -> dict:
     """Full analysis pipeline for one row. Returns a result dict; never raises."""
+    t0 = time.monotonic()
     cache_key = make_cache_key(row, session_id)
     cached = None if bypass_cache else await check_cache(storage, cache_key)
 
     if cached:
         rca = cached.get("rca_output") or {}
         confidence = float(rca.get("confidence", 0.5))
-        # Cache entries written before the synthesis fix may carry a cleared flag for
-        # exhausted paths, so re-derive it from the stored hypotheses too.
-        human_review = (
-            confidence < 0.75
-            or bool(rca.get("requires_human_review"))
-            or _no_confirmed_hypothesis(rca.get("_hypotheses_tested"), rca.get("_hypotheses_ruled_out"))
-        )
-        status = IncidentStatus.needs_review if human_review else IncidentStatus.complete
+        reasons = _cached_review_reasons(rca)
+        llm_calls = rca.get("_llm_calls") or []
+        cached_evidence, id_map = _with_fresh_evidence_ids(rca.get("_evidence") or [])
+        # Cost and trace describe the analysis that produced this result (no new LLM calls are made).
+        cost, cost_warnings = incident_cost(llm_calls)
         incident = RCAIncident(
             recon_row_id=row.id,
+            similar_incidents=rca.get("_similar_incidents") or [],
+            similarity_scores=rca.get("_similarity_scores") or [],
+            # Verdicts and claims cite evidence by id; point them at the re-keyed rows.
+            **_remap({f: rca[f"_{f}"] for f in _GRAPH_FIELDS if rca.get(f"_{f}") is not None}, id_map),
+            **_remap(_explanation_fields(rca), id_map),
             hypotheses_tested=rca.get("_hypotheses_tested") or [],
             hypotheses_ruled_out=rca.get("_hypotheses_ruled_out") or [],
+            final_hypothesis=rca.get("_final_hypothesis"),
             total_tool_calls=rca.get("_total_tool_calls") or 0,
-            total_tokens_used=rca.get("_total_tokens_used") or 0,
+            total_tokens_used=rca.get("_total_tokens_used") or _llm_tokens(llm_calls),
+            latency_ms=rca.get("_latency_ms") or 0,
             confidence=confidence,
             root_cause_summary=rca.get("root_cause"),
             suggested_fix=rca.get("suggested_fix"),
             postmortem_draft=rca.get("postmortem_draft"),
             jira_summary=rca.get("jira_summary"),
-            requires_human_review=human_review,
-            status=status,
+            requires_human_review=bool(reasons),
+            review_reasons=reasons,
+            llm_calls=llm_calls,
+            cost_usd=cost,
+            cost_warnings=cost_warnings,
+            trace=rca.get("_trace") or [],
+            status=IncidentStatus.needs_review if reasons else IncidentStatus.complete,
             llm_model=cached.get("llm_model") or config.synthesis_llm,
         )
+        incident.e2e_latency_ms = int((time.monotonic() - t0) * 1000)
         try:
-            incident_id = await storage.save_rca_incident(incident)
+            incident_id = await _save_incident_and_evidence(storage, incident, cached_evidence)
         except Exception as exc:
-            return {"incident_id": None, "incident": None, "cached": True, "human_review": human_review, "error": f"save incident: {exc}"}
-        for ev_data in rca.get("_evidence") or []:
-            try:
-                await storage.save_evidence(Evidence(
-                    incident_id=incident_id,
-                    source_type=ev_data["source_type"],
-                    source_reference=ev_data["source_reference"],
-                    content=ev_data["content"],
-                    relevance_explanation=ev_data["relevance_explanation"],
-                ))
-            except Exception:
-                pass
-        return {"incident_id": incident_id, "incident": incident, "cached": True, "human_review": human_review, "error": None}
-
-    initial_state = {
-        "recon_row": row.model_dump(mode="json"),
-        "current_hypothesis": "",
-        "hypotheses_tested": [],
-        "hypotheses_ruled_out": [],
-        "evidence_collected": [],
-        "rag_candidates": [],
-        "reranked_candidates": [],
-        "root_cause": None,
-        "confidence": None,
-        "rca_output": None,
-        "iterations": 0,
-        "requires_human_review": False,
-        "llm_calls": [],
-        "tool_calls": [],
-        "total_latency_ms": 0,
-        "evidence_retry_count": 0,
-    }
+            return {"incident_id": None, "incident": None, "cached": True, "human_review": bool(reasons), "error": f"save incident: {exc}"}
+        return {"incident_id": incident_id, "incident": incident, "cached": True, "human_review": bool(reasons), "error": None}
 
     try:
-        final = await asyncio.to_thread(graph.invoke, initial_state)
+        final = await asyncio.to_thread(graph.invoke, initial_state(row.model_dump(mode="json")))
     except Exception as exc:
         return {"incident_id": None, "incident": None, "cached": False, "human_review": False, "error": str(exc)}
 
     rca = final.get("rca_output") or {}
-    human_review = bool(final.get("requires_human_review") or rca.get("requires_human_review"))
-    status = IncidentStatus.needs_review if human_review else IncidentStatus.complete
+    reasons = review_reasons(final)
+    llm_calls = final.get("llm_calls") or []
+    # Synthesis degradation is reported on the incident the way the UI expects it.
+    final_hypothesis = "API_UNAVAILABLE" if final.get("synthesis_status") == "api_unavailable" \
+        else (final.get("current_hypothesis") or None)
+    evidence = _evidence_rows(final.get("evidence_collected") or [])
+    similar_ids, similar_scores = _similar(final.get("reranked_candidates") or [])
+    cost, cost_warnings = incident_cost(llm_calls)
 
     incident = RCAIncident(
         recon_row_id=row.id,
+        similar_incidents=similar_ids,
+        similarity_scores=similar_scores,
+        hypothesis_verdicts=final.get("hypothesis_verdicts") or [],
+        graph_status=final.get("graph_status"),
+        root_cause_category=final.get("root_cause_category"),
+        contributing_factors=final.get("contributing_factors") or [],
+        graph_version=final.get("graph_version"),
+        **_explanation_fields(rca),
         hypotheses_tested=final.get("hypotheses_tested") or [],
         hypotheses_ruled_out=final.get("hypotheses_ruled_out") or [],
-        final_hypothesis=final.get("current_hypothesis") or None,
-        confidence=rca.get("confidence") or final.get("confidence"),
+        final_hypothesis=final_hypothesis,
+        confidence=rca.get("confidence") if rca.get("confidence") is not None else final.get("confidence"),
         root_cause_summary=rca.get("root_cause") or final.get("root_cause"),
         suggested_fix=rca.get("suggested_fix"),
         postmortem_draft=rca.get("postmortem_draft"),
         jira_summary=rca.get("jira_summary"),
-        requires_human_review=human_review,
-        status=status,
+        requires_human_review=bool(reasons),
+        review_reasons=reasons,
+        llm_calls=llm_calls,
+        status=IncidentStatus.needs_review if reasons else IncidentStatus.complete,
         llm_model=config.synthesis_llm,
         total_tool_calls=len(final.get("evidence_collected") or []),
-        total_tokens_used=sum(
-            (c.get("input_tokens", 0) + c.get("output_tokens", 0))
-            for c in (final.get("llm_calls") or [])
-        ),
+        total_tokens_used=_llm_tokens(llm_calls),
         latency_ms=final.get("total_latency_ms") or 0,
+        cost_usd=cost,
+        cost_warnings=cost_warnings,
+        trace=final.get("trace") or [],
+        e2e_latency_ms=int((time.monotonic() - t0) * 1000),
+        retrieval_error=final.get("retrieval_error"),
     )
 
     try:
-        incident_id = await storage.save_rca_incident(incident)
+        incident_id = await _save_incident_and_evidence(storage, incident, evidence)
     except Exception as exc:
-        return {"incident_id": None, "incident": None, "cached": False, "human_review": human_review, "error": f"save incident: {exc}"}
+        return {"incident_id": None, "incident": None, "cached": False, "human_review": bool(reasons), "error": f"save incident: {exc}"}
 
-    for ev in final.get("evidence_collected") or []:
-        er = ev.get("evidence_result")
-        if not er:
-            continue
-        try:
-            await storage.save_evidence(Evidence(
-                incident_id=incident_id,
-                source_type=er["source_type"],
-                source_reference=er["source_reference"],
-                content=er["content"],
-                relevance_explanation=er["relevance_explanation"],
-            ))
-        except Exception:
-            pass
+    degraded = degraded_because(final, reasons)
+    if degraded:
+        # Don't pin an outage for the cache's lifetime: the next run of this row re-analyzes.
+        return {"incident_id": incident_id, "incident": incident, "cached": False, "human_review": bool(reasons),
+                "error": None, "degraded": degraded}
 
-    _evidence_cache = [
-        {
-            "source_type": ev["evidence_result"]["source_type"],
-            "source_reference": ev["evidence_result"]["source_reference"],
-            "content": ev["evidence_result"]["content"],
-            "relevance_explanation": ev["evidence_result"]["relevance_explanation"],
-        }
-        for ev in (final.get("evidence_collected") or [])
-        if ev.get("evidence_result")
-    ]
     await write_cache(storage, cache_key, {
         **rca,
-        "_hypotheses_tested": final.get("hypotheses_tested") or [],
-        "_hypotheses_ruled_out": final.get("hypotheses_ruled_out") or [],
-        "_total_tool_calls": len(final.get("evidence_collected") or []),
-        "_total_tokens_used": sum(
-            (c.get("input_tokens", 0) + c.get("output_tokens", 0))
-            for c in (final.get("llm_calls") or [])
-        ),
-        "_evidence": _evidence_cache,
+        "_hypotheses_tested": incident.hypotheses_tested,
+        "_hypotheses_ruled_out": incident.hypotheses_ruled_out,
+        "_final_hypothesis": incident.final_hypothesis,
+        "_review_reasons": reasons,
+        "_llm_calls": llm_calls,
+        "_trace": incident.trace,
+        "_latency_ms": incident.latency_ms,
+        "_total_tool_calls": incident.total_tool_calls,
+        "_total_tokens_used": incident.total_tokens_used,
+        "_evidence": evidence,
+        "_similar_incidents": similar_ids,
+        "_similarity_scores": similar_scores,
+        **{f"_{f}": getattr(incident, f) for f in _GRAPH_FIELDS},
     }, config.synthesis_llm)
 
-    return {"incident_id": incident_id, "incident": incident, "cached": False, "human_review": human_review, "error": None}
+    return {"incident_id": incident_id, "incident": incident, "cached": False, "human_review": bool(reasons), "error": None}
 
 
 # ---------------------------------------------------------------------------
@@ -338,14 +465,27 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
 # ---------------------------------------------------------------------------
 
 @app.get("/api/v1/health")
-async def health():
+async def health(request: Request):
+    """ok | degraded. Degraded = the app answers but the database is unreachable or the
+    knowledge base is empty. (A down app doesn't answer at all.)"""
     config = get_config()
+    db_ok, kb = True, None
+    try:
+        kb = await _storage.count_artifacts()
+    except Exception:
+        db_ok = False
+    problems = ([] if db_ok else ["database unreachable"]) + (["knowledge base empty"] if db_ok and not kb else [])
+    missing = getattr(request.app.state, "missing_columns", None)
+    if missing:
+        problems.append("schema migrations missing")
     return {
-        "status": "ok",
+        "status": "degraded" if problems else "ok",
+        "problems": problems,
         "version": "0.1.0",
         "llm_model": config.synthesis_llm,
         "vector_store": "supabase-pgvector",
-        "db": "supabase",
+        "db": "ok" if db_ok else "unreachable",
+        "kb_artifacts": kb,
     }
 
 
@@ -555,11 +695,19 @@ async def stream_run_analysis(
                 }
                 yield f"id: {incident.id}\n"
                 yield f"event: incident\ndata: {json.dumps(payload)}\n\n"
-            await storage.update_run_status(
-                run_id,
-                status="complete",
-                completed_at=datetime.now(timezone.utc),
-            )
+            # Replaying a finished run must not move completed_at (it drives "Duration");
+            # only mark runs that finished all rows but were never marked complete.
+            try:
+                run = await storage.get_recon_run(run_id)
+                already_done = run.status == "complete" and run.completed_at is not None
+            except Exception:
+                already_done = False
+            if not already_done:
+                await storage.update_run_status(
+                    run_id,
+                    status="complete",
+                    completed_at=datetime.now(timezone.utc),
+                )
             yield f"event: done\ndata: {json.dumps({'total_rows': len(existing_incidents)})}\n\n"
 
         return StreamingResponse(
@@ -572,9 +720,26 @@ async def stream_run_analysis(
     graph = build_graph(config, storage)
 
     async def _generate():
-        for i, row in enumerate(rows):
-            try:
-                result = await _analyze_row(row, config, graph, storage, bypass_cache=bypass_cache, session_id=session_id)
+        # Rows are analyzed concurrently (ROW_CONCURRENCY at a time) and streamed as each finishes;
+        # the UI orders by severity, so arrival order doesn't matter.
+        semaphore = asyncio.Semaphore(ROW_CONCURRENCY)
+
+        async def _one(i, row):
+            async with semaphore:
+                try:
+                    return i, row, await _analyze_row(row, config, graph, storage, bypass_cache=bypass_cache,
+                                                      session_id=session_id), None
+                except Exception as exc:  # _analyze_row shouldn't raise; never let one row kill the stream
+                    return i, row, None, exc
+
+        tasks = [asyncio.create_task(_one(i, row)) for i, row in enumerate(rows)]
+        try:
+            for finished in asyncio.as_completed(tasks):
+                i, row, result, exc = await finished
+                if exc is not None:
+                    payload = {"row_index": i, "row_id": str(row.id), "error": str(exc)}
+                    yield f"event: error\ndata: {json.dumps(payload)}\n\n"
+                    continue
                 if result["error"]:
                     payload = {"row_index": i, "row_id": str(row.id), "error": result["error"]}
                     yield f"event: error\ndata: {json.dumps(payload)}\n\n"
@@ -598,9 +763,9 @@ async def stream_run_analysis(
                 }
                 yield f"id: {result['incident_id']}\n"
                 yield f"event: incident\ndata: {json.dumps(payload)}\n\n"
-            except Exception as exc:
-                payload = {"row_index": i, "row_id": str(row.id), "error": str(exc)}
-                yield f"event: error\ndata: {json.dumps(payload)}\n\n"
+        finally:
+            for task in tasks:  # client went away: stop waiting on the rest
+                task.cancel()
         await storage.update_run_status(
             run_id,
             status="complete",
@@ -613,6 +778,16 @@ async def stream_run_analysis(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+def _row_fields(row) -> dict:
+    """Fields the run views show for each incident, joined from its recon row."""
+    return {
+        "severity": row.severity.value if row and row.severity else None,
+        "sf_object": row.sf_object if row else None,
+        "sf_field": row.sf_field if row else None,
+        "discrepancy_type": row.discrepancy_type.value if row and row.discrepancy_type else None,
+    }
 
 
 @app.get("/api/v1/recon/runs/{run_id}")
@@ -632,7 +807,7 @@ async def get_run(run_id: str, storage: StorageDep):
     for inc in incidents:
         row = row_map.get(str(inc.recon_row_id))
         d = inc.model_dump(mode="json")
-        d["severity"] = row.severity.value if row and row.severity else None
+        d.update(_row_fields(row))
         incidents_out.append(d)
 
     return {
@@ -659,7 +834,7 @@ async def list_run_incidents(run_id: str, storage: StorageDep):
     for inc in incidents:
         row = row_map.get(str(inc.recon_row_id))
         d = inc.model_dump(mode="json")
-        d["severity"] = row.severity.value if row and row.severity else None
+        d.update(_row_fields(row))
         incidents_out.append(d)
 
     return {"run_id": run_id, "incidents": incidents_out}
@@ -674,10 +849,43 @@ async def get_incident(incident_id: str, storage: StorageDep):
 
     evidence = await storage.get_evidence_for_incident(incident_id)
     resolution = await storage.get_resolution_for_incident(incident_id)
+    evidence_json = [e.model_dump(mode="json") for e in evidence]
+
+    # Group evidence by hypothesis, in the order the hypotheses were tested.
+    order = {h: i for i, h in enumerate(incident.hypotheses_tested)}
+    by_hypothesis: dict[str, list[dict]] = {}
+    for ev in sorted(evidence_json, key=lambda e: order.get(e.get("hypothesis_key"), len(order))):
+        by_hypothesis.setdefault(ev.get("hypothesis_key") or "unlinked", []).append(ev)
+
+    similar = []
+    for artifact_id, score in zip(incident.similar_incidents, incident.similarity_scores or []):
+        try:
+            artifact = await storage.get_artifact(str(artifact_id))
+        except Exception:
+            continue  # artifact removed since the incident was analyzed
+        similar.append({
+            "id": str(artifact_id),
+            "similarity": score,
+            "source": artifact.source,
+            "root_cause_category": artifact.root_cause_category,
+            "discrepancy_type": artifact.discrepancy_type,
+            "summary": artifact.content[:280],
+        })
+
+    recon_row = None
+    if incident.recon_row_id:
+        try:
+            recon_row = (await storage.get_recon_row(str(incident.recon_row_id))).model_dump(mode="json")
+        except Exception:
+            recon_row = None  # row removed; the page shows the incident without it
 
     return {
         **incident.model_dump(mode="json"),
-        "evidence": [e.model_dump(mode="json") for e in evidence],
+        "recon_row": recon_row,
+        "severity": (recon_row or {}).get("severity"),
+        "evidence": evidence_json,
+        "evidence_by_hypothesis": by_hypothesis,
+        "similar_incidents_detail": similar,
         "resolution": resolution.model_dump(mode="json") if resolution else None,
     }
 

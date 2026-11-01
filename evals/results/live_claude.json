@@ -1,0 +1,6294 @@
+{
+  "schema_version": 1,
+  "mode": "live",
+  "config": "claude",
+  "models": [
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6"
+  ],
+  "runs": 3,
+  "created_at": "2026-11-01T08:31:14+00:00",
+  "git_sha": "b397d2bc9dc310dbdb5a1db701535a2162d95b84",
+  "dataset": {
+    "path": "data/benchmark_ground_truth.json",
+    "sha256": "3f53bba25abd4f48c9cef90e550389b9bcef1133cb02410066bd3f1af7a9f6a5",
+    "scenarios_sha256": "83ba789a789da164dc26a58af73c84742d70631ad8429836dcdaa49479b76b8a",
+    "incidents": 50
+  },
+  "graph_version": "2.0.0",
+  "prompt_versions": {
+    "proposer.md": "04003ff2b144",
+    "critic.md": "7ed1ddfea4e4"
+  },
+  "pricing_per_mtok": {
+    "claude-haiku-4-5-20251001": [
+      1.0,
+      5.0
+    ],
+    "claude-sonnet-4-6": [
+      3.0,
+      15.0
+    ]
+  },
+  "caveats": [
+    "Dataset: 50 synthetic incidents written and labeled by the project author; not production data.",
+    "Tool results come from simulators driven by a declared fault per record (data/scenarios.json), with seeded confounders. Graph accuracy therefore measures whether the diagnosis logic finds the declared fault through noise; it is not an estimate of real-world accuracy.",
+    "All rates carry 95% Wilson intervals; with n=50 an interval is roughly +/-10 points or wider."
+  ],
+  "environment_notes": [
+    "live: real LLM calls",
+    "no OPENAI_API_KEY: embeddings faked, retrieval not measured"
+  ],
+  "metrics": {
+    "errors": {
+      "count": 0,
+      "incidents": []
+    },
+    "accuracy": {
+      "overall": {
+        "k": 50,
+        "n": 50,
+        "rate": 1.0,
+        "ci95": [
+          0.9287,
+          1.0
+        ]
+      },
+      "by_discrepancy_type": {
+        "DUPLICATE_DOWNSTREAM": {
+          "k": 3,
+          "n": 3,
+          "rate": 1.0,
+          "ci95": [
+            0.4385,
+            1.0
+          ]
+        },
+        "MISSING_RECORD": {
+          "k": 2,
+          "n": 2,
+          "rate": 1.0,
+          "ci95": [
+            0.3424,
+            1.0
+          ]
+        },
+        "NULL_DOWNSTREAM": {
+          "k": 20,
+          "n": 20,
+          "rate": 1.0,
+          "ci95": [
+            0.8389,
+            1.0
+          ]
+        },
+        "STALE_VALUE": {
+          "k": 4,
+          "n": 4,
+          "rate": 1.0,
+          "ci95": [
+            0.5101,
+            1.0
+          ]
+        },
+        "VALUE_MISMATCH": {
+          "k": 21,
+          "n": 21,
+          "rate": 1.0,
+          "ci95": [
+            0.8454,
+            1.0
+          ]
+        }
+      },
+      "confusion": {
+        "CDC_FIELD_EXCLUDED": {
+          "CDC_FIELD_EXCLUDED": 6
+        },
+        "DATAWAVE_TRANSFORM_ERROR": {
+          "DATAWAVE_TRANSFORM_ERROR": 21
+        },
+        "DELIVERY_GAP": {
+          "DELIVERY_GAP": 6
+        },
+        "DUPLICATE_DOWNSTREAM": {
+          "DUPLICATE_DOWNSTREAM": 3
+        },
+        "FLS_STRIPPED": {
+          "FLS_STRIPPED": 14
+        }
+      }
+    },
+    "efficiency": {
+      "within_min_hypotheses": {
+        "k": 50,
+        "n": 50,
+        "rate": 1.0,
+        "ci95": [
+          0.9287,
+          1.0
+        ]
+      },
+      "deciding_check_matches_label": {
+        "k": 47,
+        "n": 50,
+        "rate": 0.94,
+        "ci95": [
+          0.8378,
+          0.9794
+        ]
+      },
+      "mean_hypotheses_tested": 2.06
+    },
+    "routing": {
+      "unsafe_auto_clear": {
+        "k": 0,
+        "n": 50,
+        "rate": 0.0,
+        "ci95": [
+          0.0,
+          0.0713
+        ]
+      },
+      "review_rate": {
+        "k": 3,
+        "n": 50,
+        "rate": 0.06,
+        "ci95": [
+          0.0206,
+          0.1622
+        ]
+      },
+      "review_vs_label": {
+        "tp": 1,
+        "fp": 2,
+        "fn": 21,
+        "tn": 26,
+        "precision": {
+          "k": 1,
+          "n": 3,
+          "rate": 0.3333,
+          "ci95": [
+            0.0615,
+            0.7923
+          ]
+        },
+        "recall": {
+          "k": 1,
+          "n": 22,
+          "rate": 0.0455,
+          "ci95": [
+            0.0081,
+            0.218
+          ]
+        }
+      },
+      "calibration_graph_confidence": {
+        "ece": 0.135,
+        "n": 50,
+        "excluded_no_confidence": 0,
+        "buckets": [
+          {
+            "range": [
+              0.7,
+              0.8
+            ],
+            "n": 2,
+            "mean_confidence": 0.7,
+            "accuracy": 1.0
+          },
+          {
+            "range": [
+              0.8,
+              0.9
+            ],
+            "n": 34,
+            "mean_confidence": 0.8603,
+            "accuracy": 1.0
+          },
+          {
+            "range": [
+              0.9,
+              1.0
+            ],
+            "n": 14,
+            "mean_confidence": 0.9,
+            "accuracy": 1.0
+          }
+        ]
+      },
+      "calibration_final_confidence": {
+        "ece": 0.0722,
+        "n": 50,
+        "excluded_no_confidence": 0,
+        "buckets": [
+          {
+            "range": [
+              0.6,
+              0.7
+            ],
+            "n": 2,
+            "mean_confidence": 0.62,
+            "accuracy": 1.0
+          },
+          {
+            "range": [
+              0.8,
+              0.9
+            ],
+            "n": 1,
+            "mean_confidence": 0.82,
+            "accuracy": 1.0
+          },
+          {
+            "range": [
+              0.9,
+              1.0
+            ],
+            "n": 47,
+            "mean_confidence": 0.9432,
+            "accuracy": 1.0
+          }
+        ]
+      }
+    },
+    "explanation": {
+      "judge_decisions": {
+        "accept": 49,
+        "escalate": 1
+      },
+      "revised": {
+        "k": 6,
+        "n": 50,
+        "rate": 0.12,
+        "ci95": [
+          0.0562,
+          0.238
+        ]
+      },
+      "grounded_when_accepted": {
+        "k": 49,
+        "n": 49,
+        "rate": 1.0,
+        "ci95": [
+          0.9273,
+          1.0
+        ]
+      }
+    },
+    "consistency": {
+      "root_cause_category": {
+        "k": 50,
+        "n": 50,
+        "rate": 1.0,
+        "ci95": [
+          0.9287,
+          1.0
+        ]
+      },
+      "review_decision": {
+        "k": 46,
+        "n": 50,
+        "rate": 0.92,
+        "ci95": [
+          0.8116,
+          0.9685
+        ]
+      },
+      "judge_decision": {
+        "k": 46,
+        "n": 50,
+        "rate": 0.92,
+        "ci95": [
+          0.8116,
+          0.9685
+        ]
+      }
+    },
+    "retrieval": {
+      "status": "not_measured",
+      "reason": "needs real embeddings (OPENAI_API_KEY) in live mode"
+    },
+    "cost_latency": {
+      "cost_usd_total": 1.683533,
+      "cost_usd_median": 0.030386,
+      "cost_usd_p95": 0.061271,
+      "tokens_median": 4893,
+      "llm_calls_median": 3,
+      "e2e_latency_ms_median": 25448,
+      "e2e_latency_ms_p95": 51435,
+      "llm_latency_ms_median": 25376,
+      "llm_latency_ms_p95": 51412
+    }
+  },
+  "critic_planted": {
+    "incidents": 25,
+    "draft_set_sha256": "23aedc042817ce09b82963552409cd889fcf502337d7698564a5601731ab437a",
+    "by_draft": {
+      "clean": {
+        "drafts": 25,
+        "critic_unavailable": 0,
+        "false_rejection": {
+          "k": 2,
+          "n": 25,
+          "rate": 0.08,
+          "ci95": [
+            0.0222,
+            0.2497
+          ]
+        },
+        "falsely_rejected_incidents": [
+          "BM-024",
+          "BM-025"
+        ]
+      },
+      "fabricated_evidence": {
+        "drafts": 25,
+        "critic_unavailable": 0,
+        "expected_stage": "deterministic",
+        "caught": {
+          "k": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95": [
+            0.8668,
+            1.0
+          ]
+        },
+        "caught_by_deterministic": {
+          "k": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95": [
+            0.8668,
+            1.0
+          ]
+        },
+        "caught_by_llm": {
+          "k": 0,
+          "n": 25,
+          "rate": 0.0,
+          "ci95": [
+            0.0,
+            0.1332
+          ]
+        },
+        "missed_incidents": []
+      },
+      "fabricated_past_incident": {
+        "drafts": 25,
+        "critic_unavailable": 0,
+        "expected_stage": "deterministic",
+        "caught": {
+          "k": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95": [
+            0.8668,
+            1.0
+          ]
+        },
+        "caught_by_deterministic": {
+          "k": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95": [
+            0.8668,
+            1.0
+          ]
+        },
+        "caught_by_llm": {
+          "k": 0,
+          "n": 25,
+          "rate": 0.0,
+          "ci95": [
+            0.0,
+            0.1332
+          ]
+        },
+        "missed_incidents": []
+      },
+      "wrong_category": {
+        "drafts": 25,
+        "critic_unavailable": 0,
+        "expected_stage": "deterministic",
+        "caught": {
+          "k": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95": [
+            0.8668,
+            1.0
+          ]
+        },
+        "caught_by_deterministic": {
+          "k": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95": [
+            0.8668,
+            1.0
+          ]
+        },
+        "caught_by_llm": {
+          "k": 0,
+          "n": 25,
+          "rate": 0.0,
+          "ci95": [
+            0.0,
+            0.1332
+          ]
+        },
+        "missed_incidents": []
+      },
+      "contradicts_refuted": {
+        "drafts": 25,
+        "critic_unavailable": 0,
+        "expected_stage": "deterministic",
+        "caught": {
+          "k": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95": [
+            0.8668,
+            1.0
+          ]
+        },
+        "caught_by_deterministic": {
+          "k": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95": [
+            0.8668,
+            1.0
+          ]
+        },
+        "caught_by_llm": {
+          "k": 0,
+          "n": 25,
+          "rate": 0.0,
+          "ci95": [
+            0.0,
+            0.1332
+          ]
+        },
+        "missed_incidents": []
+      },
+      "placeholder_text": {
+        "drafts": 25,
+        "critic_unavailable": 0,
+        "expected_stage": "deterministic",
+        "caught": {
+          "k": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95": [
+            0.8668,
+            1.0
+          ]
+        },
+        "caught_by_deterministic": {
+          "k": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95": [
+            0.8668,
+            1.0
+          ]
+        },
+        "caught_by_llm": {
+          "k": 1,
+          "n": 25,
+          "rate": 0.04,
+          "ci95": [
+            0.0071,
+            0.1954
+          ]
+        },
+        "missed_incidents": []
+      },
+      "unsupported_mechanism": {
+        "drafts": 25,
+        "critic_unavailable": 0,
+        "expected_stage": "llm",
+        "caught": {
+          "k": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95": [
+            0.8668,
+            1.0
+          ]
+        },
+        "caught_by_deterministic": {
+          "k": 0,
+          "n": 25,
+          "rate": 0.0,
+          "ci95": [
+            0.0,
+            0.1332
+          ]
+        },
+        "caught_by_llm": {
+          "k": 25,
+          "n": 25,
+          "rate": 1.0,
+          "ci95": [
+            0.8668,
+            1.0
+          ]
+        },
+        "missed_incidents": []
+      }
+    },
+    "cost_usd": 0.869142
+  },
+  "ablations": null,
+  "failure_patterns": [
+    {
+      "kind": "correct diagnosis, explanation escalated",
+      "detail": "critic_rejected",
+      "count": 1,
+      "incidents": [
+        "BM-023"
+      ]
+    }
+  ],
+  "incidents": [
+    {
+      "id": "BM-001",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4029,
+      "cost_usd": 0.029323,
+      "llm_latency_ms": 25852,
+      "e2e_latency_ms": 25919
+    },
+    {
+      "id": "BM-002",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 3719,
+      "cost_usd": 0.025723,
+      "llm_latency_ms": 22926,
+      "e2e_latency_ms": 23001
+    },
+    {
+      "id": "BM-003",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 3803,
+      "cost_usd": 0.026291,
+      "llm_latency_ms": 22700,
+      "e2e_latency_ms": 22755
+    },
+    {
+      "id": "BM-004",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 1,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 10599,
+      "cost_usd": 0.068951,
+      "llm_latency_ms": 56855,
+      "e2e_latency_ms": 56920
+    },
+    {
+      "id": "BM-005",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 3816,
+      "cost_usd": 0.026674,
+      "llm_latency_ms": 24267,
+      "e2e_latency_ms": 24349
+    },
+    {
+      "id": "BM-006",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5440,
+      "cost_usd": 0.033134,
+      "llm_latency_ms": 25376,
+      "e2e_latency_ms": 25461
+    },
+    {
+      "id": "BM-007",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 3650,
+      "cost_usd": 0.025736,
+      "llm_latency_ms": 21629,
+      "e2e_latency_ms": 21665
+    },
+    {
+      "id": "BM-008",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4490,
+      "cost_usd": 0.028206,
+      "llm_latency_ms": 23363,
+      "e2e_latency_ms": 23376
+    },
+    {
+      "id": "BM-009",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5371,
+      "cost_usd": 0.031991,
+      "llm_latency_ms": 25618,
+      "e2e_latency_ms": 25631
+    },
+    {
+      "id": "BM-010",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5627,
+      "cost_usd": 0.033951,
+      "llm_latency_ms": 28992,
+      "e2e_latency_ms": 29005
+    },
+    {
+      "id": "BM-011",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5305,
+      "cost_usd": 0.029897,
+      "llm_latency_ms": 22794,
+      "e2e_latency_ms": 22816
+    },
+    {
+      "id": "BM-012",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5588,
+      "cost_usd": 0.033292,
+      "llm_latency_ms": 27061,
+      "e2e_latency_ms": 27075
+    },
+    {
+      "id": "BM-013",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4698,
+      "cost_usd": 0.031128,
+      "llm_latency_ms": 26316,
+      "e2e_latency_ms": 26348
+    },
+    {
+      "id": "BM-014",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5518,
+      "cost_usd": 0.033402,
+      "llm_latency_ms": 26777,
+      "e2e_latency_ms": 26792
+    },
+    {
+      "id": "BM-015",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4740,
+      "cost_usd": 0.030396,
+      "llm_latency_ms": 25592,
+      "e2e_latency_ms": 25611
+    },
+    {
+      "id": "BM-016",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 2,
+      "tokens": 3200,
+      "cost_usd": 0.024264,
+      "llm_latency_ms": 19655,
+      "e2e_latency_ms": 19677
+    },
+    {
+      "id": "BM-017",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 2,
+      "tokens": 3110,
+      "cost_usd": 0.023442,
+      "llm_latency_ms": 19216,
+      "e2e_latency_ms": 19229
+    },
+    {
+      "id": "BM-018",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4599,
+      "cost_usd": 0.028435,
+      "llm_latency_ms": 24214,
+      "e2e_latency_ms": 24230
+    },
+    {
+      "id": "BM-019",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.91,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4677,
+      "cost_usd": 0.029367,
+      "llm_latency_ms": 24081,
+      "e2e_latency_ms": 24094
+    },
+    {
+      "id": "BM-020",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4016,
+      "cost_usd": 0.028894,
+      "llm_latency_ms": 25554,
+      "e2e_latency_ms": 25572
+    },
+    {
+      "id": "BM-021",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5049,
+      "cost_usd": 0.029457,
+      "llm_latency_ms": 25470,
+      "e2e_latency_ms": 25490
+    },
+    {
+      "id": "BM-022",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5298,
+      "cost_usd": 0.030386,
+      "llm_latency_ms": 23925,
+      "e2e_latency_ms": 23943
+    },
+    {
+      "id": "BM-023",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.91,
+      "requires_review": true,
+      "review_reasons": [
+        "critic_rejected"
+      ],
+      "judge_decision": "escalate",
+      "revision_count": 1,
+      "critic": {
+        "supported": 3,
+        "unsupported": 0,
+        "contradicted": 1
+      },
+      "grounded": null,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 9957,
+      "cost_usd": 0.061271,
+      "llm_latency_ms": 51412,
+      "e2e_latency_ms": 51435
+    },
+    {
+      "id": "BM-024",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5360,
+      "cost_usd": 0.03057,
+      "llm_latency_ms": 25131,
+      "e2e_latency_ms": 25155
+    },
+    {
+      "id": "BM-025",
+      "run": 1,
+      "discrepancy_type": "MISSING_RECORD",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HMR1",
+        "HMR2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.84,
+      "confidence": 0.82,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 1,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 9729,
+      "cost_usd": 0.061563,
+      "llm_latency_ms": 51827,
+      "e2e_latency_ms": 51846
+    },
+    {
+      "id": "BM-026",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4464,
+      "cost_usd": 0.028458,
+      "llm_latency_ms": 23331,
+      "e2e_latency_ms": 23345
+    },
+    {
+      "id": "BM-027",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5352,
+      "cost_usd": 0.030424,
+      "llm_latency_ms": 24127,
+      "e2e_latency_ms": 24147
+    },
+    {
+      "id": "BM-028",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5184,
+      "cost_usd": 0.029378,
+      "llm_latency_ms": 23289,
+      "e2e_latency_ms": 23305
+    },
+    {
+      "id": "BM-029",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4487,
+      "cost_usd": 0.031487,
+      "llm_latency_ms": 27315,
+      "e2e_latency_ms": 27344
+    },
+    {
+      "id": "BM-030",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5354,
+      "cost_usd": 0.0338,
+      "llm_latency_ms": 26651,
+      "e2e_latency_ms": 26665
+    },
+    {
+      "id": "BM-031",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5055,
+      "cost_usd": 0.028187,
+      "llm_latency_ms": 22293,
+      "e2e_latency_ms": 22310
+    },
+    {
+      "id": "BM-032",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": false,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5701,
+      "cost_usd": 0.034445,
+      "llm_latency_ms": 27965,
+      "e2e_latency_ms": 27980
+    },
+    {
+      "id": "BM-033",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5506,
+      "cost_usd": 0.031406,
+      "llm_latency_ms": 24770,
+      "e2e_latency_ms": 24784
+    },
+    {
+      "id": "BM-034",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5672,
+      "cost_usd": 0.033394,
+      "llm_latency_ms": 28172,
+      "e2e_latency_ms": 28189
+    },
+    {
+      "id": "BM-035",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5386,
+      "cost_usd": 0.030716,
+      "llm_latency_ms": 23471,
+      "e2e_latency_ms": 23484
+    },
+    {
+      "id": "BM-036",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5343,
+      "cost_usd": 0.031775,
+      "llm_latency_ms": 27179,
+      "e2e_latency_ms": 27198
+    },
+    {
+      "id": "BM-037",
+      "run": 1,
+      "discrepancy_type": "STALE_VALUE",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HSV1",
+        "HSV2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.84,
+      "confidence": 0.91,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 1,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 9943,
+      "cost_usd": 0.061195,
+      "llm_latency_ms": 49126,
+      "e2e_latency_ms": 49144
+    },
+    {
+      "id": "BM-038",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": false,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4861,
+      "cost_usd": 0.030843,
+      "llm_latency_ms": 25012,
+      "e2e_latency_ms": 25025
+    },
+    {
+      "id": "BM-039",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 3956,
+      "cost_usd": 0.02754,
+      "llm_latency_ms": 22585,
+      "e2e_latency_ms": 22597
+    },
+    {
+      "id": "BM-040",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.91,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5158,
+      "cost_usd": 0.034032,
+      "llm_latency_ms": 28557,
+      "e2e_latency_ms": 28570
+    },
+    {
+      "id": "BM-041",
+      "run": 1,
+      "discrepancy_type": "MISSING_RECORD",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HMR1",
+        "HMR2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.84,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 3917,
+      "cost_usd": 0.029181,
+      "llm_latency_ms": 24894,
+      "e2e_latency_ms": 24912
+    },
+    {
+      "id": "BM-042",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4721,
+      "cost_usd": 0.029959,
+      "llm_latency_ms": 25271,
+      "e2e_latency_ms": 25286
+    },
+    {
+      "id": "BM-043",
+      "run": 1,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4016,
+      "cost_usd": 0.029104,
+      "llm_latency_ms": 24822,
+      "e2e_latency_ms": 24836
+    },
+    {
+      "id": "BM-044",
+      "run": 1,
+      "discrepancy_type": "STALE_VALUE",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HSV1",
+        "HSV2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.7,
+      "confidence": 0.62,
+      "requires_review": true,
+      "review_reasons": [
+        "graph_low_confidence",
+        "low_confidence"
+      ],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 3820,
+      "cost_usd": 0.028936,
+      "llm_latency_ms": 26388,
+      "e2e_latency_ms": 26402
+    },
+    {
+      "id": "BM-045",
+      "run": 1,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4893,
+      "cost_usd": 0.032099,
+      "llm_latency_ms": 25729,
+      "e2e_latency_ms": 25747
+    },
+    {
+      "id": "BM-046",
+      "run": 1,
+      "discrepancy_type": "STALE_VALUE",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HSV1",
+        "HSV2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.84,
+      "confidence": 0.91,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 1,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 9900,
+      "cost_usd": 0.06104,
+      "llm_latency_ms": 50794,
+      "e2e_latency_ms": 50812
+    },
+    {
+      "id": "BM-047",
+      "run": 1,
+      "discrepancy_type": "STALE_VALUE",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HSV1",
+        "HSV2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.7,
+      "confidence": 0.62,
+      "requires_review": true,
+      "review_reasons": [
+        "graph_low_confidence",
+        "low_confidence"
+      ],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4065,
+      "cost_usd": 0.028947,
+      "llm_latency_ms": 25436,
+      "e2e_latency_ms": 25448
+    },
+    {
+      "id": "BM-048",
+      "run": 1,
+      "discrepancy_type": "DUPLICATE_DOWNSTREAM",
+      "label": {
+        "root_cause": "DUPLICATE_DOWNSTREAM",
+        "review": true,
+        "min_hypotheses": 2,
+        "early_termination_kind": "duplicate_rows"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DUPLICATE_DOWNSTREAM",
+      "correct": true,
+      "hypotheses_tested": [
+        "HDD1"
+      ],
+      "deciding_kind": "retries",
+      "graph_confidence": 0.85,
+      "confidence": 0.95,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4768,
+      "cost_usd": 0.027698,
+      "llm_latency_ms": 22922,
+      "e2e_latency_ms": 22949
+    },
+    {
+      "id": "BM-049",
+      "run": 1,
+      "discrepancy_type": "DUPLICATE_DOWNSTREAM",
+      "label": {
+        "root_cause": "DUPLICATE_DOWNSTREAM",
+        "review": true,
+        "min_hypotheses": 2,
+        "early_termination_kind": "duplicate_rows"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DUPLICATE_DOWNSTREAM",
+      "correct": true,
+      "hypotheses_tested": [
+        "HDD1"
+      ],
+      "deciding_kind": "retries",
+      "graph_confidence": 0.85,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 3704,
+      "cost_usd": 0.028576,
+      "llm_latency_ms": 27045,
+      "e2e_latency_ms": 27058
+    },
+    {
+      "id": "BM-050",
+      "run": 1,
+      "discrepancy_type": "DUPLICATE_DOWNSTREAM",
+      "label": {
+        "root_cause": "DUPLICATE_DOWNSTREAM",
+        "review": true,
+        "min_hypotheses": 2,
+        "early_termination_kind": "duplicate_rows"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DUPLICATE_DOWNSTREAM",
+      "correct": true,
+      "hypotheses_tested": [
+        "HDD1"
+      ],
+      "deciding_kind": "retries",
+      "graph_confidence": 0.85,
+      "confidence": 0.91,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 1,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 9103,
+      "cost_usd": 0.055169,
+      "llm_latency_ms": 45634,
+      "e2e_latency_ms": 45654
+    },
+    {
+      "id": "BM-001",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 3975,
+      "cost_usd": 0.028309,
+      "llm_latency_ms": 24034,
+      "e2e_latency_ms": 24048
+    },
+    {
+      "id": "BM-002",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 3946,
+      "cost_usd": 0.028384,
+      "llm_latency_ms": 24526,
+      "e2e_latency_ms": 24539
+    },
+    {
+      "id": "BM-003",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4008,
+      "cost_usd": 0.028704,
+      "llm_latency_ms": 23506,
+      "e2e_latency_ms": 23530
+    },
+    {
+      "id": "BM-004",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5180,
+      "cost_usd": 0.029138,
+      "llm_latency_ms": 22289,
+      "e2e_latency_ms": 22307
+    },
+    {
+      "id": "BM-005",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4150,
+      "cost_usd": 0.030794,
+      "llm_latency_ms": 27307,
+      "e2e_latency_ms": 27430
+    },
+    {
+      "id": "BM-006",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5476,
+      "cost_usd": 0.033208,
+      "llm_latency_ms": 26429,
+      "e2e_latency_ms": 26441
+    },
+    {
+      "id": "BM-007",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4012,
+      "cost_usd": 0.030026,
+      "llm_latency_ms": 26813,
+      "e2e_latency_ms": 26833
+    },
+    {
+      "id": "BM-008",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4496,
+      "cost_usd": 0.028308,
+      "llm_latency_ms": 25500,
+      "e2e_latency_ms": 25513
+    },
+    {
+      "id": "BM-009",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5539,
+      "cost_usd": 0.033611,
+      "llm_latency_ms": 28131,
+      "e2e_latency_ms": 28145
+    },
+    {
+      "id": "BM-010",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5517,
+      "cost_usd": 0.032745,
+      "llm_latency_ms": 26323,
+      "e2e_latency_ms": 26337
+    },
+    {
+      "id": "BM-011",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5639,
+      "cost_usd": 0.033515,
+      "llm_latency_ms": 29166,
+      "e2e_latency_ms": 29180
+    },
+    {
+      "id": "BM-012",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5336,
+      "cost_usd": 0.030892,
+      "llm_latency_ms": 26281,
+      "e2e_latency_ms": 26294
+    },
+    {
+      "id": "BM-013",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4458,
+      "cost_usd": 0.028524,
+      "llm_latency_ms": 23203,
+      "e2e_latency_ms": 23216
+    },
+    {
+      "id": "BM-014",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5485,
+      "cost_usd": 0.032621,
+      "llm_latency_ms": 26119,
+      "e2e_latency_ms": 26140
+    },
+    {
+      "id": "BM-015",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4715,
+      "cost_usd": 0.029901,
+      "llm_latency_ms": 24380,
+      "e2e_latency_ms": 24393
+    },
+    {
+      "id": "BM-016",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 2,
+      "tokens": 3134,
+      "cost_usd": 0.023418,
+      "llm_latency_ms": 19073,
+      "e2e_latency_ms": 19086
+    },
+    {
+      "id": "BM-017",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 2,
+      "tokens": 3375,
+      "cost_usd": 0.026685,
+      "llm_latency_ms": 21869,
+      "e2e_latency_ms": 21885
+    },
+    {
+      "id": "BM-018",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.91,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 1,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 9006,
+      "cost_usd": 0.057856,
+      "llm_latency_ms": 48559,
+      "e2e_latency_ms": 48577
+    },
+    {
+      "id": "BM-019",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4667,
+      "cost_usd": 0.029289,
+      "llm_latency_ms": 24631,
+      "e2e_latency_ms": 24645
+    },
+    {
+      "id": "BM-020",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4004,
+      "cost_usd": 0.028714,
+      "llm_latency_ms": 25042,
+      "e2e_latency_ms": 25066
+    },
+    {
+      "id": "BM-021",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5117,
+      "cost_usd": 0.030167,
+      "llm_latency_ms": 26604,
+      "e2e_latency_ms": 26622
+    },
+    {
+      "id": "BM-022",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.82,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 1,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 10122,
+      "cost_usd": 0.063326,
+      "llm_latency_ms": 52348,
+      "e2e_latency_ms": 52372
+    },
+    {
+      "id": "BM-023",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 1,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 9891,
+      "cost_usd": 0.060005,
+      "llm_latency_ms": 50015,
+      "e2e_latency_ms": 50043
+    },
+    {
+      "id": "BM-024",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5403,
+      "cost_usd": 0.031275,
+      "llm_latency_ms": 25340,
+      "e2e_latency_ms": 25358
+    },
+    {
+      "id": "BM-025",
+      "run": 2,
+      "discrepancy_type": "MISSING_RECORD",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HMR1",
+        "HMR2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.84,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5400,
+      "cost_usd": 0.03264,
+      "llm_latency_ms": 28462,
+      "e2e_latency_ms": 28475
+    },
+    {
+      "id": "BM-026",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4369,
+      "cost_usd": 0.027131,
+      "llm_latency_ms": 23049,
+      "e2e_latency_ms": 23065
+    },
+    {
+      "id": "BM-027",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5274,
+      "cost_usd": 0.029564,
+      "llm_latency_ms": 22700,
+      "e2e_latency_ms": 22714
+    },
+    {
+      "id": "BM-028",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5189,
+      "cost_usd": 0.029441,
+      "llm_latency_ms": 24672,
+      "e2e_latency_ms": 24690
+    },
+    {
+      "id": "BM-029",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4211,
+      "cost_usd": 0.028509,
+      "llm_latency_ms": 24388,
+      "e2e_latency_ms": 24401
+    },
+    {
+      "id": "BM-030",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5359,
+      "cost_usd": 0.033815,
+      "llm_latency_ms": 26581,
+      "e2e_latency_ms": 26594
+    },
+    {
+      "id": "BM-031",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5173,
+      "cost_usd": 0.029535,
+      "llm_latency_ms": 25766,
+      "e2e_latency_ms": 25782
+    },
+    {
+      "id": "BM-032",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": false,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5716,
+      "cost_usd": 0.03419,
+      "llm_latency_ms": 27174,
+      "e2e_latency_ms": 27187
+    },
+    {
+      "id": "BM-033",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5469,
+      "cost_usd": 0.031043,
+      "llm_latency_ms": 25367,
+      "e2e_latency_ms": 25389
+    },
+    {
+      "id": "BM-034",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5431,
+      "cost_usd": 0.030547,
+      "llm_latency_ms": 23891,
+      "e2e_latency_ms": 23906
+    },
+    {
+      "id": "BM-035",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5337,
+      "cost_usd": 0.030087,
+      "llm_latency_ms": 24599,
+      "e2e_latency_ms": 24614
+    },
+    {
+      "id": "BM-036",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5187,
+      "cost_usd": 0.029795,
+      "llm_latency_ms": 24537,
+      "e2e_latency_ms": 24559
+    },
+    {
+      "id": "BM-037",
+      "run": 2,
+      "discrepancy_type": "STALE_VALUE",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HSV1",
+        "HSV2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.84,
+      "confidence": 0.91,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5390,
+      "cost_usd": 0.031312,
+      "llm_latency_ms": 25803,
+      "e2e_latency_ms": 25817
+    },
+    {
+      "id": "BM-038",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": false,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5027,
+      "cost_usd": 0.032865,
+      "llm_latency_ms": 27285,
+      "e2e_latency_ms": 27299
+    },
+    {
+      "id": "BM-039",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4316,
+      "cost_usd": 0.031774,
+      "llm_latency_ms": 26367,
+      "e2e_latency_ms": 26380
+    },
+    {
+      "id": "BM-040",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4821,
+      "cost_usd": 0.030427,
+      "llm_latency_ms": 24552,
+      "e2e_latency_ms": 24566
+    },
+    {
+      "id": "BM-041",
+      "run": 2,
+      "discrepancy_type": "MISSING_RECORD",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HMR1",
+        "HMR2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.84,
+      "confidence": 0.91,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4082,
+      "cost_usd": 0.030788,
+      "llm_latency_ms": 27196,
+      "e2e_latency_ms": 27211
+    },
+    {
+      "id": "BM-042",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4592,
+      "cost_usd": 0.0283,
+      "llm_latency_ms": 22608,
+      "e2e_latency_ms": 22621
+    },
+    {
+      "id": "BM-043",
+      "run": 2,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 3978,
+      "cost_usd": 0.028858,
+      "llm_latency_ms": 25495,
+      "e2e_latency_ms": 25509
+    },
+    {
+      "id": "BM-044",
+      "run": 2,
+      "discrepancy_type": "STALE_VALUE",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HSV1",
+        "HSV2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.7,
+      "confidence": 0.62,
+      "requires_review": true,
+      "review_reasons": [
+        "graph_low_confidence",
+        "low_confidence"
+      ],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 3893,
+      "cost_usd": 0.029479,
+      "llm_latency_ms": 27533,
+      "e2e_latency_ms": 27558
+    },
+    {
+      "id": "BM-045",
+      "run": 2,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.88,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 1,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 9084,
+      "cost_usd": 0.060116,
+      "llm_latency_ms": 50442,
+      "e2e_latency_ms": 50459
+    },
+    {
+      "id": "BM-046",
+      "run": 2,
+      "discrepancy_type": "STALE_VALUE",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HSV1",
+        "HSV2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.84,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5251,
+      "cost_usd": 0.029825,
+      "llm_latency_ms": 23825,
+      "e2e_latency_ms": 23838
+    },
+    {
+      "id": "BM-047",
+      "run": 2,
+      "discrepancy_type": "STALE_VALUE",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HSV1",
+        "HSV2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.7,
+      "confidence": 0.62,
+      "requires_review": true,
+      "review_reasons": [
+        "graph_low_confidence",
+        "low_confidence"
+      ],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4078,
+      "cost_usd": 0.029274,
+      "llm_latency_ms": 26239,
+      "e2e_latency_ms": 26259
+    },
+    {
+      "id": "BM-048",
+      "run": 2,
+      "discrepancy_type": "DUPLICATE_DOWNSTREAM",
+      "label": {
+        "root_cause": "DUPLICATE_DOWNSTREAM",
+        "review": true,
+        "min_hypotheses": 2,
+        "early_termination_kind": "duplicate_rows"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DUPLICATE_DOWNSTREAM",
+      "correct": true,
+      "hypotheses_tested": [
+        "HDD1"
+      ],
+      "deciding_kind": "retries",
+      "graph_confidence": 0.85,
+      "confidence": 0.91,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 1,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 9154,
+      "cost_usd": 0.058566,
+      "llm_latency_ms": 49247,
+      "e2e_latency_ms": 49268
+    },
+    {
+      "id": "BM-049",
+      "run": 2,
+      "discrepancy_type": "DUPLICATE_DOWNSTREAM",
+      "label": {
+        "root_cause": "DUPLICATE_DOWNSTREAM",
+        "review": true,
+        "min_hypotheses": 2,
+        "early_termination_kind": "duplicate_rows"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DUPLICATE_DOWNSTREAM",
+      "correct": true,
+      "hypotheses_tested": [
+        "HDD1"
+      ],
+      "deciding_kind": "retries",
+      "graph_confidence": 0.85,
+      "confidence": 0.91,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 1,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 6780,
+      "cost_usd": 0.051076,
+      "llm_latency_ms": 46926,
+      "e2e_latency_ms": 46946
+    },
+    {
+      "id": "BM-050",
+      "run": 2,
+      "discrepancy_type": "DUPLICATE_DOWNSTREAM",
+      "label": {
+        "root_cause": "DUPLICATE_DOWNSTREAM",
+        "review": true,
+        "min_hypotheses": 2,
+        "early_termination_kind": "duplicate_rows"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DUPLICATE_DOWNSTREAM",
+      "correct": true,
+      "hypotheses_tested": [
+        "HDD1"
+      ],
+      "deciding_kind": "retries",
+      "graph_confidence": 0.85,
+      "confidence": 0.88,
+      "requires_review": true,
+      "review_reasons": [
+        "critic_rejected"
+      ],
+      "judge_decision": "escalate",
+      "revision_count": 1,
+      "critic": {
+        "supported": 3,
+        "unsupported": 1,
+        "contradicted": 0
+      },
+      "grounded": null,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 9149,
+      "cost_usd": 0.056519,
+      "llm_latency_ms": 49845,
+      "e2e_latency_ms": 49870
+    },
+    {
+      "id": "BM-001",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4066,
+      "cost_usd": 0.029254,
+      "llm_latency_ms": 26221,
+      "e2e_latency_ms": 26235
+    },
+    {
+      "id": "BM-002",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 3711,
+      "cost_usd": 0.025699,
+      "llm_latency_ms": 22792,
+      "e2e_latency_ms": 22808
+    },
+    {
+      "id": "BM-003",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4062,
+      "cost_usd": 0.029514,
+      "llm_latency_ms": 25529,
+      "e2e_latency_ms": 25543
+    },
+    {
+      "id": "BM-004",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5310,
+      "cost_usd": 0.03057,
+      "llm_latency_ms": 23413,
+      "e2e_latency_ms": 23428
+    },
+    {
+      "id": "BM-005",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4070,
+      "cost_usd": 0.02969,
+      "llm_latency_ms": 25457,
+      "e2e_latency_ms": 25470
+    },
+    {
+      "id": "BM-006",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5401,
+      "cost_usd": 0.032683,
+      "llm_latency_ms": 26041,
+      "e2e_latency_ms": 26060
+    },
+    {
+      "id": "BM-007",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 3904,
+      "cost_usd": 0.028826,
+      "llm_latency_ms": 25386,
+      "e2e_latency_ms": 25401
+    },
+    {
+      "id": "BM-008",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4522,
+      "cost_usd": 0.028482,
+      "llm_latency_ms": 23877,
+      "e2e_latency_ms": 23895
+    },
+    {
+      "id": "BM-009",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5528,
+      "cost_usd": 0.033818,
+      "llm_latency_ms": 26635,
+      "e2e_latency_ms": 26648
+    },
+    {
+      "id": "BM-010",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5645,
+      "cost_usd": 0.033885,
+      "llm_latency_ms": 26995,
+      "e2e_latency_ms": 27018
+    },
+    {
+      "id": "BM-011",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5396,
+      "cost_usd": 0.030794,
+      "llm_latency_ms": 24887,
+      "e2e_latency_ms": 24900
+    },
+    {
+      "id": "BM-012",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5307,
+      "cost_usd": 0.030253,
+      "llm_latency_ms": 24330,
+      "e2e_latency_ms": 24347
+    },
+    {
+      "id": "BM-013",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4499,
+      "cost_usd": 0.028779,
+      "llm_latency_ms": 24828,
+      "e2e_latency_ms": 24844
+    },
+    {
+      "id": "BM-014",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5350,
+      "cost_usd": 0.031244,
+      "llm_latency_ms": 24742,
+      "e2e_latency_ms": 24759
+    },
+    {
+      "id": "BM-015",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4779,
+      "cost_usd": 0.030501,
+      "llm_latency_ms": 25571,
+      "e2e_latency_ms": 25586
+    },
+    {
+      "id": "BM-016",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 2,
+      "tokens": 3465,
+      "cost_usd": 0.027471,
+      "llm_latency_ms": 22666,
+      "e2e_latency_ms": 22690
+    },
+    {
+      "id": "BM-017",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 2,
+      "tokens": 3124,
+      "cost_usd": 0.023796,
+      "llm_latency_ms": 19690,
+      "e2e_latency_ms": 19703
+    },
+    {
+      "id": "BM-018",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4537,
+      "cost_usd": 0.027733,
+      "llm_latency_ms": 22242,
+      "e2e_latency_ms": 22255
+    },
+    {
+      "id": "BM-019",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.91,
+      "requires_review": true,
+      "review_reasons": [
+        "critic_rejected"
+      ],
+      "judge_decision": "escalate",
+      "revision_count": 1,
+      "critic": {
+        "supported": 4,
+        "unsupported": 1,
+        "contradicted": 0
+      },
+      "grounded": null,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 9717,
+      "cost_usd": 0.066411,
+      "llm_latency_ms": 56948,
+      "e2e_latency_ms": 56965
+    },
+    {
+      "id": "BM-020",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4047,
+      "cost_usd": 0.029491,
+      "llm_latency_ms": 26701,
+      "e2e_latency_ms": 26714
+    },
+    {
+      "id": "BM-021",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5119,
+      "cost_usd": 0.030351,
+      "llm_latency_ms": 26278,
+      "e2e_latency_ms": 26296
+    },
+    {
+      "id": "BM-022",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5289,
+      "cost_usd": 0.030047,
+      "llm_latency_ms": 24510,
+      "e2e_latency_ms": 24676
+    },
+    {
+      "id": "BM-023",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5286,
+      "cost_usd": 0.029928,
+      "llm_latency_ms": 23971,
+      "e2e_latency_ms": 23986
+    },
+    {
+      "id": "BM-024",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5363,
+      "cost_usd": 0.030545,
+      "llm_latency_ms": 24691,
+      "e2e_latency_ms": 24712
+    },
+    {
+      "id": "BM-025",
+      "run": 3,
+      "discrepancy_type": "MISSING_RECORD",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HMR1",
+        "HMR2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.84,
+      "confidence": 0.91,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 1,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 9326,
+      "cost_usd": 0.056814,
+      "llm_latency_ms": 46358,
+      "e2e_latency_ms": 46376
+    },
+    {
+      "id": "BM-026",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4426,
+      "cost_usd": 0.02796,
+      "llm_latency_ms": 23120,
+      "e2e_latency_ms": 23137
+    },
+    {
+      "id": "BM-027",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5250,
+      "cost_usd": 0.029446,
+      "llm_latency_ms": 23167,
+      "e2e_latency_ms": 23185
+    },
+    {
+      "id": "BM-028",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5267,
+      "cost_usd": 0.030441,
+      "llm_latency_ms": 25881,
+      "e2e_latency_ms": 25895
+    },
+    {
+      "id": "BM-029",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4487,
+      "cost_usd": 0.031595,
+      "llm_latency_ms": 26191,
+      "e2e_latency_ms": 26208
+    },
+    {
+      "id": "BM-030",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5131,
+      "cost_usd": 0.031139,
+      "llm_latency_ms": 26591,
+      "e2e_latency_ms": 26605
+    },
+    {
+      "id": "BM-031",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5191,
+      "cost_usd": 0.029913,
+      "llm_latency_ms": 24395,
+      "e2e_latency_ms": 24408
+    },
+    {
+      "id": "BM-032",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": false,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5711,
+      "cost_usd": 0.033897,
+      "llm_latency_ms": 27041,
+      "e2e_latency_ms": 27054
+    },
+    {
+      "id": "BM-033",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.91,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 1,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 10099,
+      "cost_usd": 0.060111,
+      "llm_latency_ms": 47936,
+      "e2e_latency_ms": 47954
+    },
+    {
+      "id": "BM-034",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "CDC_FIELD_EXCLUDED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "cdc"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "CDC_FIELD_EXCLUDED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a",
+        "H3b"
+      ],
+      "deciding_kind": "cdc",
+      "graph_confidence": 0.88,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5677,
+      "cost_usd": 0.033709,
+      "llm_latency_ms": 27094,
+      "e2e_latency_ms": 27115
+    },
+    {
+      "id": "BM-035",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.91,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5472,
+      "cost_usd": 0.031548,
+      "llm_latency_ms": 24403,
+      "e2e_latency_ms": 24416
+    },
+    {
+      "id": "BM-036",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5567,
+      "cost_usd": 0.034535,
+      "llm_latency_ms": 29492,
+      "e2e_latency_ms": 29510
+    },
+    {
+      "id": "BM-037",
+      "run": 3,
+      "discrepancy_type": "STALE_VALUE",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HSV1",
+        "HSV2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.84,
+      "confidence": 0.92,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5616,
+      "cost_usd": 0.034208,
+      "llm_latency_ms": 28978,
+      "e2e_latency_ms": 28990
+    },
+    {
+      "id": "BM-038",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": false,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4685,
+      "cost_usd": 0.028887,
+      "llm_latency_ms": 22472,
+      "e2e_latency_ms": 22488
+    },
+    {
+      "id": "BM-039",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4338,
+      "cost_usd": 0.03189,
+      "llm_latency_ms": 26807,
+      "e2e_latency_ms": 26820
+    },
+    {
+      "id": "BM-040",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4817,
+      "cost_usd": 0.030693,
+      "llm_latency_ms": 25620,
+      "e2e_latency_ms": 25633
+    },
+    {
+      "id": "BM-041",
+      "run": 3,
+      "discrepancy_type": "MISSING_RECORD",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HMR1",
+        "HMR2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.84,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4047,
+      "cost_usd": 0.030351,
+      "llm_latency_ms": 26794,
+      "e2e_latency_ms": 26809
+    },
+    {
+      "id": "BM-042",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.91,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4975,
+      "cost_usd": 0.032581,
+      "llm_latency_ms": 26644,
+      "e2e_latency_ms": 26661
+    },
+    {
+      "id": "BM-043",
+      "run": 3,
+      "discrepancy_type": "NULL_DOWNSTREAM",
+      "label": {
+        "root_cause": "FLS_STRIPPED",
+        "review": false,
+        "min_hypotheses": 3,
+        "early_termination_kind": "fls"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "FLS_STRIPPED",
+      "correct": true,
+      "hypotheses_tested": [
+        "H1",
+        "H3a"
+      ],
+      "deciding_kind": "fls",
+      "graph_confidence": 0.9,
+      "confidence": 0.97,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4005,
+      "cost_usd": 0.029035,
+      "llm_latency_ms": 24912,
+      "e2e_latency_ms": 24924
+    },
+    {
+      "id": "BM-044",
+      "run": 3,
+      "discrepancy_type": "STALE_VALUE",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HSV1",
+        "HSV2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.7,
+      "confidence": 0.62,
+      "requires_review": true,
+      "review_reasons": [
+        "graph_low_confidence",
+        "low_confidence"
+      ],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 3865,
+      "cost_usd": 0.029171,
+      "llm_latency_ms": 26388,
+      "e2e_latency_ms": 26403
+    },
+    {
+      "id": "BM-045",
+      "run": 3,
+      "discrepancy_type": "VALUE_MISMATCH",
+      "label": {
+        "root_cause": "DATAWAVE_TRANSFORM_ERROR",
+        "review": true,
+        "min_hypotheses": 4,
+        "early_termination_kind": "dataweave"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DATAWAVE_TRANSFORM_ERROR",
+      "correct": true,
+      "hypotheses_tested": [
+        "HVM1",
+        "HVM2"
+      ],
+      "deciding_kind": "dataweave",
+      "graph_confidence": 0.86,
+      "confidence": 0.93,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4857,
+      "cost_usd": 0.031991,
+      "llm_latency_ms": 26657,
+      "e2e_latency_ms": 26678
+    },
+    {
+      "id": "BM-046",
+      "run": 3,
+      "discrepancy_type": "STALE_VALUE",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HSV1",
+        "HSV2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.84,
+      "confidence": 0.91,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 5689,
+      "cost_usd": 0.034993,
+      "llm_latency_ms": 29591,
+      "e2e_latency_ms": 29604
+    },
+    {
+      "id": "BM-047",
+      "run": 3,
+      "discrepancy_type": "STALE_VALUE",
+      "label": {
+        "root_cause": "DELIVERY_GAP",
+        "review": false,
+        "min_hypotheses": 2,
+        "early_termination_kind": "delivery"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DELIVERY_GAP",
+      "correct": true,
+      "hypotheses_tested": [
+        "HSV1",
+        "HSV2"
+      ],
+      "deciding_kind": "delivery",
+      "graph_confidence": 0.7,
+      "confidence": 0.62,
+      "requires_review": true,
+      "review_reasons": [
+        "graph_low_confidence",
+        "low_confidence"
+      ],
+      "judge_decision": "accept",
+      "revision_count": 0,
+      "critic": {
+        "supported": 5,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 3,
+      "tokens": 4073,
+      "cost_usd": 0.028971,
+      "llm_latency_ms": 26662,
+      "e2e_latency_ms": 26674
+    },
+    {
+      "id": "BM-048",
+      "run": 3,
+      "discrepancy_type": "DUPLICATE_DOWNSTREAM",
+      "label": {
+        "root_cause": "DUPLICATE_DOWNSTREAM",
+        "review": true,
+        "min_hypotheses": 2,
+        "early_termination_kind": "duplicate_rows"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DUPLICATE_DOWNSTREAM",
+      "correct": true,
+      "hypotheses_tested": [
+        "HDD1"
+      ],
+      "deciding_kind": "retries",
+      "graph_confidence": 0.85,
+      "confidence": 0.82,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 1,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 8850,
+      "cost_usd": 0.055074,
+      "llm_latency_ms": 48166,
+      "e2e_latency_ms": 48190
+    },
+    {
+      "id": "BM-049",
+      "run": 3,
+      "discrepancy_type": "DUPLICATE_DOWNSTREAM",
+      "label": {
+        "root_cause": "DUPLICATE_DOWNSTREAM",
+        "review": true,
+        "min_hypotheses": 2,
+        "early_termination_kind": "duplicate_rows"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DUPLICATE_DOWNSTREAM",
+      "correct": true,
+      "hypotheses_tested": [
+        "HDD1"
+      ],
+      "deciding_kind": "retries",
+      "graph_confidence": 0.85,
+      "confidence": 0.82,
+      "requires_review": true,
+      "review_reasons": [
+        "critic_rejected"
+      ],
+      "judge_decision": "escalate",
+      "revision_count": 1,
+      "critic": {
+        "supported": 3,
+        "unsupported": 1,
+        "contradicted": 0
+      },
+      "grounded": null,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 6990,
+      "cost_usd": 0.052498,
+      "llm_latency_ms": 48161,
+      "e2e_latency_ms": 48178
+    },
+    {
+      "id": "BM-050",
+      "run": 3,
+      "discrepancy_type": "DUPLICATE_DOWNSTREAM",
+      "label": {
+        "root_cause": "DUPLICATE_DOWNSTREAM",
+        "review": true,
+        "min_hypotheses": 2,
+        "early_termination_kind": "duplicate_rows"
+      },
+      "error": null,
+      "graph_status": "confirmed",
+      "root_cause_category": "DUPLICATE_DOWNSTREAM",
+      "correct": true,
+      "hypotheses_tested": [
+        "HDD1"
+      ],
+      "deciding_kind": "retries",
+      "graph_confidence": 0.85,
+      "confidence": 0.88,
+      "requires_review": false,
+      "review_reasons": [],
+      "judge_decision": "accept",
+      "revision_count": 1,
+      "critic": {
+        "supported": 4,
+        "unsupported": 0,
+        "contradicted": 0
+      },
+      "grounded": true,
+      "retrieval": null,
+      "llm_calls": 5,
+      "tokens": 9396,
+      "cost_usd": 0.058724,
+      "llm_latency_ms": 50969,
+      "e2e_latency_ms": 50996
+    }
+  ]
+}

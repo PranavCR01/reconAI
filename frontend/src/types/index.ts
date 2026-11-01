@@ -64,6 +64,8 @@ export interface ReconRow {
   created_at: string | null
 }
 
+export type EvidenceOutcome = 'supports' | 'refutes' | 'neutral' | 'error' | 'skipped'
+
 export interface Evidence {
   id: string | null
   incident_id: string | null
@@ -72,6 +74,65 @@ export interface Evidence {
   content: string
   relevance_explanation: string
   created_at: string | null
+  hypothesis_key?: string | null
+  tool?: string | null
+  tool_args?: Record<string, unknown> | null
+  outcome?: EvidenceOutcome | null
+  raw_result?: Record<string, unknown> | null
+}
+
+export type HypothesisVerdict = 'confirmed' | 'refuted' | 'inconclusive'
+
+export interface HypothesisVerdictRecord {
+  hypothesis_id: string
+  label: string
+  kind: string
+  category: string
+  verdict: HypothesisVerdict
+  reason: string
+  confidence: number | null
+  evidence_ids: string[]
+}
+
+export type CriticVerdict = 'supported' | 'unsupported' | 'contradicted'
+
+export interface Claim {
+  claim_id: string
+  kind: 'root_cause' | 'mechanism' | 'impact' | 'fix' | 'context'
+  status: 'established' | 'hypothesis'
+  category: string | null
+  text: string
+  evidence_ids: string[]
+  similar_incident_ids: string[]
+  hypothesis_ids: string[]
+  critic?: { verdict: CriticVerdict; reason: string; stage?: string; evidence_ids?: string[] } | null
+}
+
+export interface LLMCallRecord {
+  agent: string
+  model: string
+  attempt?: number
+  input_tokens: number
+  output_tokens: number
+  latency_ms: number
+  error?: string
+}
+
+export interface TraceStep {
+  node: string
+  started_at: string
+  duration_ms: number
+  detail: Record<string, unknown>
+  llm_calls: LLMCallRecord[]
+}
+
+export interface SimilarIncidentDetail {
+  id: string
+  similarity: number
+  source: string | null
+  root_cause_category: string | null
+  discrepancy_type: string | null
+  summary: string
 }
 
 export interface RCAIncident {
@@ -94,6 +155,24 @@ export interface RCAIncident {
   total_tokens_used: number
   latency_ms: number
   created_at: string | null
+  review_reasons?: string[]
+  llm_calls?: LLMCallRecord[]
+  hypothesis_verdicts?: HypothesisVerdictRecord[]
+  graph_status?: 'confirmed' | 'exhausted' | 'unknown_type' | 'running' | null
+  root_cause_category?: string | null
+  contributing_factors?: string[]
+  graph_version?: string | null
+  claims?: Claim[]
+  judge_decision?: 'accept' | 'escalate' | null
+  revision_count?: number
+  prompt_versions?: Record<string, string>
+  e2e_latency_ms?: number
+  cost_usd?: number | null
+  cost_warnings?: string[]
+  trace?: TraceStep[]
+  recon_row?: ReconRow | null
+  evidence_by_hypothesis?: Record<string, Evidence[]>
+  similar_incidents_detail?: SimilarIncidentDetail[]
   // Joined fields from ReconRow (populated via SSE or API join)
   severity?: Severity | null
   sf_object?: string | null

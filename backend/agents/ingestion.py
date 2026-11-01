@@ -57,20 +57,8 @@ class IngestionAgent:
 
         return {
             "recon_row": {**classified.model_dump(mode="json"), "db2_environment": db2_env},
-            "current_hypothesis": "",
-            "hypotheses_tested": [],
-            "hypotheses_ruled_out": [],
-            "evidence_collected": [],
-            "rag_candidates": [],
-            "reranked_candidates": [],
-            "root_cause": None,
-            "confidence": None,
-            "rca_output": None,
-            "iterations": 0,
-            "requires_human_review": False,
-            "llm_calls": llm_calls,
-            "tool_calls": [],
-            "total_latency_ms": 0,
+            "llm_calls": [{"agent": "ingestion", **c} for c in llm_calls],
+            "total_latency_ms": sum(c.get("latency_ms", 0) for c in llm_calls),
         }
 
     def _derive_discrepancy(

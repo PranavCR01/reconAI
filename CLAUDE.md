@@ -1,7 +1,7 @@
 # ReconAI — CLAUDE.md
 
 ## What This Is
-AI-powered Salesforce integration reconciliation and RCA tool. Replaces a manual Excel decision tree used by Recon teams to diagnose data discrepancies between Salesforce FSC and downstream systems (DB2, Snowflake).
+AI-powered Salesforce integration reconciliation and RCA tool. Replaces a manual Excel decision tree used by Recon teams to diagnose data discrepancies between Salesforce FSC and downstream systems (DB2). Salesforce, Splunk and DB2 are simulated.
 
 **Pitch:** "Datadog Bits AI SRE for Salesforce integration pipelines, with the Excel decision tree encoded as a deterministic hypothesis graph."  
 **Audience:** Deloitte colleagues + Salesforce engineers. Every architectural choice must be defensible.  
@@ -52,25 +52,28 @@ reconai/
 
 ---
 
-## Four Agents — Boundaries Are Hard
-- **Ingestion:** classify discrepancy type + severity. Haiku only. No tool calls.
-- **Hypothesis:** walk graph, decide next step. Deterministic Python — no LLM call. Routes to Evidence Agent.
-- **Evidence:** execute ALL tool calls. Deterministic Python — no LLM call. Returns cited EvidenceResult.
-- **Synthesis:** assemble RCA from complete state. Sonnet. No tool calls.
+## Pipeline — Boundaries Are Hard
+`ingestion → hypothesis ⇄ evidence → rag_retrieval → proposer → critic → judge` (see `docs/ADR.md`).
+- **Ingestion:** classify discrepancy type + severity. Haiku only for ambiguous rows. No tool calls.
+- **Hypothesis:** walk the catalogue in `backend/graph/hypotheses.py`, record confirmed / refuted / inconclusive per check. Deterministic — no LLM.
+- **Evidence:** execute ALL tool calls; every result is an evidence record with an ID, hypothesis key, outcome and raw result. Deterministic — no LLM.
+- **Proposer:** writes the explanation as claims citing evidence (E#) and past incidents (P#). Sonnet. No tool calls.
+- **Critic:** deterministic claim checks, then an LLM review. **Judge:** code only — accept / revise once / escalate.
 
-Hypothesis decides *what* to check. Evidence *executes* the check. Never merge these.
-LLM calls happen only in Ingestion (ambiguous classification), the RAG reranker, and Synthesis. Each appends a `{agent, model, input_tokens, output_tokens, latency_ms}` entry to `state.llm_calls`.
+Hypothesis decides *what* to check. Evidence *executes* the check. The graph decides the diagnosis; proposer/critic/judge only govern its explanation. Never merge these.
+Each node may only write the state keys it owns (`OWNERS` in `backend/models/state.py`). Every LLM call appends `{agent, model, attempt, input_tokens, output_tokens, latency_ms, error?}` to `state.llm_calls`; every node appends a `trace` step.
 
 ---
 
 ## Non-Negotiables
-1. Every `RCAIncident` must have ≥1 `Evidence` row per hypothesis tested. Orchestrator validates before Synthesis runs. No evidence → retry (max 2), not surface.
-2. `propose_replay` tool is ALWAYS gated behind human approval. Never auto-execute.
-3. Confidence < 0.75 → `requires_human_review = True`. Surfaces separately in UI.
-4. Every LLM call logs: model, version, token count, latency.
+1. Every tested hypothesis has ≥1 evidence record (tool errors included, as `error` outcome). Missing coverage → retry (max 2), then `missing_evidence` review reason.
+2. The system never changes data in any connected system. Humans record resolutions; nothing is replayed automatically.
+3. `requires_human_review` is derived from `review_reasons` only. Confidence < 0.75, an unconfirmed graph, weak evidence, or a rejected/unverifiable claim each add a reason.
+4. Every LLM call logs model, attempt, tokens, latency and error, and is costed (`PRICING_PER_MTOK` in `config.py`; unknown model → cost None + warning, never $0).
 5. P1 incidents display first in UI regardless of processing order.
 6. Pydantic on every agent boundary. Schema violation → retry with error context.
 7. Mock tools must vary responses based on input — no hardcoded strings.
+8. Every number shown in docs or on `/benchmark` comes from a committed file in `evals/results/`.
 
 ---
 
@@ -81,7 +84,7 @@ LLM calls happen only in Ingestion (ambiguous classification), the RAG reranker,
 
 ## Workflow Rules
 - Read CLAUDE.md at the start of every session
-- Read the relevant slice brief before implementing that slice
+- Slice briefs in `docs/slices/` and `docs/history/` are historical; `docs/ADR.md` is the current design
 - `/plan` before any implementation — resolve ambiguities first
 - Never break the non-negotiables above
 - Always verify only one Python process on port 8000 before debugging: `netstat -ano | findstr :8000`
@@ -91,13 +94,13 @@ LLM calls happen only in Ingestion (ambiguous classification), the RAG reranker,
 - Analytics endpoints have 5-min in-memory cache (`_analytics_cache` in main.py). Cache key format: `f"{endpoint}:{days}"`. TTL = 300s.
 - Routing: `/` = Landing (public), `/upload` = Upload (app entry). Vercel SPA rewrite in `vercel.json` required for direct-URL navigation to work on Vercel deployment.
 - Landing page is standalone (no Shell/TopBar wrapper) — has its own nav with brand mark and "Open app →" CTA.
-- Access gate on `/upload`: checks `localStorage.recon_access === 'granted'`. Gate submits to `POST /api/v1/track/demo-request`. Bypass via code input checking `VITE_DEMO_CODE` env var (default `reconai2025`). Gate always shows success (fail-open) — backend insert is best-effort.
+- No access gate on `/upload` (removed in May 2026). The `/track/demo-request` endpoint still exists but the UI no longer calls it.
 - Tracking endpoints (`/track/pageview`, `/track/demo-request`) always return 200 — Supabase errors are caught and sent to Sentry, never surfaced to the client.
 - `demo_requests` table columns: `id, name, email, company, requested_at, code_sent, notes`. Insert payload uses these exact keys (not `full_name`/`work_email`/`submitted_at`).
 - Resend email notification on demo request: gated on `RESEND_API_KEY` + `NOTIFY_EMAIL` env vars. No-op if either is unset. Render env vars needed.
 - Sentry init in `main.py` gated on `SENTRY_DSN` env var — no-op if unset. `sentry_sdk.capture_exception()` used in synthesis and tracking endpoints.
-- Synthesis graceful degradation: `anthropic.APIError`/`APIStatusError` (and `groq.APIError`) caught in `_call_llm` → returns degraded RCAOutput (confidence 0.0, requires_human_review True, final_hypothesis "API_UNAVAILABLE"). SSE stream never crashes.
-- `HealthBanner` in App.tsx polls `GET /api/v1/health` every 60s — fixed top banner when down, auto-hides on recovery, dismissible.
+- Proposer/critic graceful degradation: API errors are caught → degraded explanation (confidence 0.0, `llm_unavailable` / `critic_unavailable` review reason, final_hypothesis "API_UNAVAILABLE"). SSE stream never crashes. Degraded results (any API error, tool error, retrieval error) are never written to `rca_cache`.
+- `HealthBanner` in App.tsx: first check at 10s, then every 90s; "down" after 2 consecutive failures, "degraded" when `/health` says so (DB unreachable, empty knowledge base, missing migrations). Dismissible, auto-hides on recovery.
 - SSE error banner in LiveAnalysis: `sseError` state set when SSE closes before `done` fires; "Retry" button increments `retryKey` to reconnect.
 - `upsertIncident` in Zustand: skips update if incoming incident has no improvement (same/fewer hypotheses_tested, same/lower confidence, same status) over stored entry.
 - `needsReviewCount` uses `requires_human_review && status !== 'complete'` — `IncidentStatus` is `'running' | 'complete' | 'needs_review' | 'escalated'`, no `'resolved'`.
@@ -109,6 +112,15 @@ LLM calls happen only in Ingestion (ambiguous classification), the RAG reranker,
 - SSE async generators (`_generate`, `_stream_existing`): `await`/`yield` must be inside the generator body — a `yield` in the outer endpoint scope turns it into a generator, making `return StreamingResponse(...)` a SyntaxError.
 - Cost guards in `main.py` (public app, every row costs LLM calls): max 200 rows / 256 KB per upload (413); uploads 20/hour per IP, 300/day total; 5,000 analyzed rows/day total (uploads + `bypass_cache` re-runs + benchmarks); `bypass_cache` 5/hour per IP (SSE error event); benchmark 3/hour per IP (429). In-memory — resets on restart/deploy. Upload.tsx mirrors the 200-row cap and shows server errors inline.
 - `/recall` uses `_recall_cache` dict with 1hr TTL (not the old bare `_recall_metrics_cache`). Cold start takes 20s+; always serve from cache on subsequent requests.
+
+- Evals: `python -m backend.evals.run --mode offline` regenerates `evals/results/offline_claude.{json,md}` and `frontend/src/data/eval_results.json`. A golden test fails if results change without being regenerated. Live runs need `--yes`, refuse a real database, and never touch production Supabase.
+- Prompts are versioned by content hash in `backend/prompts/VERSIONS.json`; update it in the same change as a prompt edit.
+- Schema migrations live in `docs/sql/` (001–006). Apply them before deploying code that writes new columns; startup logs + Sentry flag missing columns.
+- Docs: `python scripts/check_docs.py` (also a pytest) checks tagged metrics (`<!--m:stem/path:fmt-->value`) against `evals/results`, bans stale claims, and checks links/paths.
+- Browser testing: `python -m backend.tests.e2e_server` (scripted model, in-memory DB). `E2E_REAL_LLM=1` uses real models from `.env` but still the in-memory DB; each row takes roughly 30–60 s and $0.03–0.07.
+- SSE stream analyzes rows concurrently (`ROW_CONCURRENCY`, default 4) and emits each as it finishes; the UI sorts by severity.
+- Judge caps stored confidence at 0.5 when the graph is unconfirmed (`model_confidence` keeps the model's figure); the UI never shows green confidence on unconfirmed or escalated incidents.
+- Rate-limit client IP: rightmost `X-Forwarded-For` entry (`TRUSTED_PROXY_HOPS`, default 1) or `TRUSTED_IP_HEADER`. Verify against the host's real headers.
 
 ---
 
@@ -143,3 +155,4 @@ LLM calls happen only in Ingestion (ambiguous classification), the RAG reranker,
 | 2026-05-07 | tooling/perf | scripts/health_check.py — 40 E2E checks. /recall 1hr TTL cache. bypass_cache=bool on SSE stream; getStreamUrl uses URLSearchParams. | Run: python scripts/health_check.py |
 | 2026-05-08 | benchmark | frontend/src/data/benchmark_data.json. Benchmark.tsx (standalone page: 4 Recharts charts + 5 written sections, data from JSON). Landing.tsx arrow fix + 3rd hero button. App.tsx route /benchmark. | CSS gap: 10 invalid — use gap: 10px or inline styles |
 | 2026-05-08 | docs | docs/slides/linkedin_slides.html — 5 slides 1200x675 dark design system, CSS only, no images. README.md — 325 lines, badges, full architecture, benchmark table, local dev, project tree. | — |
+| 2026-11-01 | redesign (#7–#16) | Test infra with fakes + CI; node-owned state + review reasons; evidence IDs/linkage; declarative hypothesis catalogue 2.0.0 + scenario simulators; proposer/critic/judge; tracing + cost; eval suite with committed results; honest incident UI; reliability fixes; docs rewrite. | Live evals not yet run (API credits); migrations 001–006 must be applied before deploy |

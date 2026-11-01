@@ -1,0 +1,457 @@
+{
+ "version": 1,
+ "generated_by": "scripts/build_scenarios.py",
+ "confounder_rates": {
+  "unrelated_missed_event": 0.35,
+  "apex_conditional_dormant": 0.3
+ },
+ "scenarios": [
+  {
+   "sf_record_id": "0031Q00001AbCdEfAA",
+   "incident_id": "BM-001",
+   "fault": "FLS_STRIPPED",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0031Q00001GhIjKlAA",
+   "incident_id": "BM-002",
+   "fault": "FLS_STRIPPED",
+   "confounders": [
+    "unrelated_missed_event"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0031Q00001MnOpQrAA",
+   "incident_id": "BM-003",
+   "fault": "FLS_STRIPPED",
+   "confounders": [
+    "apex_conditional_dormant"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0031Q00001StUvWxAA",
+   "incident_id": "BM-004",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [
+    "unrelated_missed_event",
+    "apex_conditional_dormant"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0031Q00001YzAbCdAA",
+   "incident_id": "BM-005",
+   "fault": "FLS_STRIPPED",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0031Q00001EfGhIjAA",
+   "incident_id": "BM-006",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [
+    "apex_conditional_dormant"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0031Q00001KlMnOpAA",
+   "incident_id": "BM-007",
+   "fault": "CDC_FIELD_EXCLUDED",
+   "confounders": [
+    "apex_conditional_dormant"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0011Q00001QrStUvAA",
+   "incident_id": "BM-008",
+   "fault": "FLS_STRIPPED",
+   "confounders": [
+    "apex_conditional_dormant"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0011Q00001WxYzAbAA",
+   "incident_id": "BM-009",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0011Q00001CdEfGhAA",
+   "incident_id": "BM-010",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0011Q00001IjKlMnAA",
+   "incident_id": "BM-011",
+   "fault": "CDC_FIELD_EXCLUDED",
+   "confounders": [
+    "apex_conditional_dormant"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0011Q00001OpQrStAA",
+   "incident_id": "BM-012",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0011Q00001UvWxYzAA",
+   "incident_id": "BM-013",
+   "fault": "FLS_STRIPPED",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0011Q00001AbCdEfAA",
+   "incident_id": "BM-014",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "00T1Q00001GhIjKlAA",
+   "incident_id": "BM-015",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [
+    "unrelated_missed_event"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "00T1Q00001MnOpQrAA",
+   "incident_id": "BM-016",
+   "fault": "CDC_FIELD_EXCLUDED",
+   "confounders": [
+    "unrelated_missed_event"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "00T1Q00001StUvWxAA",
+   "incident_id": "BM-017",
+   "fault": "CDC_FIELD_EXCLUDED",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "00U1Q00001YzAbCdAA",
+   "incident_id": "BM-018",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [
+    "unrelated_missed_event"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "00U1Q00001EfGhIjAA",
+   "incident_id": "BM-019",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [
+    "unrelated_missed_event"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "00U1Q00001KlMnOpAA",
+   "incident_id": "BM-020",
+   "fault": "FLS_STRIPPED",
+   "confounders": [
+    "unrelated_missed_event",
+    "apex_conditional_dormant"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0071Q00001QrStUvAA",
+   "incident_id": "BM-021",
+   "fault": "FLS_STRIPPED",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0071Q00001WxYzAbAA",
+   "incident_id": "BM-022",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0071Q00001CdEfGhAA",
+   "incident_id": "BM-023",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [
+    "unrelated_missed_event",
+    "apex_conditional_dormant"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0071Q00001IjKlMnAA",
+   "incident_id": "BM-024",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [
+    "unrelated_missed_event",
+    "apex_conditional_dormant"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0071Q00001OpQrStAA",
+   "incident_id": "BM-025",
+   "fault": "DELIVERY_GAP",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "00K1Q00001UvWxYzAA",
+   "incident_id": "BM-026",
+   "fault": "FLS_STRIPPED",
+   "confounders": [
+    "apex_conditional_dormant"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "00K1Q00001AbCdEfAA",
+   "incident_id": "BM-027",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "00K1Q00001GhIjKlAA",
+   "incident_id": "BM-028",
+   "fault": "CDC_FIELD_EXCLUDED",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0PO1Q00001MnOpQrAA",
+   "incident_id": "BM-029",
+   "fault": "FLS_STRIPPED",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0PO1Q00001StUvWxAA",
+   "incident_id": "BM-030",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [
+    "unrelated_missed_event"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0B1Q00001YzAbCdAA",
+   "incident_id": "BM-031",
+   "fault": "FLS_STRIPPED",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0B1Q00001EfGhIjAA",
+   "incident_id": "BM-032",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0B1Q00001KlMnOpAA",
+   "incident_id": "BM-033",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [
+    "apex_conditional_dormant"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0B1Q00001QrStUvAA",
+   "incident_id": "BM-034",
+   "fault": "CDC_FIELD_EXCLUDED",
+   "confounders": [
+    "apex_conditional_dormant"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0B1Q00001WxYzAbAA",
+   "incident_id": "BM-035",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [
+    "unrelated_missed_event",
+    "apex_conditional_dormant"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0B1Q00001CdEfGhAA",
+   "incident_id": "BM-036",
+   "fault": "FLS_STRIPPED",
+   "confounders": [
+    "unrelated_missed_event"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0B1Q00001IjKlMnAA",
+   "incident_id": "BM-037",
+   "fault": "DELIVERY_GAP",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0C1Q00001OpQrStAA",
+   "incident_id": "BM-038",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0C1Q00001UvWxYzAA",
+   "incident_id": "BM-039",
+   "fault": "FLS_STRIPPED",
+   "confounders": [
+    "apex_conditional_dormant"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0C1Q00001AbCdEfAA",
+   "incident_id": "BM-040",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0C1Q00001GhIjKlAA",
+   "incident_id": "BM-041",
+   "fault": "DELIVERY_GAP",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0D1Q00001MnOpQrAA",
+   "incident_id": "BM-042",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [
+    "unrelated_missed_event"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0D1Q00001StUvWxAA",
+   "incident_id": "BM-043",
+   "fault": "FLS_STRIPPED",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0D1Q00001YzAbCdAA",
+   "incident_id": "BM-044",
+   "fault": "DELIVERY_GAP",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0D1Q00001EfGhIjAA",
+   "incident_id": "BM-045",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0B1Q00001OpQrStAA",
+   "incident_id": "BM-046",
+   "fault": "DELIVERY_GAP",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "0031Q00001UvWxYzAA",
+   "incident_id": "BM-047",
+   "fault": "DELIVERY_GAP",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "00K1Q00001MnOpQrAA",
+   "incident_id": "BM-048",
+   "fault": "DUPLICATE_DOWNSTREAM",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0C1Q00001StUvWxAA",
+   "incident_id": "BM-049",
+   "fault": "DUPLICATE_DOWNSTREAM",
+   "confounders": [
+    "unrelated_missed_event"
+   ],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0B1Q00001UvWxYzAA",
+   "incident_id": "BM-050",
+   "fault": "DUPLICATE_DOWNSTREAM",
+   "confounders": [],
+   "source": "benchmark"
+  },
+  {
+   "sf_record_id": "a0B1Q000002StUvWxAA",
+   "fault": "CDC_FIELD_EXCLUDED",
+   "confounders": [],
+   "source": "demo"
+  },
+  {
+   "sf_record_id": "a0B1Q000002YzAbCdAA",
+   "fault": "APEX_SUPPRESSION",
+   "confounders": [],
+   "source": "demo"
+  },
+  {
+   "sf_record_id": "a0B1Q000002EfGhIjAA",
+   "fault": "DELIVERY_GAP",
+   "confounders": [
+    "apex_conditional_dormant"
+   ],
+   "source": "demo"
+  },
+  {
+   "sf_record_id": "a0C1Q000003KlMnOpAA",
+   "fault": "DATAWAVE_TRANSFORM_ERROR",
+   "confounders": [
+    "unrelated_missed_event"
+   ],
+   "source": "demo"
+  },
+  {
+   "sf_record_id": "a0C1Q000003QrStUvAA",
+   "fault": "DUPLICATE_DOWNSTREAM",
+   "confounders": [],
+   "source": "demo"
+  },
+  {
+   "sf_record_id": "a0D1Q000004VwXyZaAA",
+   "fault": "NO_FAULT_FOUND",
+   "confounders": [],
+   "source": "demo"
+  },
+  {
+   "sf_record_id": "a0D1Q000004BcDeFgAA",
+   "fault": "DOWNSTREAM_OVERWRITE",
+   "confounders": [],
+   "source": "demo"
+  }
+ ]
+}

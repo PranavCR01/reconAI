@@ -118,13 +118,19 @@ Results are committed in `evals/results/` with a report; the `/benchmark` page r
 | Planted wrong root-cause category caught | <!--m:offline_claude/critic_planted.by_draft.wrong_category.caught:frac-->50/50 |
 | Clean explanations wrongly rejected | <!--m:offline_claude/critic_planted.by_draft.clean.false_rejection:frac-->0/50 |
 | Agreement with the labels' "needs review" flag (recall) | <!--m:offline_claude/metrics.routing.review_vs_label.recall:frac-->0/22 |
+| **Live** (Sonnet 4.6, 3 runs): model critic catches a planted unsupported mechanism | <!--m:live_claude/critic_planted.by_draft.unsupported_mechanism.caught:frac-->25/25 |
+| **Live**: correct drafts the critic wrongly rejects | <!--m:live_claude/critic_planted.by_draft.clean.false_rejection:frac-->2/25 |
+| **Live**: explanations accepted / grounded when accepted | <!--m:live_claude/metrics.explanation.judge_decisions.accept:num-->49 of 50 / <!--m:live_claude/metrics.explanation.grounded_when_accepted:frac-->49/49 |
+| **Live**: same review decision across 3 runs | <!--m:live_claude/metrics.consistency.review_decision:frac-->46/50 |
+| **Live**: cost per incident, median / p95 | <!--m:live_claude/metrics.cost_latency.cost_usd_median:usd-->$0.030 / <!--m:live_claude/metrics.cost_latency.cost_usd_p95:usd-->$0.061 |
+| **Live**: end-to-end per incident, median / p95 (ms) | <!--m:live_claude/metrics.cost_latency.e2e_latency_ms_median:num-->25448 / <!--m:live_claude/metrics.cost_latency.e2e_latency_ms_p95:num-->51435 |
 
 How to read this:
 
 - The simulated world contains each labeled fault by construction, so graph accuracy shows the logic finds the declared fault through noise. It is **not** a real-world accuracy estimate.
 - The ablation is the informative result: check order matters once noise is present.
 - The review labels assume ambiguity the simulated world doesn't reproduce, so agreement with them is low; this is reported, not tuned away.
-- Explanation quality, the model critic, consistency across runs, cost and latency come from a live run. No live results are committed yet.
+- Live rows come from `evals/results/live_claude.json` (real models, fake embeddings, so retrieval quality is not measured).
 
 ---
 

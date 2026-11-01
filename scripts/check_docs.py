@@ -4,7 +4,7 @@
        <!--m:offline_claude/metrics.accuracy.overall:pct-->100%
    i.e. results file stem / dotted path : format, immediately followed by the value.
    The check fails if the value differs from the committed results file.
-   Formats: pct -> "100%", frac -> "50/50", ci -> "93-100%", num -> str(value).
+   Formats: pct -> "100%", frac -> "50/50", ci -> "93-100%", num -> str(value), usd -> "$0.030".
 2. Stale claims: banned phrases for features or numbers that don't exist.
 3. Links: relative markdown links and backticked repo paths must exist.
 
@@ -34,7 +34,7 @@ BANNED = [
     (re.compile(r"under 15 seconds", re.I), "retired latency claim; cite evals/results"),
 ]
 
-TAG = re.compile(r'<!--m:([\w-]+)/([\w.]+):(pct|frac|ci|num)-->([^\s|<),;"]*)')
+TAG = re.compile(r'<!--m:([\w-]+)/([\w.]+):(pct|frac|ci|num|usd)-->([^\s|<),;"]*)')
 MD_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 CODE_PATH = re.compile(r"`((?:backend|frontend|docs|data|scripts|evals)/[\w./-]+\.\w+)`")
 
@@ -59,6 +59,8 @@ def render(value, fmt: str) -> str:
     if fmt == "ci":
         lo, hi = value["ci95"]
         return f"{round(lo * 100)}-{round(hi * 100)}%"
+    if fmt == "usd":
+        return f"${value:.3f}"
     return str(value)
 
 

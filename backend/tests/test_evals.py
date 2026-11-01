@@ -302,3 +302,9 @@ def test_published_frontend_results_are_current():
     from backend.evals.publish import PUBLISHED, render
 
     assert PUBLISHED.read_text() == render(), "run `python -m backend.evals.publish` and commit the result"
+
+
+def test_concurrent_eval_matches_sequential():
+    a = run_eval("offline", "claude", limit=12, ablations=False, workers=1)
+    b = run_eval("offline", "claude", limit=12, ablations=False, workers=4)
+    assert _stable(json.loads(json.dumps(a))) == _stable(json.loads(json.dumps(b)))

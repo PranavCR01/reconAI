@@ -133,48 +133,70 @@ def _record(inc: dict, run: int, result: dict, final: dict | None, env) -> dict:
     return rec
 
 
-def _analyze_all(incidents, config, env, runs: int, progress) -> tuple[list[dict], dict[str, dict]]:
+def _analyze_all(incidents, config, env, runs: int, progress, workers: int = 1) -> tuple[list[dict], dict[str, dict]]:
+    """Analyze every (run, incident) pair, `workers` at a time. Each task gets its own capturing
+    wrapper around the shared compiled graph; results are returned in (run, incident) order."""
     from backend.graph.recon_graph import build_graph
     from backend.main import _analyze_row
 
-    graph = _CapturingGraph(build_graph(config, env.storage))
+    compiled = build_graph(config, env.storage)
+    jobs = [(run, i, inc) for run in range(1, runs + 1) for i, inc in enumerate(incidents)]
+    done = 0
+
+    async def one(run, i, inc, semaphore):
+        nonlocal done
+        async with semaphore:
+            graph = _CapturingGraph(compiled)
+            result = await _analyze_row(benchmark_row(inc), config, graph, env.storage,
+                                        bypass_cache=True, session_id=f"eval-run-{run}")
+            done += 1
+            progress(f"{done}/{len(jobs)} run {run} {inc['id']}")
+            return run, i, inc, result, graph.last
+
+    async def all_jobs():
+        semaphore = asyncio.Semaphore(max(1, workers))
+        return await asyncio.gather(*(one(run, i, inc, semaphore) for run, i, inc in jobs))
+
     records, finals = [], {}
-    for run in range(1, runs + 1):
-        for i, inc in enumerate(incidents, start=1):
-            result = asyncio.run(_analyze_row(benchmark_row(inc), config, graph, env.storage,
-                                              bypass_cache=True, session_id=f"eval-run-{run}"))
-            records.append(_record(inc, run, result, graph.last, env))
-            if run == 1 and graph.last is not None:
-                finals[inc["id"]] = graph.last
-            progress(f"run {run}/{runs} incident {i}/{len(incidents)} {inc['id']}")
+    for run, i, inc, result, final in sorted(asyncio.run(all_jobs()), key=lambda r: (r[0], r[1])):
+        records.append(_record(inc, run, result, final, env))
+        if run == 1 and final is not None:
+            finals[inc["id"]] = final
     return records, finals
 
 
 # ---------------------------------------------------------------------------
 # Critic: planted-claim set
 # ---------------------------------------------------------------------------
-def _planted(finals: dict[str, dict], config, limit: int | None, progress) -> dict:
+def _planted(finals: dict[str, dict], config, limit: int | None, progress, workers: int = 1) -> dict:
     from backend.agents.explanation import run_critic
     from backend.evals import planted as P
 
     per_incident: dict[str, dict] = {}
     outcomes: dict[str, list[dict]] = {k: [] for k in ("clean", *P.DEFECTS)}
     ids = [i for i, f in finals.items() if P.applicable(f)][:limit]
-    for n, incident_id in enumerate(ids, start=1):
-        state = finals[incident_id]
-        drafts = P.drafts(state)
+    jobs = []
+    for incident_id in ids:
+        drafts = P.drafts(finals[incident_id])
         per_incident[incident_id] = drafts
-        for kind, claims in drafts.items():
-            if claims is None:
-                continue
-            out = run_critic(P.critic_state(state, claims), config)
-            verdicts = {v["claim_id"]: v for v in out["critic_verdicts"]}
-            rejected = [v for v in verdicts.values() if v["verdict"] != "supported"]
-            outcomes[kind].append({"incident": incident_id, "critic_status": out["critic_status"],
-                                   "rejected": bool(rejected) or out["critic_status"] != "ok",
-                                   "stages": sorted({v.get("stage") for v in rejected if v.get("stage")}),
-                                   "cost_usd": _cost(out.get("llm_calls") or [])})
-        progress(f"planted {n}/{len(ids)} {incident_id}")
+        jobs += [(incident_id, kind, claims) for kind, claims in drafts.items() if claims is not None]
+
+    def review(job):
+        incident_id, kind, claims = job
+        out = run_critic(P.critic_state(finals[incident_id], claims), config)
+        rejected = [v for v in out["critic_verdicts"] if v["verdict"] != "supported"]
+        return kind, {"incident": incident_id, "critic_status": out["critic_status"],
+                      "rejected": bool(rejected) or out["critic_status"] != "ok",
+                      "stages": sorted({v.get("stage") for v in rejected if v.get("stage")}),
+                      "cost_usd": _cost(out.get("llm_calls") or [])}
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        for n, (kind, outcome) in enumerate(pool.map(review, jobs), start=1):  # map keeps job order
+            outcomes[kind].append(outcome)
+            if n % 25 == 0 or n == len(jobs):
+                progress(f"planted {n}/{len(jobs)} drafts")
 
     summary = {}
     for kind, items in outcomes.items():
@@ -443,7 +465,7 @@ def _git_sha() -> str | None:
 
 def run_eval(mode: str = "offline", config_key: str = "claude", runs: int = 1, limit: int | None = None,
              planted_limit: int | None = None, yes: bool = False, ablations: bool | None = None,
-             progress=lambda msg: None) -> dict:
+             progress=lambda msg: None, workers: int | None = None) -> dict:
     from backend.config import CONFIGS, PRICING_PER_MTOK
     from backend.graph.hypotheses import GRAPH_VERSION
     from backend.prompts import recorded_versions
@@ -452,10 +474,12 @@ def run_eval(mode: str = "offline", config_key: str = "claude", runs: int = 1, l
     incidents = load_incidents()[:limit]
     config = CONFIGS[config_key]
     ablations = (mode == "offline") if ablations is None else ablations
+    # Offline is CPU-bound and must be byte-for-byte reproducible: one at a time. Live calls mostly wait.
+    workers = workers or (1 if mode == "offline" else 6)
     with environment(mode, config_key, yes) as env:
         asyncio.run(seed_artifacts(env.storage))
-        records, finals = _analyze_all(incidents, config, env, runs, progress)
-        planted = _planted(finals, config, planted_limit, progress)
+        records, finals = _analyze_all(incidents, config, env, runs, progress, workers)
+        planted = _planted(finals, config, planted_limit, progress, workers)
         ablation_results = _ablations(incidents, config, env) if ablations else None
         notes = env.notes
         real_embeddings = env.real_embeddings
@@ -506,6 +530,7 @@ def main(argv=None) -> int:
     p.add_argument("--planted-limit", type=int, default=None, help="planted-claim drafts for the first N incidents")
     p.add_argument("--out", type=Path, default=RESULTS_DIR)
     p.add_argument("--yes", action="store_true", help="confirm spending money on a live run")
+    p.add_argument("--workers", type=int, default=None, help="concurrent analyses (default 1 offline, 6 live)")
     args = p.parse_args(argv)
 
     n = len(load_incidents()[:args.limit])
@@ -514,6 +539,7 @@ def main(argv=None) -> int:
         print(f"Estimated cost: ${estimate} (padded 1.5x; unknown model price -> None)", file=sys.stderr)
     try:
         results = run_eval(args.mode, args.config, args.runs, args.limit, args.planted_limit, args.yes,
+                           workers=args.workers,
                            progress=lambda m: print(m, file=sys.stderr))
     except LiveRunRefused as exc:
         print(f"Refused: {exc}", file=sys.stderr)

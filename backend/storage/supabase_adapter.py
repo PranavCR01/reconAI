@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -25,6 +26,14 @@ def _dump(model: Any) -> dict:
 class SupabaseAdapter(StorageAdapter):
     def __init__(self, client: Client) -> None:
         self._client = client
+        # The supabase/postgrest client shares one HTTP/2 connection. Rows are analyzed
+        # concurrently, so every database call goes through this lock: calls take
+        # milliseconds, while a row's analysis takes tens of seconds.
+        self._lock = threading.Lock()
+
+    def _locked(self, fn):
+        with self._lock:
+            return fn()
 
     @classmethod
     def from_env(cls) -> SupabaseAdapter:
@@ -33,7 +42,7 @@ class SupabaseAdapter(StorageAdapter):
         return cls(create_client(url, key))
 
     async def _run(self, fn):
-        return await asyncio.to_thread(fn)
+        return await asyncio.to_thread(self._locked, fn)
 
     async def missing_columns(self, required: dict[str, list[str]]) -> list[str]:
         """Return 'table.column' for each required column the database rejects."""
@@ -246,10 +255,10 @@ class SupabaseAdapter(StorageAdapter):
         return [ReconArtifact.model_validate(r) for r in result.data]
 
     def search_artifacts_sync(self, embedding: list[float], limit: int = 5) -> list[dict]:
-        result = self._client.rpc(
+        result = self._locked(lambda: self._client.rpc(
             "match_artifacts",
             {"query_embedding": embedding, "match_threshold": 0.4, "match_count": limit},
-        ).execute()
+        ).execute())
         return result.data
 
     # -----------------------------------------------------------------------

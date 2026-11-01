@@ -107,6 +107,7 @@ BENCHMARKS_PER_IP_PER_HOUR = 3
 _HOUR, _DAY = 3600, 86400
 # Rows analyzed at once per stream. Each row is mostly waiting on model calls.
 ROW_CONCURRENCY = max(1, int(os.environ.get("ROW_CONCURRENCY", "4") or 4))
+SSE_KEEPALIVE_S = 15.0
 
 _rate_events: dict[str, deque] = defaultdict(deque)  # key -> deque[(timestamp, amount)]
 
@@ -733,36 +734,44 @@ async def stream_run_analysis(
                     return i, row, None, exc
 
         tasks = [asyncio.create_task(_one(i, row)) for i, row in enumerate(rows)]
+        pending = set(tasks)
         try:
-            for finished in asyncio.as_completed(tasks):
-                i, row, result, exc = await finished
-                if exc is not None:
-                    payload = {"row_index": i, "row_id": str(row.id), "error": str(exc)}
-                    yield f"event: error\ndata: {json.dumps(payload)}\n\n"
+            while pending:
+                finished, pending = await asyncio.wait(pending, timeout=SSE_KEEPALIVE_S,
+                                                       return_when=asyncio.FIRST_COMPLETED)
+                if not finished:
+                    # Rows take tens of seconds; proxies drop connections that stay silent.
+                    yield ": keep-alive\n\n"
                     continue
-                if result["error"]:
-                    payload = {"row_index": i, "row_id": str(row.id), "error": result["error"]}
-                    yield f"event: error\ndata: {json.dumps(payload)}\n\n"
-                    continue
-                incident: RCAIncident = result["incident"]
-                if cutoff_dt and incident.created_at and incident.created_at <= cutoff_dt:
-                    continue
-                payload = {
-                    "row_index": i,
-                    "row_id": str(row.id),
-                    "incident_id": result["incident_id"],
-                    "cached": result["cached"],
-                    "severity": row.severity.value if row.severity else None,
-                    "sf_object": row.sf_object,
-                    "sf_field": row.sf_field,
-                    "root_cause_summary": incident.root_cause_summary,
-                    "confidence": incident.confidence,
-                    "requires_human_review": incident.requires_human_review,
-                    "jira_summary": incident.jira_summary,
-                    "llm_model": incident.llm_model,
-                }
-                yield f"id: {result['incident_id']}\n"
-                yield f"event: incident\ndata: {json.dumps(payload)}\n\n"
+                for task in sorted(finished, key=lambda t: t.result()[0]):
+                    i, row, result, exc = task.result()
+                    failure = str(exc) if exc is not None else result["error"]
+                    if failure:
+                        # One row failing is not a stream failure: "row_error", not "error" (which
+                        # EventSource clients treat like a dropped connection).
+                        _report_row_failure(run_id, i, row, failure, exc)
+                        payload = {"row_index": i, "row_id": str(row.id), "error": failure[:500]}
+                        yield f"event: row_error\ndata: {json.dumps(payload)}\n\n"
+                        continue
+                    incident: RCAIncident = result["incident"]
+                    if cutoff_dt and incident.created_at and incident.created_at <= cutoff_dt:
+                        continue
+                    payload = {
+                        "row_index": i,
+                        "row_id": str(row.id),
+                        "incident_id": result["incident_id"],
+                        "cached": result["cached"],
+                        "severity": row.severity.value if row.severity else None,
+                        "sf_object": row.sf_object,
+                        "sf_field": row.sf_field,
+                        "root_cause_summary": incident.root_cause_summary,
+                        "confidence": incident.confidence,
+                        "requires_human_review": incident.requires_human_review,
+                        "jira_summary": incident.jira_summary,
+                        "llm_model": incident.llm_model,
+                    }
+                    yield f"id: {result['incident_id']}\n"
+                    yield f"event: incident\ndata: {json.dumps(payload)}\n\n"
         finally:
             for task in tasks:  # client went away: stop waiting on the rest
                 task.cancel()
@@ -778,6 +787,15 @@ async def stream_run_analysis(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+def _report_row_failure(run_id, index, row, failure: str, exc: Exception | None) -> None:
+    """Row failures used to vanish; log them and send them to Sentry so they can be diagnosed."""
+    print(f"ERROR: run {run_id} row {index} ({row.sf_object}.{row.sf_field}) failed: {failure[:500]}", flush=True)
+    if exc is not None:
+        sentry_sdk.capture_exception(exc)
+    else:
+        sentry_sdk.capture_message(f"row analysis failed: {failure[:300]}", level="error")
 
 
 def _row_fields(row) -> dict:

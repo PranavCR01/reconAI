@@ -124,6 +124,8 @@ class RCAIncident(BaseModel):
     cost_usd: Optional[float] = None            # None when any call's model has no known price
     cost_warnings: list[str] = Field(default_factory=list)
     trace: list[dict] = Field(default_factory=list)
+    # Set when similar-incident retrieval failed (issue #15); None means it ran (possibly with 0 results).
+    retrieval_error: Optional[str] = None
     created_at: Optional[datetime] = None
 
 

@@ -30,7 +30,8 @@ def _detail(node: str, state: dict, out: dict) -> dict:
         return {"tools": [{"hypothesis": e.get("hypothesis_key"), "tool": e.get("tool"), "outcome": e.get("outcome")}
                           for e in out.get("evidence_collected") or []]}
     if node == "rag_retrieval":
-        return {"candidates": len(out.get("rag_candidates") or []), "reranked": len(out.get("reranked_candidates") or [])}
+        return {"candidates": len(out.get("rag_candidates") or []), "reranked": len(out.get("reranked_candidates") or []),
+                "error": out.get("retrieval_error")}
     if node == "proposer":
         return {"status": out.get("synthesis_status"), "claims": len((out.get("proposal") or {}).get("claims") or []),
                 "round": out.get("proposal_count")}
@@ -78,9 +79,12 @@ def build_graph(config: AgentConfig, storage):
         return check_node_output("evidence", run_evidence(state))
 
     def _rag_retrieval(state: ReconState) -> dict:
-        candidates = retrieve_similar_artifacts(state, storage)
+        try:
+            candidates, error = retrieve_similar_artifacts(state, storage), None
+        except Exception as exc:
+            candidates, error = [], f"{type(exc).__name__}: {exc}"[:300]
         reranked, llm_call = rerank_candidates(candidates, state, config)
-        out: dict = {"rag_candidates": candidates, "reranked_candidates": reranked}
+        out: dict = {"rag_candidates": candidates, "reranked_candidates": reranked, "retrieval_error": error}
         if llm_call:
             # Non-negotiable #4: append the reranker call; the reducer keeps earlier entries.
             out["llm_calls"] = [llm_call]

@@ -296,6 +296,12 @@ class SupabaseAdapter(StorageAdapter):
         )
         return result.data
 
+    async def count_artifacts(self) -> int:
+        result = await self._run(
+            lambda: self._client.table("recon_artifacts").select("id", count="exact").limit(1).execute()
+        )
+        return result.count or 0
+
     async def get_total_runs_count(self) -> int:
         result = await self._run(
             lambda: self._client.table("recon_runs").select("id", count="exact").execute()

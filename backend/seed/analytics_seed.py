@@ -47,10 +47,34 @@ RC_WEIGHTS = [r[1] for r in ROOT_CAUSES]
 FIX_TYPES = ["fls_permission_grant", "dataweave_mapping_fix", "cdc_channel_config", "delivery_gap", "other"]
 FIX_WEIGHTS = [0.34, 0.22, 0.18, 0.14, 0.12]
 
-ORIGIN = datetime(2026, 4, 6, 0, 0, 0, tzinfo=timezone.utc)
-END = datetime(2026, 5, 4, 23, 59, 59, tzinfo=timezone.utc)
+# The data below was authored for this 29-day window; seeding shifts everything (runs,
+# incidents, deployments) so the window ends 3 days before the seed runs, which keeps it
+# inside the Analytics page's default 30-day range whenever it is (re)seeded.
+BASE_ORIGIN = datetime(2026, 4, 6, 0, 0, 0, tzinfo=timezone.utc)
+SPAN_DAYS = 28
+END_OFFSET_DAYS = 3
 
-# Days that should spike (0-indexed from ORIGIN)
+
+def seed_window(now: datetime) -> tuple[datetime, datetime]:
+    """(origin, end) for a seed run at `now`: end is 23:59:59 three days ago, origin 28 days before."""
+    end = (now - timedelta(days=END_OFFSET_DAYS)).replace(hour=23, minute=59, second=59, microsecond=0)
+    origin = (end - timedelta(days=SPAN_DAYS)).replace(hour=0, minute=0, second=0)
+    return origin, end
+
+
+def shifted_deployments(origin: datetime) -> list[dict]:
+    shift = origin - BASE_ORIGIN
+    out = []
+    for dep in DEPLOYMENTS:
+        when = datetime.fromisoformat(dep["deployed_at"]) + shift
+        name = dep["deploy_name"]
+        if name.startswith("db2-DDL-"):
+            name = f"db2-DDL-{when.date().isoformat()}"
+        out.append({**dep, "deploy_name": name, "deployed_at": when.isoformat()})
+    return out
+
+
+# Days that should spike (0-indexed from the window origin)
 SPIKE_DAYS = {16, 20, 23}  # Apr 22, Apr 26, Apr 29
 
 DEPLOYMENTS = [
@@ -78,10 +102,11 @@ def _gauss(mu: float, sigma: float, lo: float, hi: float) -> float:
     return _clamp(RNG.gauss(mu, sigma), lo, hi)
 
 
-def main():
-    url = os.environ["SUPABASE_URL"]
-    key = os.environ["SUPABASE_SERVICE_KEY"]
-    client = create_client(url, key)
+def main(client=None, now: datetime | None = None):
+    if client is None:
+        client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
+    now = now or datetime.now(timezone.utc)
+    ORIGIN, END = seed_window(now)
 
     # Idempotency check
     count_result = client.table("recon_runs").select("id", count="exact").execute()
@@ -212,7 +237,7 @@ def main():
             "fix_verified": True,
             "ai_was_correct": ai_correct,
             "resolved_by": "recon-analyst",
-            "resolved_at": (datetime.now(timezone.utc) - timedelta(days=RNG.randint(0, 25))).isoformat(),
+            "resolved_at": (END - timedelta(days=RNG.randint(0, 25))).isoformat(),
         })
 
     for batch in _chunk(resolutions, 50):
@@ -220,7 +245,7 @@ def main():
     print(f"  Inserted {len(resolutions)} resolutions")
 
     # --- deployment_events ---
-    for dep in DEPLOYMENTS:
+    for dep in shifted_deployments(ORIGIN):
         client.table("deployment_events").insert({
             "id": str(uuid.uuid4()),
             "deploy_name": dep["deploy_name"],

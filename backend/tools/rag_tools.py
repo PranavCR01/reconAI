@@ -74,7 +74,7 @@ def embed_text(text: str) -> list[float]:
 
 
 def retrieve_similar_artifacts(state: dict, storage) -> list[dict]:
-    """Embed the current row context and call match_artifacts RPC synchronously."""
+    """Embed the current row context and call match_artifacts RPC synchronously. Raises on failure."""
     row = state.get("recon_row", {})
     query = " ".join(filter(None, [
         row.get("sf_object"),
@@ -86,11 +86,9 @@ def retrieve_similar_artifacts(state: dict, storage) -> list[dict]:
     ])).strip()
     if not query:
         return []
-    try:
-        embedding = embed_text(query)
-        return storage.search_artifacts_sync(embedding, limit=8)
-    except Exception:
-        return []
+    # Errors propagate: the graph records them as a retrieval error, distinct from zero results.
+    embedding = embed_text(query)
+    return storage.search_artifacts_sync(embedding, limit=8)
 
 
 def rerank_candidates(

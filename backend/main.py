@@ -64,6 +64,24 @@ REQUIRED_COLUMNS["rca_incidents"] += ["hypothesis_verdicts", "graph_status", "ro
 _GRAPH_FIELDS = ("hypothesis_verdicts", "graph_status", "root_cause_category", "contributing_factors", "graph_version")
 REQUIRED_COLUMNS["rca_incidents"] += ["claims", "judge_decision", "revision_count", "prompt_versions"]
 REQUIRED_COLUMNS["rca_incidents"] += ["e2e_latency_ms", "cost_usd", "cost_warnings", "trace"]
+REQUIRED_COLUMNS["rca_incidents"] += ["retrieval_error"]
+
+# Review reasons that mean a dependency failed, not that the case is hard: never cache these.
+_OUTAGE_REASONS = {"llm_unavailable", "critic_unavailable", "proposer_invalid_output", "missing_evidence"}
+
+
+def degraded_because(final: dict, reasons: list[str]) -> list[str]:
+    """Why a fresh result is degraded (empty = healthy). Degraded results are not cached, so the
+    same rows are analyzed again once the dependency recovers."""
+    why = sorted(set(reasons) & _OUTAGE_REASONS)
+    if final.get("retrieval_error"):
+        why.append("retrieval_error")
+    if any(e.get("outcome") == "error" for e in final.get("evidence_collected") or []):
+        why.append("tool_error")
+    # Invalid output that a retry fixed is not an outage; an API error on any call is.
+    if any(c.get("error") and not str(c["error"]).startswith("invalid output") for c in final.get("llm_calls") or []):
+        why.append("llm_call_error")
+    return sorted(set(why))
 
 
 def _explanation_fields(rca: dict) -> dict:
@@ -91,11 +109,29 @@ _HOUR, _DAY = 3600, 86400
 _rate_events: dict[str, deque] = defaultdict(deque)  # key -> deque[(timestamp, amount)]
 
 
-def _client_ip(request: Request) -> str:
-    fwd = request.headers.get("x-forwarded-for")
+def client_ip(headers, peer: str | None) -> str:
+    """Client IP for rate limiting.
+
+    The leftmost X-Forwarded-For entry is whatever the client sent, so it can be spoofed.
+    Each proxy appends the address it received the request from, so the trustworthy entry
+    is the one added by the first proxy we control: counting from the right, skip
+    TRUSTED_PROXY_HOPS - 1 entries (default 1 hop: Render's load balancer -> rightmost).
+    If the platform sets a header the client cannot forge, name it in TRUSTED_IP_HEADER.
+    Verify against the deployment's real headers before relying on per-IP limits; the
+    global daily caps are the hard guard either way.
+    """
+    trusted = os.environ.get("TRUSTED_IP_HEADER", "").strip().lower()
+    if trusted and headers.get(trusted):
+        return headers.get(trusted).strip()
+    fwd = [p.strip() for p in (headers.get("x-forwarded-for") or "").split(",") if p.strip()]
     if fwd:
-        return fwd.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+        hops = max(1, int(os.environ.get("TRUSTED_PROXY_HOPS", "1") or 1))
+        return fwd[-hops] if len(fwd) >= hops else fwd[0]
+    return peer or "unknown"
+
+
+def _client_ip(request: Request) -> str:
+    return client_ip(request.headers, request.client.host if request.client else None)
 
 
 def _retry_after(key: str, limit: int, window_s: int, amount: int = 1) -> int:
@@ -136,11 +172,20 @@ async def lifespan(app: FastAPI):
         msg = f"Supabase schema is missing columns {app.state.missing_columns}; apply docs/sql/ migrations"
         print(f"ERROR: {msg}", flush=True)
         sentry_sdk.capture_message(msg, level="error")
+    from backend.seed.fsc_incidents import seed_artifacts
     try:
-        from backend.seed.fsc_incidents import seed_artifacts
         await seed_artifacts(_storage)
-    except Exception:
-        pass
+    except Exception as exc:
+        print(f"ERROR: knowledge-base seeding failed: {type(exc).__name__}: {exc}", flush=True)
+        sentry_sdk.capture_exception(exc)
+    try:
+        app.state.kb_artifacts = await _storage.count_artifacts()
+    except Exception as exc:
+        app.state.kb_artifacts = None
+        sentry_sdk.capture_exception(exc)
+    if not app.state.kb_artifacts:
+        print("ERROR: knowledge base is empty; incidents will run without past-incident context", flush=True)
+        sentry_sdk.capture_message("knowledge base is empty after startup", level="error")
     yield
 
 
@@ -155,8 +200,9 @@ app.add_middleware(
         "http://localhost:5176",
         "http://localhost:5199",
         "https://recon-ai-iota.vercel.app",
-        "https://*.vercel.app",
     ],
+    # Starlette does not expand "*" inside allow_origins; preview deploys need a regex.
+    allow_origin_regex=r"https://[a-z0-9-]+\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -378,12 +424,19 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
         cost_warnings=cost_warnings,
         trace=final.get("trace") or [],
         e2e_latency_ms=int((time.monotonic() - t0) * 1000),
+        retrieval_error=final.get("retrieval_error"),
     )
 
     try:
         incident_id = await _save_incident_and_evidence(storage, incident, evidence)
     except Exception as exc:
         return {"incident_id": None, "incident": None, "cached": False, "human_review": bool(reasons), "error": f"save incident: {exc}"}
+
+    degraded = degraded_because(final, reasons)
+    if degraded:
+        # Don't pin an outage for the cache's lifetime: the next run of this row re-analyzes.
+        return {"incident_id": incident_id, "incident": incident, "cached": False, "human_review": bool(reasons),
+                "error": None, "degraded": degraded}
 
     await write_cache(storage, cache_key, {
         **rca,
@@ -410,14 +463,27 @@ async def _analyze_row(row: ReconRow, config, graph, storage, bypass_cache: bool
 # ---------------------------------------------------------------------------
 
 @app.get("/api/v1/health")
-async def health():
+async def health(request: Request):
+    """ok | degraded. Degraded = the app answers but the database is unreachable or the
+    knowledge base is empty. (A down app doesn't answer at all.)"""
     config = get_config()
+    db_ok, kb = True, None
+    try:
+        kb = await _storage.count_artifacts()
+    except Exception:
+        db_ok = False
+    problems = ([] if db_ok else ["database unreachable"]) + (["knowledge base empty"] if db_ok and not kb else [])
+    missing = getattr(request.app.state, "missing_columns", None)
+    if missing:
+        problems.append("schema migrations missing")
     return {
-        "status": "ok",
+        "status": "degraded" if problems else "ok",
+        "problems": problems,
         "version": "0.1.0",
         "llm_model": config.synthesis_llm,
         "vector_store": "supabase-pgvector",
-        "db": "supabase",
+        "db": "ok" if db_ok else "unreachable",
+        "kb_artifacts": kb,
     }
 
 

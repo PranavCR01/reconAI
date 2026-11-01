@@ -12,7 +12,7 @@ reasons can only be added, never removed.
 from __future__ import annotations
 
 import operator
-from typing import Annotated, TypedDict
+from typing import Optional, Annotated, TypedDict
 
 
 class ReconState(TypedDict, total=False):
@@ -36,6 +36,7 @@ class ReconState(TypedDict, total=False):
     evidence_retry_count: int
     # retrieval
     rag_candidates: list[dict]
+    retrieval_error: Optional[str]  # set when retrieval failed (distinct from no results)
     reranked_candidates: list[dict]
     # proposer
     proposal: dict | None
@@ -66,7 +67,7 @@ OWNERS: dict[str, frozenset[str]] = {
         "hypothesis_verdicts", "graph_status", "root_cause_category", "contributing_factors", "graph_version",
     }),
     "evidence": frozenset({"evidence_collected", "evidence_retry_count"}),
-    "rag_retrieval": frozenset({"rag_candidates", "reranked_candidates"}),
+    "rag_retrieval": frozenset({"rag_candidates", "reranked_candidates", "retrieval_error"}),
     "proposer": frozenset({"proposal", "proposal_count", "synthesis_status"}),
     "critic": frozenset({"critic_verdicts", "critic_status"}),
     "judge": frozenset({"judge_decision", "rca_output", "root_cause", "confidence"}),
@@ -110,6 +111,7 @@ def initial_state(recon_row: dict) -> ReconState:
         "evidence_collected": [],
         "evidence_retry_count": 0,
         "rag_candidates": [],
+        "retrieval_error": None,
         "reranked_candidates": [],
         "proposal": None,
         "proposal_count": 0,

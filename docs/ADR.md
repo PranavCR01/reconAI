@@ -13,7 +13,7 @@ ingestion ─► hypothesis ⇄ evidence ─► retrieval ─► proposer ─►
                                                                           escalate)
 ```
 
-`backend/graph/recon_graph.py` wires the nodes. Every node is wrapped to append one trace step
+`backend/graph/recon_graph.py` wires the nodes. A run's rows are analyzed concurrently (`ROW_CONCURRENCY`, default 4) and streamed as each finishes. Every node is wrapped to append one trace step
 (start time, duration, a readable summary and the model calls it made).
 
 | Node | Decides | LLM? | Owns these state keys |

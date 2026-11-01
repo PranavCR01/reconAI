@@ -105,6 +105,8 @@ ROWS_PER_DAY = 5000              # all clients combined — the real spend cap
 BYPASS_CACHE_PER_IP_PER_HOUR = 5
 BENCHMARKS_PER_IP_PER_HOUR = 3
 _HOUR, _DAY = 3600, 86400
+# Rows analyzed at once per stream. Each row is mostly waiting on model calls.
+ROW_CONCURRENCY = max(1, int(os.environ.get("ROW_CONCURRENCY", "4") or 4))
 
 _rate_events: dict[str, deque] = defaultdict(deque)  # key -> deque[(timestamp, amount)]
 
@@ -718,9 +720,26 @@ async def stream_run_analysis(
     graph = build_graph(config, storage)
 
     async def _generate():
-        for i, row in enumerate(rows):
-            try:
-                result = await _analyze_row(row, config, graph, storage, bypass_cache=bypass_cache, session_id=session_id)
+        # Rows are analyzed concurrently (ROW_CONCURRENCY at a time) and streamed as each finishes;
+        # the UI orders by severity, so arrival order doesn't matter.
+        semaphore = asyncio.Semaphore(ROW_CONCURRENCY)
+
+        async def _one(i, row):
+            async with semaphore:
+                try:
+                    return i, row, await _analyze_row(row, config, graph, storage, bypass_cache=bypass_cache,
+                                                      session_id=session_id), None
+                except Exception as exc:  # _analyze_row shouldn't raise; never let one row kill the stream
+                    return i, row, None, exc
+
+        tasks = [asyncio.create_task(_one(i, row)) for i, row in enumerate(rows)]
+        try:
+            for finished in asyncio.as_completed(tasks):
+                i, row, result, exc = await finished
+                if exc is not None:
+                    payload = {"row_index": i, "row_id": str(row.id), "error": str(exc)}
+                    yield f"event: error\ndata: {json.dumps(payload)}\n\n"
+                    continue
                 if result["error"]:
                     payload = {"row_index": i, "row_id": str(row.id), "error": result["error"]}
                     yield f"event: error\ndata: {json.dumps(payload)}\n\n"
@@ -744,9 +763,9 @@ async def stream_run_analysis(
                 }
                 yield f"id: {result['incident_id']}\n"
                 yield f"event: incident\ndata: {json.dumps(payload)}\n\n"
-            except Exception as exc:
-                payload = {"row_index": i, "row_id": str(row.id), "error": str(exc)}
-                yield f"event: error\ndata: {json.dumps(payload)}\n\n"
+        finally:
+            for task in tasks:  # client went away: stop waiting on the rest
+                task.cancel()
         await storage.update_run_status(
             run_id,
             status="complete",

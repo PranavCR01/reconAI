@@ -51,7 +51,7 @@ def test_rows_run_concurrently_up_to_the_limit(client, sample_csv_text, slow_pro
         assert elapsed < 10 * DELAY * 0.6, f"{elapsed:.2f}s is not faster than sequential"
 
 
-def test_one_failing_row_does_not_stop_the_others(client, sample_csv_text, monkeypatch):
+def test_one_failing_row_does_not_stop_the_others(client, sample_csv_text, monkeypatch, capsys):
     import backend.main as main
 
     real = main._analyze_row
@@ -63,7 +63,54 @@ def test_one_failing_row_does_not_stop_the_others(client, sample_csv_text, monke
 
     monkeypatch.setattr(main, "_analyze_row", flaky)
     events, _ = _run(client, sample_csv_text)
-    errors = [e for e in events if e.get("event") == "error"]
+    assert not [e for e in events if e.get("event") == "error"], "a row failure must not look like a stream failure"
+    row_errors = [e for e in events if e.get("event") == "row_error"]
     incidents = [e for e in events if e.get("event") == "incident"]
-    assert len(errors) == 1 and "boom" in errors[0]["data"]["error"]
+    assert len(row_errors) == 1 and "boom" in row_errors[0]["data"]["error"]
     assert len(incidents) == 9 and events[-1]["event"] == "done"
+    assert "row" in capsys.readouterr().out and "boom" in "".join(e["data"]["error"] for e in row_errors), \
+        "row failures are logged, not silent"
+
+
+def test_keepalive_while_rows_are_slow(client, sample_csv_text, slow_proposer, monkeypatch):
+    import backend.main as main
+
+    monkeypatch.setattr(main, "SSE_KEEPALIVE_S", 0.05)
+    run_id = upload_csv(client, sample_csv_text).json()["run_id"]
+    with client.stream("GET", f"/api/v1/recon/runs/{run_id}/stream") as response:
+        lines = list(response.iter_lines())
+    assert ": keep-alive" in lines, "silent gaps must carry keep-alive comments"
+    assert lines.count("event: incident") == 10 and "event: done" in lines
+
+
+def test_database_calls_never_overlap():
+    """The postgrest client shares one HTTP/2 connection, so the adapter serializes calls."""
+    import asyncio
+    from types import SimpleNamespace as NS
+
+    from backend.storage.supabase_adapter import SupabaseAdapter
+
+    state = {"active": 0, "peak": 0}
+    lock = threading.Lock()
+
+    def execute():
+        with lock:
+            state["active"] += 1
+            state["peak"] = max(state["peak"], state["active"])
+        time.sleep(0.02)
+        with lock:
+            state["active"] -= 1
+        return NS(data=[], count=0)
+
+    query = NS(execute=execute)
+    query.select = lambda *a, **k: query
+    query.limit = lambda *a, **k: query
+    client = NS(table=lambda name: query, rpc=lambda *a, **k: query)
+    adapter = SupabaseAdapter(client)
+
+    async def burst():
+        await asyncio.gather(*(adapter.count_artifacts() for _ in range(8)),
+                             *(asyncio.to_thread(adapter.search_artifacts_sync, [0.0]) for _ in range(4)))
+
+    asyncio.run(burst())
+    assert state["peak"] == 1

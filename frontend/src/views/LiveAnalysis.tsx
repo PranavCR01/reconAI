@@ -95,6 +95,12 @@ export default function LiveAnalysis() {
   const [isDone, setIsDone] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [sseError, setSseError] = useState(false)
+  const [failedRows, setFailedRows] = useState<{ row_index: number; error: string }[]>([])
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearReconnect = () => {
+    if (reconnectTimer.current) { clearTimeout(reconnectTimer.current); reconnectTimer.current = null }
+    setSseError(false)
+  }
   const [retryKey, setRetryKey] = useState(0)
   const [totalRows, setTotalRows] = useState(0)
   const [cacheHits, setCacheHits] = useState(0)
@@ -124,12 +130,14 @@ export default function LiveAnalysis() {
     const timer = setTimeout(() => {
       const cleanup = connectToRun(runId, {
         onIncident: (e) => {
+          clearReconnect()
           store.upsertIncident(sseToIncident(e))
           store.setSseConnected(true)
           store.setRunStatus('streaming')
           if (e.cached) setCacheHits(n => n + 1)
         },
         onDone: async (e) => {
+          clearReconnect()
           store.setRunStatus('complete')
           store.setSseConnected(false)
           setIsDone(true)
@@ -167,6 +175,17 @@ export default function LiveAnalysis() {
           store.setSseConnected(false)
           if (!isDone) setSseError(true)
         },
+        onReconnecting: () => {
+          // Brief drops are normal on long runs; only report one that doesn't recover.
+          if (reconnectTimer.current) return
+          reconnectTimer.current = setTimeout(() => {
+            reconnectTimer.current = null
+            if (!isDone) setSseError(true)
+          }, 30_000)
+        },
+        onRowError: (e) => {
+          setFailedRows(prev => prev.some(r => r.row_index === e.row_index) ? prev : [...prev, { row_index: e.row_index, error: e.error }])
+        },
       }, store.llmConfig, sessionId)
       sseCleanupRef.current = cleanup
     }, 5000)
@@ -187,7 +206,7 @@ export default function LiveAnalysis() {
   const resolvedCount = allIncidents.filter(i => i.status === 'complete').length
   const needsReviewCount = allIncidents.filter(i => i.requires_human_review === true).length
   const completedCount = allIncidents.filter(i => i.status !== 'running').length
-  const analyzingCount = Math.max(0, (expectedRows || totalRows) - completedCount)
+  const analyzingCount = Math.max(0, (expectedRows || totalRows) - completedCount - failedRows.length)
   const cacheHitPct = total > 0 ? Math.min(100, Math.round((cacheHits / total) * 100)) : null
 
   // Stats sourced from API response after done — reliable since SSE carries zero for these
@@ -294,6 +313,16 @@ export default function LiveAnalysis() {
           >
             Retry
           </button>
+        </div>
+      )}
+
+      {failedRows.length > 0 && (
+        <div data-testid="row-failures" style={{
+          background: 'var(--p2-bg)', borderBottom: '1px solid var(--warn)', padding: '8px 18px',
+          fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--warn)', overflowWrap: 'anywhere',
+        }}>
+          {failedRows.length} row{failedRows.length === 1 ? '' : 's'} could not be analyzed (the rest of the run continues):{' '}
+          {failedRows.map(r => `row ${r.row_index + 1}: ${r.error.slice(0, 160)}`).join(' · ')}
         </div>
       )}
 

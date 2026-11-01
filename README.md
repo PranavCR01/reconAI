@@ -18,7 +18,9 @@
 ![Recharts](https://img.shields.io/badge/Recharts-2.12-22B5BF?style=flat)
 ![Zustand](https://img.shields.io/badge/Zustand-4-443E38?style=flat)
 
-AI-powered Salesforce FSC integration reconciliation and root cause analysis, replacing 3 hours of manual Splunk correlation with automated hypothesis graph analysis in under 15 seconds per incident.
+AI-assisted root cause analysis for Salesforce FSC integration discrepancies. A deterministic hypothesis graph decides the diagnosis from cited evidence; an LLM writes the explanation, a critic checks every claim against that evidence, and anything unconfirmed or unverifiable goes to a person.
+
+> **Demo scope.** Salesforce, Splunk and DB2 are simulated, and the evaluation dataset is 50 synthetic, author-labeled incidents. See [Evaluation](#evaluation) for what the numbers do and don't show.
 
 ---
 
@@ -28,96 +30,57 @@ AI-powered Salesforce FSC integration reconciliation and root cause analysis, re
 |---|---|
 | App | https://recon-ai-iota.vercel.app |
 | Demo Video | https://youtu.be/cEzxQ1xfltU |
-| Research Notes | https://www.notion.so/ReconAI-Research-Architecture-Notes-358a47a2b4cf8000944fefad0ddf1349 |
-| Dev Journal | https://www.notion.so/ReconAI-Project-Arc-358a47a2b4cf8004a38bee6d50283911?source=copy_link |
+| Architecture | [docs/ADR.md](docs/ADR.md) |
 | GitHub | https://github.com/PranavCR01/reconAI |
 
 ---
 
 ## The Problem
 
-Salesforce FSC integration teams begin each day correlating data discrepancies between Salesforce and downstream systems like DB2 and Snowflake. The process depends on an Excel decision tree that encodes years of tribal knowledge: which Splunk query to run first, which FSC fields are commonly stripped by FLS, which CDC channels silently exclude custom objects. When a discrepancy repeats, the analyst must trace it from scratch. There is no postmortem, no audit trail, and no accumulated memory — only the same failures recurring week after week.
+Salesforce FSC integration teams begin each day correlating data discrepancies between Salesforce and downstream systems such as DB2. The process depends on an Excel decision tree that encodes years of tribal knowledge: which Splunk query to run first, which FSC fields are commonly stripped by FLS, which CDC channels silently exclude custom objects. When a discrepancy repeats, the analyst must trace it from scratch. There is no postmortem, no audit trail, and no accumulated memory — only the same failures recurring week after week.
 
 ---
 
 ## What ReconAI Does
 
-ReconAI encodes that decision tree as a deterministic hypothesis graph and runs it automatically for every discrepancy in the morning CSV, streaming results to the analyst in real time.
+**Upload.** The analyst uploads the reconciliation CSV (up to 200 rows): object and field, the downstream DB2 table and column, both values, the discrepancy type and a severity.
 
-**Step 1 — Upload.** The analyst uploads the daily reconciliation CSV. Each row identifies a Salesforce object and field, the downstream DB2 table and column, the observed discrepancy type (NULL_DOWNSTREAM, VALUE_MISMATCH, STALE_VALUE, MISSING_RECORD, or DUPLICATE_DOWNSTREAM), and a severity rating.
+**Diagnose.** For each row, a LangGraph state machine walks a hypothesis graph: it picks the next check for the discrepancy type, runs the check's tool, records the result as evidence with an ID, and marks the hypothesis confirmed, refuted or inconclusive. It stops at the first confirmation.
 
-**Step 2 — Analyze.** A LangGraph state machine routes each discrepancy through a hypothesis graph. Agents make real tool calls against Salesforce, Splunk, and DB2 simulators. The graph terminates as soon as a hypothesis is confirmed, avoiding unnecessary checks.
+**Explain and verify.** A model drafts the explanation as claims that cite the evidence and similar past incidents. A critic checks each claim (deterministic rules first, then a model), and a judge in code accepts it, asks for one revision, or sends the incident to review.
 
-**Step 3 — Fix.** Every incident receives a root cause with cited evidence, a suggested remediation, an auto-generated postmortem draft, and a Jira summary. Results stream to the browser as each incident completes, with P1 incidents surfaced first regardless of processing order.
+**Review.** Results stream to the browser as they finish, P1 first. Each incident shows the hypothesis timeline with its evidence, the critic's verdict per claim, similar past incidents, a full trace with per-call tokens, latency and cost, and why it needs review if it does. Analysts record the confirmed cause and fix; summaries copy to the clipboard for Jira.
 
 ---
 
 ## Architecture
 
-### System Overview
-
 ```
-Upload CSV
-    │
-    ▼
-Ingestion Agent  ──── classifies discrepancy type and severity (Claude Haiku)
-    │
-    ▼
-Hypothesis Agent ──── walks graph, decides next hypothesis (deterministic, no LLM)
-    │
-    ▼
-Evidence Agent   ──── executes tool calls, returns cited EvidenceResult (deterministic, no LLM)
-    │
-    ▼
-Synthesis Agent  ──── assembles RCA from complete state (Claude Sonnet)
-    │
-    ▼
-SSE Stream       ──── FastAPI StreamingResponse, one event per incident
-    │
-    ▼
-React Frontend   ──── Zustand store, live incident cards, P1 priority sort
+ingestion ─► hypothesis ⇄ evidence ─► retrieval ─► proposer ─► critic ─► judge ─► review gate
 ```
 
-The Ingestion and Hypothesis agents carry no tool calls. Only the Evidence agent executes tools. This boundary is enforced by design: Hypothesis decides what to check, Evidence executes the check. The two responsibilities are never merged.
+| Step | What it does | Model |
+|---|---|---|
+| Ingestion | Classify discrepancy type and severity | Haiku, only for ambiguous rows |
+| Hypothesis graph | Pick the next check; record each verdict | none (code) |
+| Evidence | Run the check's tool; store result, outcome and ID | none (code) |
+| Retrieval | Find and rerank similar past incidents (pgvector) | Haiku reranker |
+| Proposer | Write the explanation as cited claims | Sonnet |
+| Critic | Deterministic claim checks, then a model review | Sonnet |
+| Judge | Accept, revise once, or escalate | none (code) |
 
-### The Hypothesis Graph
+Details, the check order per discrepancy type and the reasoning behind each decision: [docs/ADR.md](docs/ADR.md).
 
-Each discrepancy enters the graph at H1 and exits at the first confirmed hypothesis. The graph structure encodes the diagnostic logic from the original Excel decision tree.
+### Data sources
 
-**H1: DB2 History Check.** Query the downstream DB2 field history over a 30-day window. Determines whether the discrepancy is new or recurring. Recurring patterns with no recent DB2 writes suggest a delivery gap rather than a data quality issue.
-
-**H2: Splunk Triage.** Query Splunk CDC pipeline logs for missed platform events. Confirms whether CDC events fired and were dropped in transit, or never fired from Salesforce at all. The graph terminates early if a delivery gap is confirmed at this node.
-
-**H3a: Field-Level Security Check.** Query Salesforce `FieldPermissions` for the integration profile on the specific object and field combination. FLS stripping is the most common root cause for NULL_DOWNSTREAM discrepancies and is checked before CDC configuration.
-
-**H3b: CDC Channel Configuration.** Check whether the field appears in the `ChangeEvent` tracked field list for the object. Long text fields, formula fields, and certain custom fields are excluded from CDC payloads by platform default.
-
-**H3c: Apex Trigger Logic.** Check for conditional publish suppression in Apex triggers. A common pattern in FSC implementations is a trigger that skips CDC event publishing when a field transitions from a populated value to null.
-
-**H4: DataWeave Transform Deep Dive.** Analyze the MuleSoft DataWeave transform layer for picklist label versus API name mismatches, timezone conversion errors, and null-suppression conditionals that silently discard values in transit.
-
-**H5: RAG Fallback.** If no deterministic hypothesis confirms, retrieve the five most similar past incidents from the pgvector store using cosine similarity on 1536-dimension embeddings. Claude Sonnet synthesizes a root cause from the retrieved context and attaches it with lower confidence.
-
-Early termination applies throughout: a NULL_DOWNSTREAM incident with a confirmed FLS hit at H3a never evaluates H3b, H3c, H4, or H5.
-
-### RAG Pipeline
-
-Embeddings are generated with OpenAI `text-embedding-3-small` at 1536 dimensions. The `recon_artifacts` table in Supabase holds 23 FSC seed artifacts covering the known failure pattern library, indexed with a pgvector HNSW index for approximate nearest-neighbor retrieval.
-
-Retrieval uses a hybrid approach: a Postgres pre-filter narrows candidates by `discrepancy_type`, an ANN search over the HNSW index ranks by cosine similarity, and Claude Haiku reranks the top results before synthesis. Artifacts ingested within the last six hours are treated as ground truth and weighted accordingly.
-
-When a human analyst confirms a resolution, that incident and its fix are embedded and written back to the artifact store, closing the memory loop.
-
-### Data Sources
-
-All integrations are implemented as simulators in the current version, with realistic probability distributions derived from known FSC failure patterns. No real Salesforce org, Splunk instance, or DB2 connection is required to run the application.
-
-| Source | What the agents query |
+| Source | Simulated checks |
 |---|---|
-| Salesforce | `FieldPermissions` for integration user, field value history, CDC `ChangeEvent` channel config, Apex trigger metadata |
-| Splunk | CDC pipeline logs, platform event publish logs, MuleSoft flow execution logs |
-| DB2 | Field value history over 30-day window, null pattern frequency analysis |
-| MuleSoft / GitHub | DataWeave transform files, field mapping configurations, deployment history |
+| Salesforce | Field-level security for the integration user, CDC field configuration, Apex publish suppression |
+| Splunk | Delivery of published change events, transform errors, retries |
+| DB2 | Field value history, duplicate rows |
+| Knowledge base | 25 resolved past incidents (`backend/seed/fsc_incidents.py`), embedded with `text-embedding-3-small` |
+
+Simulator results are driven by a declared fault per record (`data/scenarios.json`) plus seeded noise, so the same record always tells the same story.
 
 ---
 
@@ -125,59 +88,55 @@ All integrations are implemented as simulators in the current version, with real
 
 | Table | Purpose |
 |---|---|
-| `recon_runs` | One reconciliation execution, linked to uploaded CSV |
-| `recon_rows` | One discrepancy row from the CSV, with 1536-dim embedding |
-| `rca_incidents` | One RCA analysis result per discrepancy row |
-| `rca_evidence` | Cited artifacts per incident — enforces the no-unsupported-claim constraint |
-| `resolutions` | Human-confirmed fixes, written back to the RAG artifact store |
-| `recon_artifacts` | pgvector HNSW store for RAG retrieval, 1536-dim cosine index |
-| `rca_cache` | 24-hour TTL cache keyed on field and value combination, bypassed with `?bypass_cache=true` |
+| `recon_runs` | One reconciliation run |
+| `recon_rows` | One discrepancy row from the CSV |
+| `rca_incidents` | The analysis: verdicts, claims with critic verdicts, judge decision, review reasons, model calls, trace, cost |
+| `rca_evidence` | Every tool result, linked to the hypothesis it tested, with outcome and raw result |
+| `resolutions` | The analyst's confirmed cause and fix |
+| `recon_artifacts` | Knowledge base of past incidents (pgvector, HNSW) |
+| `rca_cache` | 30-day cache per session; degraded results are never cached |
 
-Supporting tables: `deployment_events` (analytics correlation), `page_views`, `demo_requests`.
+Schema changes are in `docs/sql/` (apply 001–006 before deploying this version).
 
 ---
 
-## Benchmark Results
+## Evaluation
 
-### Test Setup
+```bash
+python -m backend.evals.run --mode offline --config claude            # free, deterministic, runs in CI
+python -m backend.evals.run --mode live --config claude --runs 3 --yes  # real models, prints a cost estimate first
+```
 
-Fifty synthetic Salesforce FSC incidents were generated across ten objects: Contact, Account, Task, Event, AccountAccountRelation, AccountContactRelation, ContactContactRelation, FinancialAccount\_\_c, KYC\_Record\_\_c, and Address\_\_c. The incidents span five discrepancy types and were manually labeled with ground truth root causes. All three configurations were evaluated with cache bypassed to ensure independent analysis. Run date: May 7, 2026.
+Results are committed in `evals/results/` with a report; the `/benchmark` page reads them. All rates carry 95% Wilson intervals.
 
-### Results
+| Measure (offline, 50 incidents) | Result |
+|---|---|
+| Graph root-cause accuracy | <!--m:offline_claude/metrics.accuracy.overall:pct-->100% (<!--m:offline_claude/metrics.accuracy.overall:frac-->50/50, CI <!--m:offline_claude/metrics.accuracy.overall:ci-->93-100%) |
+| Same, with delivery checked first and seeded noise (ablation) | <!--m:offline_claude/ablations.delivery_first_all_confounders.accuracy:pct-->60% (<!--m:offline_claude/ablations.delivery_first_all_confounders.accuracy:frac-->30/50) |
+| Unsafe auto-clear (wrong and not sent to review) | <!--m:offline_claude/metrics.routing.unsafe_auto_clear:frac-->0/50 |
+| Planted fabricated evidence caught by the critic | <!--m:offline_claude/critic_planted.by_draft.fabricated_evidence.caught:frac-->50/50 |
+| Planted wrong root-cause category caught | <!--m:offline_claude/critic_planted.by_draft.wrong_category.caught:frac-->50/50 |
+| Clean explanations wrongly rejected | <!--m:offline_claude/critic_planted.by_draft.clean.false_rejection:frac-->0/50 |
+| Agreement with the labels' "needs review" flag (recall) | <!--m:offline_claude/metrics.routing.review_vs_label.recall:frac-->0/22 |
 
-| Config | Accuracy | Human Review Rate | Avg Confidence | Avg Latency | Cost per Incident |
-|---|---|---|---|---|---|
-| Claude Sonnet | 70% | 56% | 80% | 12.5s | $0.006 |
-| Groq Llama 3.3 70B | 62% | 50% | 85% | 1.4s | $0.001 |
-| Hybrid (recommended) | 67% | 65% | 81% | ~9s | $0.004 |
+How to read this:
 
-### Failure Patterns
-
-All three configurations share the same failure modes, confirming these are graph-level issues rather than model-specific weaknesses.
-
-| Pattern | Description | Incidents Affected |
-|---|---|---|
-| H2/H3a Confusion | Splunk check terminates before FLS check on complex NULL_DOWNSTREAM incidents where both CDC events are missing and FLS is restricted | 5 |
-| STALE_VALUE RAG Fallback | The STALE_VALUE hypothesis branch exhausts without confirming DELIVERY_GAP, causing fallback to H5 instead of confirming consumer lag at H2 | 3 |
-| CDC Exclusion Fallback | H3b fails to confirm CDC field exclusion, falling through to H5 RAG fallback instead of returning a deterministic result | 3 |
-
-### Key Finding
-
-The Hybrid configuration achieves the best human review calibration at 65%, combining Groq classification speed with Claude Sonnet synthesis quality to produce the optimal cost-accuracy tradeoff for production deployment.
+- The simulated world contains each labeled fault by construction, so graph accuracy shows the logic finds the declared fault through noise. It is **not** a real-world accuracy estimate.
+- The ablation is the informative result: check order matters once noise is present.
+- The review labels assume ambiguity the simulated world doesn't reproduce, so agreement with them is low; this is reported, not tuned away.
+- Explanation quality, the model critic, consistency across runs, cost and latency come from a live run. No live results are committed yet.
 
 ---
 
 ## Design Constraints
 
-These invariants are enforced throughout the codebase and are not negotiable.
-
-1. Every `RCAIncident` must have at least one `rca_evidence` row per hypothesis tested. The orchestrator validates evidence completeness before Synthesis runs. Missing evidence triggers a retry (maximum two attempts), not a surface.
-2. The `propose_replay` tool is always gated behind explicit human approval. It is never auto-executed.
-3. Confidence below 0.75 sets `requires_human_review = true`. These incidents are surfaced separately in the UI.
-4. Every LLM call is logged with model name, version, token count, and latency.
-5. P1 incidents display first in the UI regardless of SSE arrival order.
-6. Pydantic v2 validation is applied at every agent boundary. A schema violation triggers a retry with error context injected into the next prompt.
-7. Simulator tools vary their responses based on input parameters. No static or hardcoded returns.
+1. Every tested hypothesis has at least one evidence record; otherwise the incident is flagged `missing_evidence` and sent to review.
+2. The system never changes data in any connected system. People record resolutions.
+3. Confidence below 0.75, an unconfirmed diagnosis, weak evidence, or any rejected or unverifiable claim sets `requires_human_review`, with the reasons shown.
+4. Every model call is logged with model, attempt, tokens, latency and errors, and costed.
+5. P1 incidents display first regardless of processing order.
+6. Pydantic validation at every agent boundary; invalid model output is retried once with the error.
+7. Simulator responses depend on their inputs; nothing is hardcoded.
 
 ---
 
@@ -203,8 +162,8 @@ OPENAI_API_KEY=
 SUPABASE_URL=
 SUPABASE_SERVICE_KEY=
 SENTRY_DSN=                  # optional, no-op if unset
-RESEND_API_KEY=              # optional, enables demo request email notifications
-NOTIFY_EMAIL=                # optional, recipient for demo request notifications
+TRUSTED_IP_HEADER=           # optional, header your host sets with the real client IP
+TRUSTED_PROXY_HOPS=          # optional, proxies appending to X-Forwarded-For (default 1)
 ```
 
 **Run the backend**
@@ -223,7 +182,7 @@ npm install
 npm run dev
 ```
 
-The frontend runs on `http://localhost:5173` by default. Set `VITE_API_URL=http://localhost:8000/api/v1` in `frontend/.env.local` to point at the local backend.
+The frontend runs on `http://localhost:5173` by default. The dev server proxies `/api` to `localhost:8000`; for other setups set `VITE_API_URL` (for example in a `.env.local` file in `frontend/`).
 
 **Seed analytics data (run once)**
 
@@ -231,7 +190,17 @@ The frontend runs on `http://localhost:5173` by default. Set `VITE_API_URL=http:
 python -m backend.seed.analytics_seed
 ```
 
-This inserts 25 synthetic reconciliation runs, approximately 375 incidents, 225 resolutions, and 8 deployment events spanning April 6 to May 4, 2026. The script is idempotent and skips if more than 10 runs already exist.
+This inserts synthetic runs, incidents, resolutions and deployment events covering the 29 days that end three days before the seed runs, so they fall inside the Analytics window. The script is idempotent and skips if more than 10 runs already exist.
+
+**Run the tests**
+
+```bash
+pip install -r requirements-dev.txt && pytest          # backend, offline, no network
+cd frontend && npm test && npm run lint && npm run build
+python scripts/check_docs.py                          # doc numbers match evals/results, no stale claims
+```
+
+Browser journey against an in-memory backend: `python -m backend.tests.e2e_server`, `npm run dev`, then `node e2e/journey.mjs` (from `frontend/`).
 
 **Run the health check**
 
@@ -248,69 +217,28 @@ Executes 40 end-to-end checks across all API endpoints and reports pass/fail wit
 ```
 reconAI/
 ├── backend/
-│   ├── agents/
-│   │   ├── ingestion.py          # discrepancy classification, Claude Haiku, no tool calls
-│   │   ├── hypothesis.py         # graph traversal and routing, deterministic (no LLM)
-│   │   ├── evidence.py           # all tool call execution, deterministic (no LLM)
-│   │   └── synthesis.py          # RCA assembly from complete state, Claude Sonnet
-│   ├── tools/
-│   │   ├── salesforce_sim.py     # FieldPermissions, CDC config, Apex trigger metadata
-│   │   ├── splunk_sim.py         # CDC pipeline logs, platform event logs
-│   │   ├── db2_sim.py            # field history, null pattern analysis
-│   │   └── rag_tools.py          # pgvector retrieval and reranking
-│   ├── graph/
-│   │   └── recon_graph.py        # LangGraph state machine definition
-│   ├── models/
-│   │   ├── state.py              # LangGraph state schema
-│   │   ├── entities.py           # Pydantic domain models
-│   │   └── outputs.py            # agent output schemas
-│   ├── storage/
-│   │   ├── adapter.py            # storage interface
-│   │   └── supabase_adapter.py   # Supabase and pgvector implementation
-│   ├── cache/
-│   │   └── rca_cache.py          # 24-hour TTL keyed cache
-│   ├── seed/
-│   │   ├── fsc_incidents.py      # 23 FSC RAG seed artifacts
-│   │   └── analytics_seed.py     # synthetic historical data for analytics
-│   ├── config.py                 # AgentConfig, LLM routing per agent
-│   └── main.py                   # FastAPI app, all endpoints, SSE streaming
+│   ├── agents/        ingestion.py, hypothesis.py (graph walker), evidence.py,
+│   │                  explanation.py (proposer / critic / judge), llm.py
+│   ├── graph/         hypotheses.py (catalogue + rules), recon_graph.py (LangGraph wiring, tracing)
+│   ├── tools/         world.py (scenario registry), salesforce_sim.py, splunk_sim.py, db2_sim.py, rag_tools.py
+│   ├── prompts/       proposer.md, critic.md, VERSIONS.json
+│   ├── models/        state.py (ownership rules), entities.py, outputs.py
+│   ├── evals/         run.py, metrics.py, planted.py, harness.py, report.py, schema.py, publish.py
+│   ├── storage/       supabase_adapter.py
+│   ├── cache/         rca_cache.py
+│   ├── seed/          fsc_incidents.py (knowledge base), analytics_seed.py
+│   ├── tests/         pytest suite with in-memory Supabase, scripted LLM and embeddings
+│   ├── config.py      model routing per step, pricing
+│   └── main.py        FastAPI app, SSE streaming, cost guards
 ├── frontend/src/
-│   ├── views/
-│   │   ├── Landing.tsx           # public landing page
-│   │   ├── Upload.tsx            # CSV upload with access gate
-│   │   ├── LiveAnalysis.tsx      # SSE streaming, real-time incident cards
-│   │   ├── IncidentDetail.tsx    # full RCA view with resolution workflow
-│   │   ├── RunSummary.tsx        # post-run summary and export
-│   │   ├── Analytics.tsx         # historical analytics dashboard
-│   │   └── Benchmark.tsx         # LLM benchmark results
-│   ├── components/
-│   │   ├── analytics/            # StatCard, IncidentsOverTime, RootCauseDonut,
-│   │   │                         #   ByObjectChart, AIAccuracyChart, DeploymentTable
-│   │   ├── layout/               # Shell, TopBar
-│   │   └── ui/                   # Badge, BrandMark, Button, Card, ConfidenceBar,
-│   │                             #   EvidenceChip, HypothesisPills, StatusPill, and others
-│   ├── store/
-│   │   └── reconStore.ts         # Zustand store for run and incident state
-│   ├── lib/
-│   │   ├── api.ts                # typed fetch wrappers for all endpoints
-│   │   ├── sse.ts                # SSE client with Last-Event-ID reconnect
-│   │   └── format.ts             # display formatting utilities
-│   ├── types/
-│   │   └── index.ts              # TypeScript interfaces for all API responses
-│   └── data/
-│       └── benchmark_data.json   # benchmark results data for Benchmark view
-├── data/
-│   ├── sample_fsc_recon.csv      # representative FSC discrepancy sample
-│   ├── benchmark_incidents.csv   # 50 benchmark test incidents
-│   └── benchmark_ground_truth.json
-├── docs/
-│   ├── design/                   # HTML design references for each view
-│   ├── slices/                   # implementation slice briefs
-│   └── slides/                   # LinkedIn slide deck
-├── scripts/
-│   └── health_check.py           # 40-point E2E health check
-├── vercel.json                   # SPA rewrite rule for Vercel deployment
-└── requirements.txt
+│   ├── views/         Landing, Upload, LiveAnalysis, IncidentDetail, RunSummary, Analytics, Benchmark
+│   ├── components/    incident/ (timeline, critic, trace panels), analytics/, layout/, ui/
+│   ├── lib/           api.ts, sse.ts, incident.ts, format.ts
+│   └── data/          eval_results.json (published from evals/results)
+├── data/              sample CSV, benchmark ground truth, scenarios.json
+├── evals/results/     committed eval results and reports
+├── docs/              ADR.md, presentation-claims.md, sql/ migrations, history/ and slices/ (historical)
+└── scripts/           check_docs.py, build_scenarios.py, health_check.py
 ```
 
 ---

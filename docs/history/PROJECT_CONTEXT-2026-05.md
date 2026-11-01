@@ -1,3 +1,5 @@
+> **Historical snapshot (May 2026). Superseded.** Describes the pre-redesign system: the access gate, synthesis agent, hand-written benchmark numbers and `propose_replay` no longer exist. Current design: [docs/ADR.md](../ADR.md); current numbers: [evals/results/](../../evals/results/).
+
 # ReconAI — Full Project Context
 
 Use this document to onboard a new Claude session to the complete state of this project.

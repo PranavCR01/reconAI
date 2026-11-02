@@ -10,6 +10,7 @@ const IncidentDetail = lazy(() => import('./views/IncidentDetail'))
 const RunSummary = lazy(() => import('./views/RunSummary'))
 const Analytics = lazy(() => import('./views/Analytics'))
 const Benchmark = lazy(() => import('./views/Benchmark'))
+const Hypotheses = lazy(() => import('./views/Hypotheses'))
 
 const _API = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api/v1'
 
@@ -111,6 +112,7 @@ function AppNav() {
   const items = [
     { label: 'Runs', href: '/upload', matchPrefix: ['/upload', '/runs', '/incidents'] },
     { label: 'Analytics', href: '/analytics', matchPrefix: ['/analytics'] },
+    { label: 'Hypotheses', href: '/hypotheses', matchPrefix: ['/hypotheses'] },
   ]
   return (
     <nav style={{ display: 'flex', gap: 2, marginLeft: 18 }}>
@@ -244,6 +246,7 @@ export default function App() {
             <Route path="/runs/:runId/incidents/:incidentId" element={<IncidentDetail />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/benchmark" element={<Benchmark />} />
+            <Route path="/hypotheses" element={<Hypotheses />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

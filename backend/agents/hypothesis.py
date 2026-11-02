@@ -8,7 +8,7 @@ hypothesis. Verdicts are explicit per hypothesis: confirmed / refuted / inconclu
 from __future__ import annotations
 
 from backend.config import AgentConfig
-from backend.graph.hypotheses import CATALOGUE, GRAPH_VERSION, Hypothesis, evaluate
+from backend.graph.hypotheses import CATALOGUE, GRAPH_VERSION, REVIEW_THRESHOLD, Hypothesis, evaluate
 from backend.models.state import ReconState
 
 
@@ -81,7 +81,7 @@ class HypothesisAgent:
                     "graph_root_cause": root_cause,
                     "graph_confidence": confidence,
                     "tool_calls": [],
-                    **({"review_reasons": ["graph_low_confidence"]} if confidence < 0.75 else {}),
+                    **({"review_reasons": ["graph_low_confidence"]} if confidence < REVIEW_THRESHOLD else {}),
                 }
 
         prefix = plan[0].id.rstrip("0123456789abc") or "H"

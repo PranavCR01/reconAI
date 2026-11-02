@@ -114,12 +114,15 @@ await page.getByRole('heading', { name: 'Eval results' }).waitFor({ timeout: 100
 check(await page.getByRole('heading', { name: 'Eval results' }).count() === 1, 'benchmark page renders from eval results')
 check(await page.getByTestId('app-bar').count() === 0, 'benchmark is standalone (no app header)')
 check(await page.getByText('Delivery-first + noise').count() === 1, 'benchmark leads with the ablation')
+await page.goto(`${BASE}/hypotheses`)
+await page.getByText('What gets checked, and in what order').waitFor({ timeout: 10000 })
+check(await page.locator('[data-testid="catalogue-row"]').count() === 15, 'hypotheses page lists all 15 checks')
 
 // Mobile: no horizontal scroll on the six routes
 const mobile = await browser.newContext({ viewport: { width: 390, height: 844 } })
 await mobile.addInitScript(() => localStorage.setItem('recon_access', 'granted'))
 const m = await mobile.newPage()
-for (const path of ['/', '/upload', `/runs/${runId}`, `/runs/${runId}/summary`, '/analytics', '/benchmark',
+for (const path of ['/', '/upload', '/hypotheses', `/runs/${runId}`, `/runs/${runId}/summary`, '/analytics', '/benchmark',
   `/runs/${runId}/incidents/${phone.id}`]) {
   await m.goto(`${BASE}${path}`)
   await m.waitForTimeout(1200)

@@ -212,3 +212,67 @@ def evaluate(hypothesis: Hypothesis, raw_result: dict | None, row: dict) -> Verd
     if not raw_result or raw_result.get("status") in ("not_implemented", "skipped"):
         return ("inconclusive", "the check could not run", None, None)
     return hypothesis.rule(raw_result, row)
+
+
+# ---------------------------------------------------------------------------
+# Plain-language description of the catalogue, published to the frontend
+# (python -m backend.graph.publish). A test keeps the published file current.
+# ---------------------------------------------------------------------------
+REVIEW_THRESHOLD = 0.75  # a confirmed cause below this goes to a person ("graph_low_confidence")
+
+TOOL_DESCRIPTION = {
+    "query_db2_field_history": "DB2 field history (30 days)",
+    "get_field_permissions": "Salesforce field permissions",
+    "get_cdc_field_config": "Salesforce CDC configuration",
+    "get_apex_trigger_config": "Apex trigger configuration",
+    "splunk_stub": "Splunk integration logs",
+}
+
+CONFIRMED_WHEN = {
+    "db2_history": "DB2 had a value in the last 30 days (it arrived, then was cleared)",
+    "fls": "the integration user has no read access to the field",
+    "cdc": "the field is not in the CDC tracked-field list",
+    "apex": "the trigger actually skipped this record (logic that exists but didn't fire = refuted)",
+    "delivery": "events were published but never delivered (one missed event = weak evidence, 0.70)",
+    "dataweave": "at least one DataWeave transform error was logged",
+    "retries": "the middleware retried delivery 2 or more times",
+    "duplicate_rows": "DB2 holds more than one row for the same Salesforce ID",
+}
+
+DISCREPANCY_DESCRIPTION = {
+    "NULL_DOWNSTREAM": "Salesforce has a value, DB2 is empty",
+    "VALUE_MISMATCH": "both sides have a value, but they differ",
+    "STALE_VALUE": "DB2 has an outdated value",
+    "MISSING_RECORD": "the whole record is missing from DB2",
+    "DUPLICATE_DOWNSTREAM": "DB2 has the same record more than once",
+}
+
+
+def catalogue_summary() -> dict:
+    """The catalogue as data: order, check, rule and confidence for every hypothesis."""
+    return {
+        "graph_version": GRAPH_VERSION,
+        "review_threshold": REVIEW_THRESHOLD,
+        "discrepancy_types": [
+            {
+                "type": dtype,
+                "description": DISCREPANCY_DESCRIPTION[dtype],
+                "hypotheses": [
+                    {
+                        "order": i,
+                        "id": h.id,
+                        "label": h.label,
+                        "category": h.category,
+                        "tool": h.tool,
+                        "checks": TOOL_DESCRIPTION[h.tool],
+                        "confirmed_when": CONFIRMED_WHEN[h.kind],
+                        "confidence": h.confidence,
+                        "weak_evidence_confidence": 0.70 if h.kind == "delivery" else None,
+                        "goes_to_review": h.confidence < REVIEW_THRESHOLD,
+                    }
+                    for i, h in enumerate(plan, start=1)
+                ],
+            }
+            for dtype, plan in CATALOGUE.items()
+        ],
+    }

@@ -1,0 +1,216 @@
+{
+  "graph_version": "2.0.0",
+  "review_threshold": 0.75,
+  "discrepancy_types": [
+    {
+      "type": "NULL_DOWNSTREAM",
+      "description": "Salesforce has a value, DB2 is empty",
+      "hypotheses": [
+        {
+          "order": 1,
+          "id": "H1",
+          "label": "Value reached DB2, then was cleared downstream",
+          "category": "DOWNSTREAM_OVERWRITE",
+          "tool": "query_db2_field_history",
+          "checks": "DB2 field history (30 days)",
+          "confirmed_when": "DB2 had a value in the last 30 days (it arrived, then was cleared)",
+          "confidence": 0.82,
+          "weak_evidence_confidence": null,
+          "goes_to_review": false
+        },
+        {
+          "order": 2,
+          "id": "H3a",
+          "label": "Integration user can't read the field (FLS)",
+          "category": "FLS_STRIPPED",
+          "tool": "get_field_permissions",
+          "checks": "Salesforce field permissions",
+          "confirmed_when": "the integration user has no read access to the field",
+          "confidence": 0.9,
+          "weak_evidence_confidence": null,
+          "goes_to_review": false
+        },
+        {
+          "order": 3,
+          "id": "H3b",
+          "label": "Field excluded from Change Data Capture",
+          "category": "CDC_FIELD_EXCLUDED",
+          "tool": "get_cdc_field_config",
+          "checks": "Salesforce CDC configuration",
+          "confirmed_when": "the field is not in the CDC tracked-field list",
+          "confidence": 0.88,
+          "weak_evidence_confidence": null,
+          "goes_to_review": false
+        },
+        {
+          "order": 4,
+          "id": "H3c",
+          "label": "Apex trigger suppressed the publish",
+          "category": "APEX_SUPPRESSION",
+          "tool": "get_apex_trigger_config",
+          "checks": "Apex trigger configuration",
+          "confirmed_when": "the trigger actually skipped this record (logic that exists but didn't fire = refuted)",
+          "confidence": 0.72,
+          "weak_evidence_confidence": null,
+          "goes_to_review": true
+        },
+        {
+          "order": 5,
+          "id": "H2",
+          "label": "Published events were not delivered",
+          "category": "DELIVERY_GAP",
+          "tool": "splunk_stub",
+          "checks": "Splunk integration logs",
+          "confirmed_when": "events were published but never delivered (one missed event = weak evidence, 0.70)",
+          "confidence": 0.84,
+          "weak_evidence_confidence": 0.7,
+          "goes_to_review": false
+        }
+      ]
+    },
+    {
+      "type": "VALUE_MISMATCH",
+      "description": "both sides have a value, but they differ",
+      "hypotheses": [
+        {
+          "order": 1,
+          "id": "HVM1",
+          "label": "Integration user can't read the field (FLS)",
+          "category": "FLS_STRIPPED",
+          "tool": "get_field_permissions",
+          "checks": "Salesforce field permissions",
+          "confirmed_when": "the integration user has no read access to the field",
+          "confidence": 0.85,
+          "weak_evidence_confidence": null,
+          "goes_to_review": false
+        },
+        {
+          "order": 2,
+          "id": "HVM2",
+          "label": "DataWeave transform wrote a wrong value",
+          "category": "DATAWAVE_TRANSFORM_ERROR",
+          "tool": "splunk_stub",
+          "checks": "Splunk integration logs",
+          "confirmed_when": "at least one DataWeave transform error was logged",
+          "confidence": 0.86,
+          "weak_evidence_confidence": null,
+          "goes_to_review": false
+        },
+        {
+          "order": 3,
+          "id": "HVM3",
+          "label": "Field excluded from Change Data Capture",
+          "category": "CDC_FIELD_EXCLUDED",
+          "tool": "get_cdc_field_config",
+          "checks": "Salesforce CDC configuration",
+          "confirmed_when": "the field is not in the CDC tracked-field list",
+          "confidence": 0.85,
+          "weak_evidence_confidence": null,
+          "goes_to_review": false
+        },
+        {
+          "order": 4,
+          "id": "HVM4",
+          "label": "Apex trigger suppressed the publish",
+          "category": "APEX_SUPPRESSION",
+          "tool": "get_apex_trigger_config",
+          "checks": "Apex trigger configuration",
+          "confirmed_when": "the trigger actually skipped this record (logic that exists but didn't fire = refuted)",
+          "confidence": 0.72,
+          "weak_evidence_confidence": null,
+          "goes_to_review": true
+        }
+      ]
+    },
+    {
+      "type": "STALE_VALUE",
+      "description": "DB2 has an outdated value",
+      "hypotheses": [
+        {
+          "order": 1,
+          "id": "HSV1",
+          "label": "Field excluded from Change Data Capture",
+          "category": "CDC_FIELD_EXCLUDED",
+          "tool": "get_cdc_field_config",
+          "checks": "Salesforce CDC configuration",
+          "confirmed_when": "the field is not in the CDC tracked-field list",
+          "confidence": 0.87,
+          "weak_evidence_confidence": null,
+          "goes_to_review": false
+        },
+        {
+          "order": 2,
+          "id": "HSV2",
+          "label": "Published updates were not delivered",
+          "category": "DELIVERY_GAP",
+          "tool": "splunk_stub",
+          "checks": "Splunk integration logs",
+          "confirmed_when": "events were published but never delivered (one missed event = weak evidence, 0.70)",
+          "confidence": 0.84,
+          "weak_evidence_confidence": 0.7,
+          "goes_to_review": false
+        }
+      ]
+    },
+    {
+      "type": "MISSING_RECORD",
+      "description": "the whole record is missing from DB2",
+      "hypotheses": [
+        {
+          "order": 1,
+          "id": "HMR1",
+          "label": "Apex trigger suppressed the record's publish",
+          "category": "APEX_SUPPRESSION",
+          "tool": "get_apex_trigger_config",
+          "checks": "Apex trigger configuration",
+          "confirmed_when": "the trigger actually skipped this record (logic that exists but didn't fire = refuted)",
+          "confidence": 0.72,
+          "weak_evidence_confidence": null,
+          "goes_to_review": true
+        },
+        {
+          "order": 2,
+          "id": "HMR2",
+          "label": "Record's events were not delivered",
+          "category": "DELIVERY_GAP",
+          "tool": "splunk_stub",
+          "checks": "Splunk integration logs",
+          "confirmed_when": "events were published but never delivered (one missed event = weak evidence, 0.70)",
+          "confidence": 0.84,
+          "weak_evidence_confidence": 0.7,
+          "goes_to_review": false
+        }
+      ]
+    },
+    {
+      "type": "DUPLICATE_DOWNSTREAM",
+      "description": "DB2 has the same record more than once",
+      "hypotheses": [
+        {
+          "order": 1,
+          "id": "HDD1",
+          "label": "Retries re-inserted the record",
+          "category": "DUPLICATE_DOWNSTREAM",
+          "tool": "splunk_stub",
+          "checks": "Splunk integration logs",
+          "confirmed_when": "the middleware retried delivery 2 or more times",
+          "confidence": 0.85,
+          "weak_evidence_confidence": null,
+          "goes_to_review": false
+        },
+        {
+          "order": 2,
+          "id": "HDD2",
+          "label": "Non-idempotent upsert wrote duplicate rows",
+          "category": "DUPLICATE_DOWNSTREAM",
+          "tool": "query_db2_field_history",
+          "checks": "DB2 field history (30 days)",
+          "confirmed_when": "DB2 holds more than one row for the same Salesforce ID",
+          "confidence": 0.8,
+          "weak_evidence_confidence": null,
+          "goes_to_review": false
+        }
+      ]
+    }
+  ]
+}
